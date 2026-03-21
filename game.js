@@ -57,6 +57,30 @@ function setupCanvas() {
   canvas.style.height = canvas.height + 'px';
 }
 
+// === CHARACTER NAME GENERATION ===
+const FIRST_NAMES = [
+  'Ronan', 'Elara', 'Thane', 'Mirka', 'Dusk', 'Vorn', 'Syla', 'Grix',
+  'Fenn', 'Aldra', 'Zeph', 'Kira', 'Torvik', 'Luma', 'Drex', 'Nyssa',
+  'Bram', 'Cael', 'Wren', 'Jorvik', 'Izara', 'Ogg', 'Pell', 'Skiv',
+  'Truda', 'Ulvo', 'Vex', 'Wynt', 'Xara', 'Yorg'
+];
+
+const EPITHETS = [
+  'the Slow', 'the Bold', 'the Unlucky', 'the Hungry', 'the Pale',
+  'the Doomed', 'the Stubborn', 'the Grumpy', 'the Confused', 'the Soggy',
+  'the Reckless', 'the Sleepy', 'the Forgetful', 'the Peculiar', 'the Cursed',
+  'the Mighty', 'the Tiny', 'the Loud', 'the Smelly', 'the Nervous',
+  'the Optimistic', 'the Backwards', 'the Slightly Famous', 'the Mostly Dead',
+  'the Perpetually Lost', 'the Sneezy', 'the Overconfident', 'the Bewildered',
+  'the Rust-Stained', 'the Adequately Brave'
+];
+
+function generateCharacterName() {
+  const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+  const epithet = EPITHETS[Math.floor(Math.random() * EPITHETS.length)];
+  return `${first} ${epithet}`;
+}
+
 // === TITLE SCREEN ===
 function showTitle() {
   $('title-screen').classList.add('active');
@@ -90,7 +114,9 @@ function newRun() {
     enemiesKilled: 0,
     itemsFound: 0,
     score: 0,
-    ghost: loadGhost()
+    ghost: loadGhost(),
+    playerName: generateCharacterName(),
+    toughestKill: null  // { name, xp }
   };
   generateFloor();
   updateUI();
@@ -192,7 +218,7 @@ const ENEMY_TIERS = {
     { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
     { name: 'Skeleton', glyph: '💀', hp: 6, attack: 2, defense: 1, ai: 'patrol', xp: 5, special: null, detect: 6 },
     { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
-    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5 }
+    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true }
   ],
   2: [
     { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
@@ -474,6 +500,7 @@ function createEnemy(template, x, y) {
     xp: template.xp,
     special: template.special,
     detect: template.detect,
+    slowMove: template.slowMove || false,
     alertness: 0, // 0=unaware, 1=suspicious, 2=hostile
     turnSkip: false, // for slow enemies
     summonCooldown: 0,
@@ -953,6 +980,11 @@ function killEnemy(enemy) {
   state.score += enemy.xp * 10;
   Audio.kill();
 
+  // Track toughest kill
+  if (!state.toughestKill || enemy.xp > state.toughestKill.xp) {
+    state.toughestKill = { name: enemy.name, glyph: enemy.glyph, xp: enemy.xp };
+  }
+
   // Slime split
   if (enemy.special === 'split') {
     const template = { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5 };
@@ -985,12 +1017,13 @@ function playerDeath(killerName) {
   Audio.death();
   haptic(100);
 
-  $('death-cause').textContent = `Slain by a ${killerName} on Floor ${state.floor}`;
+  const tk = state.toughestKill;
+  $('death-cause').textContent = `${state.playerName} was slain by a ${killerName} on Floor ${state.floor}`;
   $('death-stats').innerHTML = `
     Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
-    Enemies slain: <span>${state.enemiesKilled}</span><br>
-    Items found: <span>${state.itemsFound}</span><br>
-    Floors explored: <span>${state.floor}</span>
+    Slain by: <span>${killerName}</span><br>
+    Toughest kill: <span>${tk ? `${tk.glyph} ${tk.name}` : 'none'}</span><br>
+    Enemies slain: <span>${state.enemiesKilled}</span> | Items found: <span>${state.itemsFound}</span>
   `;
   $('last-words-input').value = '';
 
@@ -1005,10 +1038,12 @@ function showVictory() {
   Audio.victory();
   haptic(100);
 
+  const tk = state.toughestKill;
+  $('victory-overlay').querySelector('h2').textContent = `${state.playerName} is victorious!`;
   $('victory-stats').innerHTML = `
     Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
-    Enemies slain: <span>${state.enemiesKilled}</span><br>
-    Items found: <span>${state.itemsFound}</span><br>
+    Toughest kill: <span>${tk ? `${tk.glyph} ${tk.name}` : 'none'}</span><br>
+    Enemies slain: <span>${state.enemiesKilled}</span> | Items found: <span>${state.itemsFound}</span><br>
     HP remaining: <span>${state.player.hp}/${state.player.maxHp}</span>
   `;
 
@@ -1033,7 +1068,7 @@ function showLevelUp() {
     { name: '+3 Max HP', desc: 'Increase max HP by 3 and heal 3', apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); }},
     { name: '+1 Attack', desc: 'Increase base attack by 1', apply: () => { state.player.attack += 1; }},
     { name: '+1 Defense', desc: 'Increase base defense by 1', apply: () => { state.player.defense += 1; }},
-    { name: 'Regeneration', desc: 'Heal 1 HP every 20 turns', apply: () => { state.player.hasRegen = true; }, rare: true, unique: true },
+    { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns (double speed)', apply: () => { state.player.hasRegen = true; }, rare: true, unique: true },
     { name: '+5 Max HP', desc: 'Increase max HP by 5 and full heal', apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true }
   ];
 
@@ -1152,7 +1187,7 @@ function processEnemies() {
     if (hasStatusEffect(enemy, 'frozen')) continue;
 
     // Slow enemies skip every other turn
-    if (enemy.special === 'slow') {
+    if (enemy.special === 'slow' || enemy.slowMove) {
       enemy.turnSkip = !enemy.turnSkip;
       if (enemy.turnSkip) continue;
     }
@@ -1945,15 +1980,12 @@ function endTurn() {
     if (state.player.hp <= 0) { playerDeath('starvation'); return; }
   }
 
-  // Regeneration perk
-  if (state.player.hasRegen) {
-    state.player.regenCounter++;
-    if (state.player.regenCounter >= 20) {
-      state.player.regenCounter = 0;
-      if (state.player.hp < state.player.maxHp) {
-        state.player.hp++;
-      }
-    }
+  // Passive regeneration — base 1 HP/30 turns; Regen perk halves the interval
+  state.player.regenCounter++;
+  const regenRate = state.player.hasRegen ? 15 : 30;
+  if (state.player.regenCounter >= regenRate && state.player.hp < state.player.maxHp) {
+    state.player.regenCounter = 0;
+    state.player.hp++;
   }
 
   // Process hazards
@@ -2692,6 +2724,8 @@ function showSettings() {
   function statRow(label, val) {
     return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
   }
+
+  $('char-name').textContent = state ? state.playerName : '—';
 
   $('char-stats').innerHTML = [
     statRow('Level', p ? p.level : noGame),
