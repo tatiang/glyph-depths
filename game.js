@@ -23,7 +23,7 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'fd30796 — Fix class grid, one-way door dead ends, seal bashing, early difficulty'; // updated each push
+const GAME_VERSION = 'f52e6ab — Add How to Play instructions screen'; // updated each push
 
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
