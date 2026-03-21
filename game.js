@@ -23,6 +23,7 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
+const GAME_VERSION = 'commit pending'; // updated each push
 
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
@@ -3404,7 +3405,10 @@ function showSettings() {
     return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
   }
 
-  $('char-name').textContent = state ? state.playerName : '—';
+  $('char-name').textContent = state
+    ? `${state.playerName} the ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer'}`
+    : '—';
+  $('game-version').textContent = GAME_VERSION;
 
   $('char-stats').innerHTML = [
     statRow('Level', p ? p.level : noGame),
