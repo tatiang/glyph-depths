@@ -21,7 +21,8 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true };
+let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
+const HERO_ICONS = ['🧝', '🤖', '🐱', '🦊', '🐸', '👻', '🍄', '💀'];
 
 // Potion/scroll name randomization for the run
 let potionNames = [];
@@ -83,6 +84,34 @@ function generateCharacterName() {
 
 // === TITLE SCREEN ===
 function showTitle() {
+  // Build the dungeon graphic
+  const graphic = $('title-graphic');
+  graphic.innerHTML = [
+    '<span style="color:#3a3a4a">  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span>',
+    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">···········</span><span style="color:#3a3a4a">▓▓▓</span>',
+    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·</span><span style="color:#80ff80">▼</span><span style="color:#2a2a38">·········</span><span style="color:#8B6914">/</span><span style="color:#2a2a38">··</span><span style="color:#3a3a4a">▓</span>',
+    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·····</span><span style="color:#f0c040">' + (settings.heroIcon || '🧝') + '</span><span style="color:#2a2a38">····</span><span style="color:#3a3a4a">▓▓▓</span>',
+    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·····</span><span style="color:#ff4040">🐀</span><span style="color:#2a2a38">····</span><span style="color:#3a3a4a">▓</span>',
+    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">···</span><span style="color:#ffcc00">💰</span><span style="color:#2a2a38">·······</span><span style="color:#3a3a4a">▓</span>',
+    '<span style="color:#3a3a4a">  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span>',
+  ].join('<br>');
+
+  // Floating particles
+  const particles = $('title-particles');
+  particles.innerHTML = '';
+  const glyphs = ['·', '✦', '◆', '▪', '✧', '⬥'];
+  for (let i = 0; i < 15; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+    p.style.left = (5 + Math.random() * 90) + '%';
+    p.style.color = ['#3a3a5a', '#504060', '#2a2a44', '#605040'][Math.floor(Math.random() * 4)];
+    p.style.animationDelay = (Math.random() * 8) + 's';
+    p.style.animationDuration = (6 + Math.random() * 6) + 's';
+    p.style.fontSize = (10 + Math.random() * 10) + 'px';
+    particles.appendChild(p);
+  }
+
   $('title-screen').classList.add('active');
 }
 
@@ -90,6 +119,7 @@ function startGame() {
   $('title-screen').classList.remove('active');
   Audio.init();
   Audio.resume();
+  Audio.titleMusic();
   newRun();
 }
 
@@ -130,7 +160,7 @@ function newRun() {
 function createPlayer() {
   return {
     x: 0, y: 0,
-    glyph: '🧝',
+    glyph: settings.heroIcon || '🧝',
     name: 'You',
     hp: 15, maxHp: 15,
     attack: 2, defense: 0,
@@ -3007,6 +3037,28 @@ function showSettings() {
     statRow('🛡️ Armor', a ? `${a.name} (+${a.defense})` : 'None'),
     statRow('💍 Ring', r ? r.name : 'None'),
   ].join('');
+
+  // Hero icon picker
+  const picker = $('hero-picker');
+  picker.innerHTML = '';
+  for (const icon of HERO_ICONS) {
+    const btn = document.createElement('div');
+    btn.className = 'hero-choice' + (settings.heroIcon === icon ? ' selected' : '');
+    btn.textContent = icon;
+    btn.setAttribute('role', 'button');
+    const selectIcon = () => {
+      settings.heroIcon = icon;
+      if (state && state.player) state.player.glyph = icon;
+      saveSettings();
+      // Update selection visuals
+      picker.querySelectorAll('.hero-choice').forEach(el => el.classList.remove('selected'));
+      btn.classList.add('selected');
+      if (state) render();
+    };
+    btn.addEventListener('click', selectIcon);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); selectIcon(); }, { passive: false });
+    picker.appendChild(btn);
+  }
 
   // Update toggles
   $('toggle-sound').classList.toggle('on', settings.sound);

@@ -198,10 +198,85 @@ const Audio = (() => {
     noise(0.3, [0.02, 0.08, 0.2, 0.15]);
   }
 
+  // Title / intro music — mysterious descending melody with reverb-like echoes
+  function titleMusic() {
+    if (!ctx || !enabled) return;
+    resume();
+
+    // Deep ambient drone
+    const droneOsc = ctx.createOscillator();
+    const droneGain = ctx.createGain();
+    const now = ctx.currentTime;
+    droneOsc.type = 'sine';
+    droneOsc.frequency.value = 55; // low A
+    droneGain.gain.setValueAtTime(0, now);
+    droneGain.gain.linearRampToValueAtTime(0.15, now + 0.8);
+    droneGain.gain.setValueAtTime(0.15, now + 3.5);
+    droneGain.gain.linearRampToValueAtTime(0, now + 5);
+    droneOsc.connect(droneGain);
+    droneGain.connect(masterGain);
+    droneOsc.start(now);
+    droneOsc.stop(now + 5.1);
+
+    // Second drone — fifth above, detuned slightly for width
+    const drone2 = ctx.createOscillator();
+    const droneG2 = ctx.createGain();
+    drone2.type = 'sine';
+    drone2.frequency.value = 82;
+    drone2.detune.value = -8;
+    droneG2.gain.setValueAtTime(0, now);
+    droneG2.gain.linearRampToValueAtTime(0.08, now + 1);
+    droneG2.gain.setValueAtTime(0.08, now + 3);
+    droneG2.gain.linearRampToValueAtTime(0, now + 4.5);
+    drone2.connect(droneG2);
+    droneG2.connect(masterGain);
+    drone2.start(now);
+    drone2.stop(now + 4.6);
+
+    // Descending melody — haunting minor key notes
+    const melody = [
+      { freq: 440, time: 0.5, dur: 0.6 },   // A4
+      { freq: 392, time: 1.1, dur: 0.5 },   // G4
+      { freq: 330, time: 1.7, dur: 0.7 },   // E4
+      { freq: 294, time: 2.5, dur: 0.5 },   // D4
+      { freq: 262, time: 3.1, dur: 0.8 },   // C4
+      { freq: 220, time: 4.0, dur: 1.0 },   // A3 — final note, longer
+    ];
+
+    melody.forEach(note => {
+      // Main note
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = note.freq;
+      g.gain.setValueAtTime(0, now + note.time);
+      g.gain.linearRampToValueAtTime(0.18, now + note.time + 0.04);
+      g.gain.linearRampToValueAtTime(0.1, now + note.time + note.dur * 0.3);
+      g.gain.linearRampToValueAtTime(0, now + note.time + note.dur);
+      o.connect(g);
+      g.connect(masterGain);
+      o.start(now + note.time);
+      o.stop(now + note.time + note.dur + 0.05);
+
+      // Echo / ghost note (quieter, slightly delayed)
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = 'sine';
+      o2.frequency.value = note.freq * 2; // octave up
+      g2.gain.setValueAtTime(0, now + note.time + 0.12);
+      g2.gain.linearRampToValueAtTime(0.04, now + note.time + 0.16);
+      g2.gain.linearRampToValueAtTime(0, now + note.time + note.dur * 0.8);
+      o2.connect(g2);
+      g2.connect(masterGain);
+      o2.start(now + note.time + 0.12);
+      o2.stop(now + note.time + note.dur + 0.1);
+    });
+  }
+
   return {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, miss, crit, merchant, boss
+    door, miss, crit, merchant, boss, titleMusic
   };
 })();
