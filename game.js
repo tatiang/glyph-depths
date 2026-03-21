@@ -23,7 +23,7 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'commit pending'; // updated each push
+const GAME_VERSION = '314a795 — Fix class select layout, sound startup, and add version display'; // updated each push
 
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
