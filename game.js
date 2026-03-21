@@ -105,10 +105,7 @@ function newRun() {
     visible: null,
     explored: null,
     rooms: [],
-    messages: [
-      { text: 'You descend into the Glyph Depths. Swipe or use the d-pad to move.', cls: '' },
-      { text: 'Bump into enemies to attack. Tap items in the inventory bar to Equip/Use/Drop them.', cls: '' }
-    ],
+    messages: [],
     gameOver: false,
     victory: false,
     enemiesKilled: 0,
@@ -122,6 +119,9 @@ function newRun() {
     lastIdleY: -1,
     minimapOpen: false
   };
+  // Welcome messages with player name
+  addMessage(`${state.playerName} descends into the Unnamed Depths.`, 'gold');
+  addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
   updateUI();
   render();
@@ -2394,7 +2394,7 @@ function updateUI() {
   const p = state.player;
 
   // Status bar
-  $('floor-label').textContent = `F${state.floor}`;
+  $('floor-label').textContent = `⬊${state.floor}`;
   $('level-label').textContent = `Lv.${p.level}`;
   $('gold-label').textContent = `💰 ${p.gold}`;
   $('hunger-label').textContent = `🍖 ${p.hunger}`;
@@ -2409,7 +2409,7 @@ function updateUI() {
   // Messages
   const msgLog = $('msg-log');
   msgLog.innerHTML = '';
-  const recent = state.messages.slice(-2);
+  const recent = state.messages.slice(-3);
   for (const msg of recent) {
     const div = document.createElement('div');
     div.className = 'msg' + (msg.cls ? ' ' + msg.cls : '');
@@ -2943,11 +2943,11 @@ function renderMinimap() {
 
       switch (tile) {
         case T.WALL:
-          ctx.fillStyle = vis ? '#3a3a4a' : '#22222c';
+          ctx.fillStyle = vis ? '#4a4a5a' : '#2a2a34';
           break;
         case T.FLOOR:
         case T.CORRIDOR:
-          ctx.fillStyle = vis ? '#2a2a38' : '#181820';
+          ctx.fillStyle = vis ? '#18181f' : '#0e0e14';
           break;
         case T.STAIRS_DOWN:
           ctx.fillStyle = '#80ff80';

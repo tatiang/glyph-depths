@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Glyph Depths</title>
+  <title>The Unnamed Depths</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -139,8 +139,9 @@
       border-top: 1px solid var(--panel-border);
       border-bottom: 1px solid var(--panel-border);
       flex-shrink: 0;
-      height: 48px;
-      overflow: hidden;
+      min-height: 52px;
+      max-height: 72px;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
@@ -148,11 +149,10 @@
 
     #msg-log .msg {
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.5;
       color: var(--text-dim);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      word-wrap: break-word;
     }
 
     #msg-log .msg:last-child { color: var(--text); }
@@ -591,8 +591,8 @@
     </div>
 
     <div id="msg-log">
-      <div class="msg">Welcome to Glyph Depths. Every glyph tells a story.</div>
-      <div class="msg">Swipe or use the d-pad to move. Descend to floor 10 and defeat the Glyph King.</div>
+      <div class="msg">Welcome to the Unnamed Depths. Nothing is what it seems.</div>
+      <div class="msg">Swipe or d-pad to move. Descend 10 floors and defeat the King.</div>
     </div>
 
     <div id="inv-bar">
@@ -628,8 +628,8 @@
 
   <!-- Overlays -->
   <div class="overlay" id="title-screen">
-    <div class="title">GLYPH DEPTHS</div>
-    <div class="subtitle">Every glyph tells a story</div>
+    <div class="title">THE UNNAMED DEPTHS</div>
+    <div class="subtitle">Nothing is what it seems until you prove it</div>
     <button class="big-btn" id="btn-start">Descend</button>
   </div>
 
@@ -645,7 +645,7 @@
 
   <div class="overlay" id="victory-overlay">
     <h1>👑 VICTORY</h1>
-    <h2>The Glyph King has fallen!</h2>
+    <h2>The Depths have been named!</h2>
     <div class="stats" id="victory-stats"></div>
     <button class="big-btn" id="btn-victory-restart">Play Again</button>
   </div>
