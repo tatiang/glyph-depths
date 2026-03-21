@@ -22,7 +22,7 @@ let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
-const HERO_ICONS = ['🧝', '🤖', '🐱', '🦊', '🐸', '👻', '🍄', '💀'];
+const HERO_ICONS = ['🧝', '🧙', '🛡️', '🗡️', '🏹', '🐉', '👻', '💀'];
 
 // Potion/scroll name randomization for the run
 let potionNames = [];
