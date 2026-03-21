@@ -24,6 +24,58 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 
+// === CLASS DEFINITIONS ===
+const CLASS_DEFS = [
+  {
+    id: 'adventurer',
+    name: 'Adventurer',
+    icon: '🧝',
+    flavor: 'A steady hand and keen instincts. Heals slowly over time.',
+    hp: 15, attack: 2, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '♻ Rapid Regeneration',
+    startItems: 'Leather Armor · Healing Potion',
+    statBadges: [{ label: '15 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Regen', cls: 'pos' }]
+  },
+  {
+    id: 'berserker',
+    name: 'Berserker',
+    icon: '🪖',
+    flavor: 'Hits hard but burns through food. Rage sharpens at the brink.',
+    hp: 22, attack: 5, defense: 0,
+    hungerRate: 2, dodgeBonus: 0, critChance: 0.10,
+    passive: '⚡ Rage: +3 ATK below 40% HP',
+    startItems: 'Short Sword · 2× Strength Potions',
+    statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+5 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: '2× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }]
+  },
+  {
+    id: 'rogue',
+    name: 'Rogue',
+    icon: '🥷',
+    flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
+    hp: 10, attack: 3, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
+    passive: '👁 15% Dodge · 20% Crit',
+    startItems: '6 Throwing Daggers · Invis Potion',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }]
+  },
+  {
+    id: 'wizard',
+    name: 'Wizard',
+    icon: '🧙',
+    flavor: 'Frail but fearsome. Magic doubles in your learned hands.',
+    hp: 11, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '✨ Arcane Affinity: scrolls ×2',
+    startItems: 'Arcane Staff · 3 identified scrolls',
+    statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }]
+  }
+];
+
 // Potion/scroll name randomization for the run
 let potionNames = [];
 let scrollNames = [];
@@ -120,16 +172,70 @@ function startGame() {
   Audio.init();
   Audio.resume();
   Audio.titleMusic();
-  newRun();
+  showClassSelect();
+}
+
+function showClassSelect() {
+  const overlay = $('class-select');
+  const cardsEl = $('class-cards');
+  const beginBtn = $('btn-begin');
+  let selectedClass = null;
+
+  cardsEl.innerHTML = '';
+  beginBtn.disabled = true;
+
+  for (const cls of CLASS_DEFS) {
+    const card = document.createElement('div');
+    card.className = 'class-card';
+    card.innerHTML = `
+      <div class="class-icon">${cls.icon}</div>
+      <div class="class-name">${cls.name}</div>
+      <div class="class-flavor">${cls.flavor}</div>
+      <div class="class-badge-row">
+        ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+      </div>
+      <div class="class-badge-row" style="margin-top:3px;">
+        ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+      </div>
+      <div class="class-start-items">${cls.startItems}</div>
+    `;
+    const selectFn = () => {
+      selectedClass = cls.id;
+      cardsEl.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      beginBtn.disabled = false;
+    };
+    card.addEventListener('click', selectFn);
+    card.addEventListener('touchend', (e) => { e.preventDefault(); selectFn(); }, { passive: false });
+    cardsEl.appendChild(card);
+  }
+
+  // Remove any old listener by replacing the button
+  const newBegin = beginBtn.cloneNode(true);
+  newBegin.disabled = true;
+  beginBtn.parentNode.replaceChild(newBegin, beginBtn);
+  newBegin.addEventListener('click', () => {
+    if (!selectedClass) return;
+    overlay.classList.remove('active');
+    newRun(selectedClass);
+  });
+  newBegin.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!selectedClass) return;
+    overlay.classList.remove('active');
+    newRun(selectedClass);
+  }, { passive: false });
+
+  overlay.classList.add('active');
 }
 
 // === NEW RUN ===
-function newRun() {
+function newRun(classId = 'adventurer') {
   randomizePotionScrollNames();
   state = {
     floor: 1,
     turnCount: 0,
-    player: createPlayer(),
+    player: createPlayer(classId),
     entities: [],
     map: null,
     visible: null,
@@ -151,36 +257,79 @@ function newRun() {
     throwMode: false,
     throwItem: null,
     floorData: Array.from({length: 11}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
-    peakHp: 15
+    peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15
   };
-  // Welcome messages with player name
-  addMessage(`${state.playerName} descends into the Unnamed Depths.`, 'gold');
+  applyClassStartingItems(classId);
+  const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
+  // Welcome messages with player name and class
+  addMessage(`${state.playerName} the ${className} descends into the Unnamed Depths.`, 'gold');
   addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
   updateUI();
   render();
 }
 
-function createPlayer() {
+function createPlayer(classId = 'adventurer') {
+  const cls = CLASS_DEFS.find(c => c.id === classId) || CLASS_DEFS[0];
   return {
     x: 0, y: 0,
+    classId,
     glyph: settings.heroIcon || '🧝',
     name: 'You',
-    hp: 15, maxHp: 15,
-    attack: 2, defense: 0,
+    hp: cls.hp, maxHp: cls.hp,
+    attack: cls.attack, defense: cls.defense,
     level: 1, xp: 0, xpToNext: 15,
     hunger: 100,
     gold: 0,
     inventory: [],
     equipped: { weapon: null, armor: null, ring: null },
     statusEffects: [],
-    hasRegen: false,
+    hasRegen: classId === 'adventurer',
     hasVampire: false,
     ironSkin: false,
     hasFury: false,
+    arcaneAffinity: classId === 'wizard',
+    dodgeBonus: cls.dodgeBonus,
+    critChance: cls.critChance,
+    hungerRate: cls.hungerRate,
     regenCounter: 0,
     turnsSurvived: 0
   };
+}
+
+function applyClassStartingItems(classId) {
+  const p = state.player;
+  if (classId === 'adventurer') {
+    const armor = ARMORS.find(a => a.name === 'Leather Armor');
+    if (armor) p.equipped.armor = { ...armor };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) p.inventory.push({ ...healPotion, glyph: '🧪', itemType: 'potion' });
+  } else if (classId === 'berserker') {
+    const sword = WEAPONS.find(w => w.name === 'Short Sword');
+    if (sword) p.equipped.weapon = { ...sword };
+    const strPotion = potionNames.find(n => n.id === 'strength');
+    if (strPotion) {
+      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
+      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
+    }
+  } else if (classId === 'rogue') {
+    p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', attack: 3, ammo: 6 });
+    const invisPotion = potionNames.find(n => n.id === 'invisibility');
+    if (invisPotion) p.inventory.push({ ...invisPotion, glyph: '🧪', itemType: 'potion' });
+  } else if (classId === 'wizard') {
+    p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 1, tier: 1, special: 'arcane' };
+    const usedIds = new Set();
+    let tries = 0;
+    while (p.inventory.length < 3 && tries < 30) {
+      tries++;
+      const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
+      if (!usedIds.has(s.id)) {
+        usedIds.add(s.id);
+        scrollIdentified[s.id] = true;
+        p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
+      }
+    }
+  }
 }
 
 // === POTION / SCROLL NAME RANDOMIZATION ===
@@ -1018,7 +1167,8 @@ function greedyStep(sx, sy, gx, gy, phaseThrough) {
 function attackEntity(attacker, defender) {
   const atk = getEffectiveAttack(attacker);
   const def = getEffectiveDefense(defender);
-  const isCrit = Math.random() < 0.1;
+  const critChance = (attacker === state.player) ? (state.player.critChance || 0.10) : 0.10;
+  const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
 
@@ -1124,6 +1274,8 @@ function getEffectiveAttack(entity) {
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
     // Battle Fury perk: +3 attack when below 30% HP
     if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) atk += 3;
+    // Berserker class rage: +3 attack when below 40% HP
+    if (state.player.classId === 'berserker' && state.player.hp < state.player.maxHp * 0.4) atk += 3;
     return Math.max(1, atk);
   }
   return entity.attack;
@@ -1232,9 +1384,10 @@ function playerDeath(killerName, killerGlyph) {
 
   const tk = state.toughestKill;
   const kg = killerGlyph || '';
-  $('death-cause').textContent = `${state.playerName} was slain by ${kg ? kg + ' ' : ''}${killerName} on Floor ${state.floor}`;
+  const deathClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
+  $('death-cause').textContent = `${state.playerName} the ${deathClassName} was slain by ${kg ? kg + ' ' : ''}${killerName} on Floor ${state.floor}`;
   $('death-stats').innerHTML = `
-    Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
+    Level <span>${state.player.level}</span> ${deathClassName} | Score: <span>${state.score}</span><br>
     Slain by: <span>${kg ? kg + ' ' : ''}${killerName}</span><br>
     Toughest kill: <span>${tk ? `${tk.glyph} ${tk.name}` : 'none'}</span><br>
     Enemies slain: <span>${state.enemiesKilled}</span> | Items found: <span>${state.itemsFound}</span>
@@ -2127,43 +2280,53 @@ function applyScrollEffect(scroll) {
       addMessage('The layout of this floor is revealed!', 'good');
       break;
     case 'fireball': {
+      const arcane = state.player.arcaneAffinity;
+      const fbDamage = arcane ? 16 : 8;
+      const fbRadius = arcane ? 4 : 3;
       let hits = 0;
       for (const e of [...state.entities]) {
         if (e.type !== 'enemy') continue;
         const d = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
-        if (d <= 3) {
-          e.hp -= 8;
+        if (d <= fbRadius) {
+          e.hp -= fbDamage;
           hits++;
           if (e.hp <= 0) {
             addMessage(`${e.name} is incinerated!`, 'good');
             removeEntity(e);
             state.player.xp += e.xp;
             state.enemiesKilled++;
+            state.floorData[Math.min(state.floor, 10)].kills++;
           }
         }
       }
-      addMessage(`A fireball erupts! ${hits} enemies hit!`, 'damage');
+      addMessage(`A fireball erupts! ${hits} enemies hit for ${fbDamage}!`, 'damage');
       screenShake();
       break;
     }
-    case 'enchant':
+    case 'enchant': {
+      const arcane = state.player.arcaneAffinity;
+      const enchBonus = arcane ? 2 : 1;
       if (state.player.equipped.weapon) {
-        state.player.equipped.weapon.attack += 1;
-        state.player.equipped.weapon.name += ' +';
-        addMessage(`Your ${state.player.equipped.weapon.name} glows brighter!`, 'good');
+        state.player.equipped.weapon.attack += enchBonus;
+        state.player.equipped.weapon.name += enchBonus === 2 ? ' ++' : ' +';
+        addMessage(`Your ${state.player.equipped.weapon.name} blazes with power!`, 'good');
       } else {
         addMessage('You have no weapon to enchant.', '');
       }
       break;
-    case 'confusion':
+    }
+    case 'confusion': {
+      const arcane = state.player.arcaneAffinity;
+      const confDur = arcane ? 20 : 10;
       for (const e of state.entities) {
         if (e.type !== 'enemy') continue;
         if (state.visible[e.y * MAP_W + e.x]) {
-          e.confused = 10;
+          e.confused = confDur;
         }
       }
-      addMessage('Visible enemies look dazed!', 'good');
+      addMessage(`Visible enemies look ${arcane ? 'completely lost' : 'dazed'}!`, 'good');
       break;
+    }
     case 'identify':
       // Identify all potions and scrolls in inventory
       for (const item of state.player.inventory) {
@@ -2194,27 +2357,33 @@ function applyScrollEffect(scroll) {
       break;
     }
     case 'summon': {
-      // Spawn golem adjacent to player so it's visible and useful
-      let pos = null;
+      const arcane = state.player.arcaneAffinity;
+      // Spawn golem(s) adjacent to player
       const dirs = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,-1],[1,-1],[-1,1]];
-      for (const [dx, dy] of dirs) {
-        const nx = state.player.x + dx, ny = state.player.y + dy;
-        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
-          pos = { x: nx, y: ny };
-          break;
+      const spawnGolem = (stats) => {
+        let pos = null;
+        for (const [dx, dy] of dirs) {
+          const nx = state.player.x + dx, ny = state.player.y + dy;
+          if (isWalkable(nx, ny) && !enemyAt(nx, ny)) { pos = { x: nx, y: ny }; break; }
         }
-      }
-      if (!pos) pos = randomFloorTile(); // fallback
-      if (pos) {
-        const golem = createEnemy({ name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 }, pos.x, pos.y);
-        golem.isAlly = true;
-        golem.allyTurns = 25;
-        golem.alertness = 2;
-        state.entities.push(golem);
-        addMessage('A stone golem materializes to aid you!', 'good');
-      } else {
-        addMessage('The scroll fizzles... no room for a summon.', 'damage');
-      }
+        if (!pos) pos = randomFloorTile();
+        if (pos) {
+          const golem = createEnemy(stats, pos.x, pos.y);
+          golem.isAlly = true;
+          golem.allyTurns = arcane ? 40 : 25;
+          golem.alertness = 2;
+          state.entities.push(golem);
+          return true;
+        }
+        return false;
+      };
+      const golemStats = arcane
+        ? { name: 'Iron Golem', glyph: '🗿', hp: 25, attack: 5, defense: 4, ai: 'chase', xp: 0, special: null, detect: 10 }
+        : { name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 };
+      const spawned = spawnGolem(golemStats);
+      if (arcane && spawned) spawnGolem({ ...golemStats }); // second golem for wizard
+      if (spawned) addMessage(arcane ? 'Two iron golems rise to serve you!' : 'A stone golem materializes to aid you!', 'good');
+      else addMessage('The scroll fizzles... no room for a summon.', 'damage');
       break;
     }
   }
@@ -2364,12 +2533,14 @@ function endTurn() {
   state.player.turnsSurvived++;
   if (state.player.hp > state.peakHp) state.peakHp = state.player.hp;
 
-  // Hunger
+  // Hunger (Berserker drains 2x faster; Ring of Hunger halves drain)
   if (state.turnCount % HUNGER_TICK === 0) {
-    const hungerRate = hasRingEffect('hunger') ? 0.5 : 1;
-    if (Math.random() < hungerRate) {
-      state.player.hunger = Math.max(0, state.player.hunger - 1);
-    }
+    const ringBonus = hasRingEffect('hunger') ? 0.5 : 1;
+    const classRate = state.player.hungerRate || 1;
+    const drainBase = Math.floor(classRate * ringBonus);
+    const drainFrac = (classRate * ringBonus) % 1;
+    const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
+    state.player.hunger = Math.max(0, state.player.hunger - drain);
   }
 
   if (state.player.hunger <= 0 && state.turnCount % HUNGER_DAMAGE_TICK === 0) {
@@ -3481,8 +3652,9 @@ function getFloorBiome(floor) {
 // === DODGE CHANCE ===
 function getDodgeChance(attacker, defender) {
   if (defender === state.player) {
-    let dodge = 0.05; // base 5%
+    let dodge = 0.05; // base 5% for all
     if (state.player.equipped.armor?.special === 'stealth') dodge += 0.15;
+    dodge += (state.player.dodgeBonus || 0); // class-based bonus (Rogue: +15%)
     return dodge;
   }
   // Evasive enemies can dodge player attacks
