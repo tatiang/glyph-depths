@@ -147,7 +147,9 @@ function newRun() {
     idleTurns: 0,        // turns spent near same spot (for wandering monster mechanic)
     lastIdleX: -1,
     lastIdleY: -1,
-    minimapOpen: false
+    minimapOpen: false,
+    throwMode: false,
+    throwItem: null
   };
   // Welcome messages with player name
   addMessage(`${state.playerName} descends into the Unnamed Depths.`, 'gold');
@@ -245,6 +247,7 @@ const RINGS = [
 ];
 
 const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
+const THROWING_DAGGERS = { name: 'Throwing Daggers', glyph: '🎯', itemType: 'thrown', ammo: 5, damage: 3, value: 30 };
 
 // === ENEMY DEFINITIONS ===
 const ENEMY_TIERS = {
@@ -273,6 +276,13 @@ const BOSS = {
   ai: 'boss', xp: 100, special: 'boss', detect: 50
 };
 
+// Mini-bosses guard milestone floors (3, 6, 9)
+const MINI_BOSSES = {
+  3: { name: 'Cave Troll', glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
+  6: { name: 'Lich',       glyph: '💀', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
+  9: { name: 'Balrog',     glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 }
+};
+
 // === DUNGEON GENERATION (BSP) ===
 function generateFloor() {
   const p = state.player;
@@ -286,6 +296,12 @@ function generateFloor() {
     generateBossFloor();
   } else {
     generateBSP();
+  }
+
+  // Announce biome when entering a new region
+  if ([1, 4, 7, 10].includes(state.floor)) {
+    const biome = getFloorBiome(state.floor);
+    addMessage(`Entering ${biome.name}...`, 'gold');
   }
 
   // Place stairs down (except floor 10)
@@ -640,6 +656,8 @@ function removeEntity(e) {
 // === SPAWNING ===
 function spawnEnemies() {
   if (state.floor === 10) return; // Boss already placed
+  // Spawn mini-boss on milestone floors
+  if (MINI_BOSSES[state.floor]) spawnMiniBoss();
   const floorConfig = getFloorConfig(state.floor);
   const count = floorConfig.minEnemies + Math.floor(Math.random() * (floorConfig.maxEnemies - floorConfig.minEnemies + 1));
   const tier = floorConfig.tier;
@@ -779,9 +797,12 @@ function generateRandomItem(floor) {
     // Scroll
     const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
     return makeScroll(s);
-  } else if (roll < 0.9) {
+  } else if (roll < 0.88) {
     // Ring
     return { ...RINGS[Math.floor(Math.random() * RINGS.length)] };
+  } else if (roll < 0.94) {
+    // Throwing Daggers
+    return { ...THROWING_DAGGERS };
   } else {
     // Food
     return { ...FOOD };
@@ -988,6 +1009,15 @@ function attackEntity(attacker, defender) {
     return;
   }
 
+  // Dodge check
+  const dodgeChance = getDodgeChance(attacker, defender);
+  if (dodgeChance > 0 && Math.random() < dodgeChance) {
+    const targetIsPlayerDodge = defender === state.player;
+    addMessage(targetIsPlayerDodge ? 'You dodge the attack!' : `${defender.name} dodges!`, targetIsPlayerDodge ? 'good' : '');
+    Audio.miss();
+    return;
+  }
+
   defender.hp -= damage;
 
   const isPlayer = attacker === state.player;
@@ -1118,6 +1148,17 @@ function killEnemy(enemy) {
       addMessage(spawned > 1 ? 'The Slime splits in two!' : 'The Slime oozes apart!', 'damage');
     } else {
       addMessage('The Slime dissolves!', '');
+    }
+  }
+
+  // Mini-boss guaranteed tier-appropriate drop
+  if (enemy.isMiniBoss) {
+    const tier = Math.ceil(state.floor / 3);
+    const pool = [...WEAPONS.filter(w => w.tier >= tier), ...ARMORS.filter(a => a.tier >= tier)];
+    if (pool.length > 0) {
+      const drop = { ...pool[Math.floor(Math.random() * pool.length)] };
+      state.entities.push(createItemEntity(drop, enemy.x, enemy.y));
+      addMessage(`The ${enemy.name} drops ${drop.name}!`, 'gold');
     }
   }
 
@@ -1357,6 +1398,14 @@ function processEnemies() {
       }
       allyAI(enemy);
       continue;
+    }
+
+    // Troll regeneration: heals 2 HP every 4 turns
+    if (enemy.special === 'troll_regen' && enemy.hp > 0 && enemy.hp < enemy.maxHp && state.turnCount % 4 === 0) {
+      enemy.hp = Math.min(enemy.maxHp, enemy.hp + 2);
+      if (state.visible[enemy.y * MAP_W + enemy.x]) {
+        addMessage(`The ${enemy.name} regenerates!`, 'damage');
+      }
     }
 
     // Confused — move randomly
@@ -1652,6 +1701,12 @@ function hasLOS(x1, y1, x2, y2) {
 function playerMove(dx, dy) {
   if (inputLocked || state.gameOver || state.victory) return;
 
+  // Throw mode — launch projectile in chosen direction
+  if (state.throwMode) {
+    throwProjectile(dx, dy);
+    return;
+  }
+
   const p = state.player;
   const nx = p.x + dx, ny = p.y + dy;
 
@@ -1741,6 +1796,14 @@ function playerMove(dx, dy) {
 
 function playerWait() {
   if (inputLocked || state.gameOver || state.victory) return;
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Throw cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
   addMessage('You wait...', '');
   endTurn();
 }
@@ -1796,6 +1859,14 @@ function pickupItem(itemEntity) {
 
 function playerDescend() {
   if (inputLocked || state.gameOver || state.victory) return;
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Throw cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
   const t = getTile(state.player.x, state.player.y);
   if (t !== T.STAIRS_DOWN) {
     addMessage('No stairs here.', '');
@@ -1894,6 +1965,18 @@ function useItem(item, index) {
         }
       }
       break;
+
+    case 'thrown':
+      if (item.ammo <= 0) {
+        addMessage('Your throwing daggers are exhausted!', 'damage');
+        return;
+      }
+      state.throwMode = true;
+      state.throwItem = { item, index };
+      addMessage(`Choose a direction to throw (${item.ammo} left). Wait to cancel.`, 'good');
+      updateUI();
+      render();
+      return; // Don't end turn or call updateUI again
 
     case 'food':
       p.hunger = Math.min(100, p.hunger + 30);
@@ -2350,8 +2433,9 @@ function render() {
   const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
   const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
 
-  // Clear
-  ctx.fillStyle = '#0a0a0f';
+  // Clear with biome background
+  const biome = getFloorBiome(state.floor);
+  ctx.fillStyle = biome.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const fontSize = Math.floor(ts * 0.7);
@@ -2397,15 +2481,15 @@ function render() {
       switch (tile) {
         case T.WALL:
           tileGlyph = '▓';
-          tileColor = vis ? '#3a3a4a' : '#1a1a24';
+          tileColor = vis ? biome.wallVis : biome.wallDim;
           break;
         case T.FLOOR:
           tileGlyph = '·';
-          tileColor = vis ? '#2a2a38' : '#151520';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
           break;
         case T.CORRIDOR:
           tileGlyph = '·';
-          tileColor = vis ? '#252530' : '#121218';
+          tileColor = vis ? biome.corrVis : biome.corrDim;
           break;
         case T.STAIRS_DOWN:
           tileGlyph = '▼';
@@ -2562,6 +2646,9 @@ function updateUI() {
 
   // Inventory
   renderInventory();
+
+  // Status effect indicators
+  renderStatusFX();
 }
 
 function renderInventory() {
@@ -2641,6 +2728,8 @@ function showItemMenu(item, index, event) {
     actions.push({ label: 'Equip', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (['potion', 'scroll', 'food'].includes(item.itemType)) {
     actions.push({ label: 'Use', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'thrown') {
+    actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Cancel', fn: () => closeItemMenu() });
@@ -3166,6 +3255,140 @@ function renderMinimap() {
   // Draw player as bright dot
   ctx.fillStyle = '#f0c040';
   ctx.fillRect(state.player.x * scale - 1, state.player.y * scale - 1, scale + 2, scale + 2);
+}
+
+// === FLOOR BIOMES ===
+function getFloorBiome(floor) {
+  if (floor <= 3) return {
+    name: 'The Sewers',
+    wallVis: '#2a4a2a', wallDim: '#111a11',
+    floorVis: '#1a2e1a', floorDim: '#0c150c',
+    corrVis:  '#162414', corrDim:  '#0a100a',
+    bg: '#060d06'
+  };
+  if (floor <= 6) return {
+    name: 'The Crypt',
+    wallVis: '#3a3a4a', wallDim: '#1a1a24',
+    floorVis: '#2a2a38', floorDim: '#151520',
+    corrVis:  '#252530', corrDim:  '#121218',
+    bg: '#0a0a0f'
+  };
+  if (floor <= 9) return {
+    name: 'The Citadel',
+    wallVis: '#4a2a2a', wallDim: '#221212',
+    floorVis: '#2e1818', floorDim: '#150c0c',
+    corrVis:  '#281414', corrDim:  '#110808',
+    bg: '#0d0606'
+  };
+  return {
+    name: 'The Sanctum',
+    wallVis: '#3a1a4a', wallDim: '#1a0a22',
+    floorVis: '#28103a', floorDim: '#12071a',
+    corrVis:  '#200d2e', corrDim:  '#0e0614',
+    bg: '#090208'
+  };
+}
+
+// === DODGE CHANCE ===
+function getDodgeChance(attacker, defender) {
+  if (defender === state.player) {
+    let dodge = 0.05; // base 5%
+    if (state.player.equipped.armor?.special === 'stealth') dodge += 0.15;
+    return dodge;
+  }
+  // Evasive enemies can dodge player attacks
+  if (['Bat', 'Spider', 'Rat'].includes(defender.name)) return 0.10;
+  return 0;
+}
+
+// === STATUS EFFECT INDICATORS ===
+function renderStatusFX() {
+  const bar = $('fx-bar');
+  if (!state || !bar) return;
+  const effects = state.player.statusEffects || [];
+  if (effects.length === 0 && !state.throwMode) { bar.innerHTML = ''; return; }
+
+  const labels = {
+    burning:      { icon: '🔥', text: 'Burn',   cls: 'fx-burning' },
+    frozen:       { icon: '❄️', text: 'Frozen', cls: 'fx-frozen' },
+    poison:       { icon: '☠️', text: 'Poison', cls: 'fx-poison' },
+    webbed:       { icon: '🕸', text: 'Webbed', cls: 'fx-webbed' },
+    invisibility: { icon: '👁', text: 'Invis',  cls: 'fx-invisibility' },
+    strength:     { icon: '💪', text: 'Str+',   cls: 'fx-strength' }
+  };
+
+  let html = '';
+  if (state.throwMode) {
+    html += '<div class="fx-pill fx-throw-mode">🎯 Aim&hellip;</div>';
+  }
+  for (const eff of effects) {
+    const cfg = labels[eff.type];
+    if (!cfg) continue;
+    html += `<div class="fx-pill ${cfg.cls}">${cfg.icon} ${cfg.text} ${eff.turns}</div>`;
+  }
+  bar.innerHTML = html;
+}
+
+// === RANGED COMBAT — THROWING DAGGERS ===
+function throwProjectile(dx, dy) {
+  state.throwMode = false;
+  const throwData = state.throwItem;
+  state.throwItem = null;
+  if (!throwData) { endTurn(); return; }
+
+  const { item } = throwData;
+  let x = state.player.x + dx;
+  let y = state.player.y + dy;
+  let hit = false;
+
+  for (let i = 0; i < 8; i++) {
+    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
+    const target = enemyAt(x, y);
+    if (target && target.hp > 0) {
+      const def = getEffectiveDefense(target);
+      const dmg = Math.max(1, item.damage - def + Math.floor(Math.random() * 3) - 1);
+      target.hp -= dmg;
+      addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
+      Audio.hit();
+      haptic(20);
+      hit = true;
+      if (target.hp <= 0) killEnemy(target);
+      break;
+    }
+    if (!isWalkable(x, y)) break;
+    x += dx;
+    y += dy;
+  }
+
+  if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
+
+  item.ammo--;
+  if (item.ammo <= 0) {
+    const idx = state.player.inventory.indexOf(item);
+    if (idx >= 0) state.player.inventory.splice(idx, 1);
+    addMessage('Your last throwing dagger is gone!', '');
+  } else {
+    addMessage(`${item.ammo} throwing dagger${item.ammo === 1 ? '' : 's'} remaining.`, '');
+  }
+
+  updateUI();
+  render();
+  endTurn();
+}
+
+// === MINI-BOSS SPAWNING ===
+function spawnMiniBoss() {
+  const template = MINI_BOSSES[state.floor];
+  if (!template) return;
+
+  const room = getFarthestRoom(state.player.x, state.player.y);
+  const x = room.x + Math.floor(room.w / 2);
+  const y = room.y + Math.floor(room.h / 2);
+
+  const miniBoss = createEnemy(template, x, y);
+  miniBoss.isMiniBoss = true;
+  state.entities.push(miniBoss);
+  addMessage(`⚠ A ${template.name} guards this floor!`, 'damage');
 }
 
 // === BOOT ===

@@ -103,6 +103,39 @@
 
     #hp-text { font-size: 11px; color: var(--text-dim); min-width: 40px; text-align: right; }
 
+    /* === STATUS EFFECT BAR === */
+    #fx-bar {
+      display: flex;
+      align-items: center;
+      padding: 3px 10px;
+      gap: 5px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+      min-height: 0;
+      height: 26px;
+      overflow: hidden;
+    }
+    #fx-bar:empty { display: none; }
+    .fx-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      border: 1px solid;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .fx-burning      { color: #ff7050; border-color: rgba(255,112,80,0.5);  background: rgba(255,112,80,0.12); }
+    .fx-frozen       { color: #80d8ff; border-color: rgba(128,216,255,0.5); background: rgba(128,216,255,0.12); }
+    .fx-poison       { color: #80ff60; border-color: rgba(128,255,96,0.5);  background: rgba(128,255,96,0.12); }
+    .fx-webbed       { color: #c8c8c8; border-color: rgba(200,200,200,0.4); background: rgba(200,200,200,0.08); }
+    .fx-invisibility { color: #a0a0ff; border-color: rgba(160,160,255,0.5); background: rgba(160,160,255,0.12); }
+    .fx-strength     { color: #ffb060; border-color: rgba(255,176,96,0.5);  background: rgba(255,176,96,0.12); }
+    .fx-throw-mode   { color: #60ffb0; border-color: rgba(96,255,176,0.5);  background: rgba(96,255,176,0.12); }
+
     /* === GAME CANVAS === */
     #canvas-wrap {
       flex: 1;
@@ -665,6 +698,8 @@
       <div class="stat"><span id="hunger-label">🍖 100</span></div>
       <div class="stat"><span id="gold-label">💰 0</span></div>
     </div>
+
+    <div id="fx-bar"></div>
 
     <div id="canvas-wrap">
       <canvas id="game-canvas"></canvas>
