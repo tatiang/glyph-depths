@@ -424,8 +424,9 @@
       border: 1px solid var(--panel-border);
       border-radius: 4px;
       image-rendering: pixelated;
-      max-width: 85vw;
-      max-height: 60vh;
+      width: 90vw;
+      max-height: 75vh;
+      object-fit: contain;
     }
 
     .minimap-hint {
@@ -692,9 +693,7 @@
     <div class="minimap-hint">Tap to close</div>
   </div>
 
-  <div id="item-menu">
-    <div class="item-name" id="menu-item-name"></div>
-  </div>
+  <div id="item-menu"></div>
 
   <div id="inspect-tip">
     <div class="tip-name" id="tip-name"></div>

@@ -1667,6 +1667,10 @@ function pickupItem(itemEntity) {
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
   addMessage(`You pick up ${itemEntity.item.name}.`, 'good');
+  // Show hint on first item pickup
+  if (state.itemsFound === 1) {
+    addMessage('Tip: Tap an item in the bar below to Equip, Use, or Drop it.', 'gold');
+  }
   Audio.pickup();
   removeEntity(itemEntity);
 }
@@ -2256,18 +2260,10 @@ function render() {
       ctx.font = `${fontSize}px monospace`;
       let tileGlyph, tileColor;
       switch (tile) {
-        case T.WALL: {
-          // Detailed wall: vary glyph based on position for a brick-like look
-          const wallHash = (mx * 7 + my * 13) % 5;
-          tileGlyph = wallHash === 0 ? '▓' : wallHash === 1 ? '▒' : wallHash === 2 ? '▓' : wallHash === 3 ? '░' : '▓';
+        case T.WALL:
+          tileGlyph = '▓';
           tileColor = vis ? '#3a3a4a' : '#1a1a24';
-          // Add slight color variation for depth
-          if (vis) {
-            const shade = ((mx * 3 + my * 7) % 3);
-            tileColor = shade === 0 ? '#3a3a4a' : shade === 1 ? '#343444' : '#404050';
-          }
           break;
-        }
         case T.FLOOR:
           tileGlyph = '·';
           tileColor = vis ? '#2a2a38' : '#151520';
@@ -2436,12 +2432,24 @@ function renderInventory() {
     { label: '💍', slot: 'ring', item: state.player.equipped.ring }
   ];
 
+  // Helper: make a slot tappable on mobile (iOS needs touchend, not just click)
+  function makeTappable(el, handler) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('click', handler);
+    el.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handler(e);
+    }, { passive: false });
+  }
+
   for (const eq of equipped) {
     const slot = document.createElement('div');
     slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
     slot.textContent = eq.item ? eq.item.glyph : eq.label;
     if (eq.item) {
-      slot.addEventListener('click', (e) => showEquippedMenu(eq, e));
+      makeTappable(slot, (e) => showEquippedMenu(eq, e));
     }
     bar.appendChild(slot);
   }
@@ -2453,7 +2461,7 @@ function renderInventory() {
     slot.className = 'inv-slot';
     slot.textContent = item.glyph;
     const idx = i;
-    slot.addEventListener('click', (e) => showItemMenu(item, idx, e));
+    makeTappable(slot, (e) => showItemMenu(item, idx, e));
     bar.appendChild(slot);
   }
 
@@ -2470,11 +2478,8 @@ function renderInventory() {
 function showItemMenu(item, index, event) {
   event.stopPropagation();
   const menu = $('item-menu');
-  $('menu-item-name').textContent = `${item.glyph} ${item.name}`;
   menu.innerHTML = '';
-  menu.appendChild($('menu-item-name').cloneNode(true));
 
-  // Re-create the item-name div
   const nameDiv = document.createElement('div');
   nameDiv.className = 'item-name';
   nameDiv.textContent = `${item.glyph} ${item.name}`;
@@ -2500,21 +2505,26 @@ function showItemMenu(item, index, event) {
   for (const act of actions) {
     const btn = document.createElement('button');
     btn.textContent = act.label;
-    btn.addEventListener('click', act.fn);
+    btn.addEventListener('click', (e) => { e.stopPropagation(); act.fn(); });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); act.fn(); }, { passive: false });
     menu.appendChild(btn);
   }
 
-  // Position near the tap
-  const rect = event.target.getBoundingClientRect();
-  menu.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
-  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  // Position near the tap — center on screen for reliability on mobile
+  menu.style.left = '50%';
+  menu.style.transform = 'translateX(-50%)';
+  menu.style.bottom = '180px';
   menu.style.top = 'auto';
   menu.classList.add('active');
 
-  // Close on outside tap
+  // Close on outside tap (works for both click and touch)
   setTimeout(() => {
-    document.addEventListener('click', closeMenuOnOutside, { once: true });
-  }, 150);
+    const closer = (e) => {
+      if (!$('item-menu').contains(e.target)) closeItemMenu();
+    };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
 }
 
 function showEquippedMenu(eq, event) {
@@ -2532,9 +2542,7 @@ function showEquippedMenu(eq, event) {
   nameDiv.textContent = desc;
   menu.appendChild(nameDiv);
 
-  const unequipBtn = document.createElement('button');
-  unequipBtn.textContent = 'Unequip';
-  unequipBtn.addEventListener('click', () => {
+  const unequipFn = () => {
     if (state.player.inventory.length >= MAX_INVENTORY) {
       addMessage('Inventory full!', 'damage');
       closeItemMenu();
@@ -2548,23 +2556,33 @@ function showEquippedMenu(eq, event) {
     updateUI();
     render();
     closeItemMenu();
-  });
+  };
+
+  const unequipBtn = document.createElement('button');
+  unequipBtn.textContent = 'Unequip';
+  unequipBtn.addEventListener('click', (e) => { e.stopPropagation(); unequipFn(); });
+  unequipBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); unequipFn(); }, { passive: false });
   menu.appendChild(unequipBtn);
 
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', closeItemMenu);
+  cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
   menu.appendChild(cancelBtn);
 
-  const rect = event.target.getBoundingClientRect();
-  menu.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
-  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  menu.style.left = '50%';
+  menu.style.transform = 'translateX(-50%)';
+  menu.style.bottom = '180px';
   menu.style.top = 'auto';
   menu.classList.add('active');
 
   setTimeout(() => {
-    document.addEventListener('click', closeMenuOnOutside, { once: true });
-  }, 150);
+    const closer = (e) => {
+      if (!$('item-menu').contains(e.target)) closeItemMenu();
+    };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
 }
 
 function closeItemMenu() {
@@ -2908,7 +2926,7 @@ function toggleMinimap() {
 function renderMinimap() {
   const mc = $('minimap-canvas');
   const ctx = mc.getContext('2d');
-  const scale = 3; // pixels per tile
+  const scale = 5; // pixels per tile — large enough to see clearly on mobile
   mc.width = MAP_W * scale;
   mc.height = MAP_H * scale;
 
