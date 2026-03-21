@@ -1,0 +1,2719 @@
+// ============================================================
+// GLYPH DEPTHS — Complete Roguelike Game Engine
+// ============================================================
+
+(() => {
+'use strict';
+
+// === CONSTANTS ===
+const MAP_W = 50, MAP_H = 50;
+const VIEW_COLS = 15, VIEW_ROWS = 19;
+const FOV_RADIUS = 8;
+const MAX_INVENTORY = 10;
+const HUNGER_TICK = 10; // lose 1 hunger every N turns
+const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
+
+// Tile types
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7 };
+
+// === GAME STATE ===
+let state = null; // main game state object
+let canvas, ctxC; // canvas and 2d context
+let tileSize = 25;
+let inputLocked = false;
+let settings = { sound: true, haptics: true, dpad: true };
+
+// Potion/scroll name randomization for the run
+let potionNames = [];
+let scrollNames = [];
+let potionIdentified = {};
+let scrollIdentified = {};
+
+// === DOM REFS ===
+const $ = id => document.getElementById(id);
+
+// === INITIALIZATION ===
+function boot() {
+  canvas = $('game-canvas');
+  ctxC = canvas.getContext('2d');
+  loadSettings();
+  setupCanvas();
+  setupInput();
+  setupUI();
+  showTitle();
+  window.addEventListener('resize', () => { setupCanvas(); if (state) render(); });
+}
+
+function setupCanvas() {
+  const wrap = $('canvas-wrap');
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  // Calculate tile size to fit
+  const ts = Math.floor(Math.min(w / VIEW_COLS, h / VIEW_ROWS));
+  tileSize = Math.max(16, Math.min(ts, 32));
+  canvas.width = VIEW_COLS * tileSize;
+  canvas.height = VIEW_ROWS * tileSize;
+  canvas.style.width = canvas.width + 'px';
+  canvas.style.height = canvas.height + 'px';
+}
+
+// === TITLE SCREEN ===
+function showTitle() {
+  $('title-screen').classList.add('active');
+}
+
+function startGame() {
+  $('title-screen').classList.remove('active');
+  Audio.init();
+  Audio.resume();
+  newRun();
+}
+
+// === NEW RUN ===
+function newRun() {
+  randomizePotionScrollNames();
+  state = {
+    floor: 1,
+    turnCount: 0,
+    player: createPlayer(),
+    entities: [],
+    map: null,
+    visible: null,
+    explored: null,
+    rooms: [],
+    messages: [
+      { text: 'You descend into the Glyph Depths...', cls: '' },
+      { text: 'Swipe to move. Bump enemies to attack.', cls: '' }
+    ],
+    gameOver: false,
+    victory: false,
+    enemiesKilled: 0,
+    itemsFound: 0,
+    score: 0,
+    ghost: loadGhost()
+  };
+  generateFloor();
+  updateUI();
+  render();
+}
+
+function createPlayer() {
+  return {
+    x: 0, y: 0,
+    glyph: '🧝',
+    name: 'You',
+    hp: 15, maxHp: 15,
+    attack: 2, defense: 0,
+    level: 1, xp: 0, xpToNext: 25,
+    hunger: 100,
+    gold: 0,
+    inventory: [],
+    equipped: { weapon: null, armor: null, ring: null },
+    statusEffects: [],
+    hasRegen: false,
+    regenCounter: 0,
+    turnsSurvived: 0
+  };
+}
+
+// === POTION / SCROLL NAME RANDOMIZATION ===
+const POTION_COLORS = [
+  { name: 'Fizzy Red Potion', glyph: '🧪', color: '#ff4444' },
+  { name: 'Thick Blue Potion', glyph: '🧪', color: '#4488ff' },
+  { name: 'Glowing Green Potion', glyph: '🧪', color: '#44ff44' },
+  { name: 'Murky Purple Potion', glyph: '🧪', color: '#aa44ff' },
+  { name: 'Shimmering Gold Potion', glyph: '🧪', color: '#ffcc00' },
+  { name: 'Pale White Potion', glyph: '🧪', color: '#dddddd' }
+];
+
+const SCROLL_LABELS = [
+  'Scroll labeled XYZZY', 'Scroll labeled LOREM', 'Scroll labeled FOOBAR',
+  'Scroll labeled ZELGO', 'Scroll labeled KRUNK', 'Scroll labeled NIMHE'
+];
+
+const POTION_EFFECTS = [
+  { id: 'healing', name: 'Potion of Healing', desc: 'Restores 10 HP' },
+  { id: 'strength', name: 'Potion of Strength', desc: '+2 Attack for 30 turns' },
+  { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
+  { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
+  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
+  { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' }
+];
+
+const SCROLL_EFFECTS = [
+  { id: 'mapping', name: 'Scroll of Mapping', desc: 'Reveal entire floor' },
+  { id: 'fireball', name: 'Scroll of Fireball', desc: '8 damage to nearby enemies' },
+  { id: 'enchant', name: 'Scroll of Enchant', desc: '+1 to equipped weapon' },
+  { id: 'confusion', name: 'Scroll of Confusion', desc: 'Confuse visible enemies' },
+  { id: 'identify', name: 'Scroll of Identify', desc: 'Identify an item type' },
+  { id: 'summon', name: 'Scroll of Summoning', desc: 'Summon a golem ally' }
+];
+
+function randomizePotionScrollNames() {
+  const pc = shuffle([...POTION_COLORS]);
+  const sl = shuffle([...SCROLL_LABELS]);
+  potionNames = POTION_EFFECTS.map((e, i) => ({ ...e, fakeName: pc[i].name, color: pc[i].color }));
+  scrollNames = SCROLL_EFFECTS.map((e, i) => ({ ...e, fakeName: sl[i] }));
+  potionIdentified = {};
+  scrollIdentified = {};
+}
+
+// === ITEM DEFINITIONS ===
+const WEAPONS = [
+  { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, special: null, tier: 1, value: 10 },
+  { name: 'Short Sword', glyph: '⚔️', itemType: 'weapon', attack: 2, special: null, tier: 1, value: 25 },
+  { name: 'War Axe', glyph: '🪓', itemType: 'weapon', attack: 3, special: 'cleave', tier: 2, value: 50 },
+  { name: 'Flame Tongue', glyph: '🔥', itemType: 'weapon', attack: 2, special: 'burn', tier: 2, value: 65 },
+  { name: 'Frost Brand', glyph: '❄️', itemType: 'weapon', attack: 2, special: 'freeze', tier: 2, value: 65 },
+  { name: 'Vampiric Blade', glyph: '🩸', itemType: 'weapon', attack: 1, special: 'vampiric', tier: 3, value: 80 },
+  { name: 'Chaos Hammer', glyph: '🔨', itemType: 'weapon', attack: 4, special: 'chaos', tier: 3, value: 90 }
+];
+
+const ARMORS = [
+  { name: 'Leather Vest', glyph: '🛡️', itemType: 'armor', defense: 1, special: null, tier: 1, value: 15 },
+  { name: 'Chain Mail', glyph: '🛡️', itemType: 'armor', defense: 2, special: null, tier: 2, value: 40 },
+  { name: 'Plate Armor', glyph: '🛡️', itemType: 'armor', defense: 3, special: 'heavy', tier: 2, value: 55 },
+  { name: 'Shadow Cloak', glyph: '🧥', itemType: 'armor', defense: 1, special: 'stealth', tier: 3, value: 70 },
+  { name: 'Thorned Armor', glyph: '🛡️', itemType: 'armor', defense: 2, special: 'thorns', tier: 3, value: 75 }
+];
+
+const RINGS = [
+  { name: 'Ring of Sight', glyph: '💍', itemType: 'ring', special: 'sight', value: 50 },
+  { name: 'Ring of Haste', glyph: '💍', itemType: 'ring', special: 'haste', value: 60 },
+  { name: 'Ring of Protection', glyph: '💍', itemType: 'ring', special: 'protection', value: 55 },
+  { name: 'Ring of Hunger', glyph: '💍', itemType: 'ring', special: 'hunger', value: 45 }
+];
+
+const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
+
+// === ENEMY DEFINITIONS ===
+const ENEMY_TIERS = {
+  1: [
+    { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
+    { name: 'Skeleton', glyph: '💀', hp: 6, attack: 2, defense: 1, ai: 'patrol', xp: 5, special: null, detect: 6 },
+    { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
+    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5 }
+  ],
+  2: [
+    { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
+    { name: 'Ghost', glyph: '👻', hp: 6, attack: 3, defense: 0, ai: 'chase', xp: 10, special: 'phase', detect: 8 },
+    { name: 'Spider', glyph: '🕷️', hp: 5, attack: 2, defense: 0, ai: 'ambush', xp: 6, special: 'web', detect: 4 },
+    { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 }
+  ],
+  3: [
+    { name: 'Wraith', glyph: '🌑', hp: 10, attack: 5, defense: 1, ai: 'chase', xp: 15, special: 'drain', detect: 8 },
+    { name: 'Mimic', glyph: '📦', hp: 12, attack: 4, defense: 3, ai: 'ambush', xp: 18, special: 'mimic', detect: 3 },
+    { name: 'Necromancer', glyph: '🧙', hp: 8, attack: 2, defense: 1, ai: 'flee', xp: 20, special: 'summon', detect: 8 },
+    { name: 'Demon', glyph: '😈', hp: 18, attack: 5, defense: 3, ai: 'chase', xp: 22, special: 'fire_trail', detect: 7 }
+  ]
+};
+
+const BOSS = {
+  name: 'Glyph King', glyph: '👑', hp: 40, attack: 6, defense: 4,
+  ai: 'boss', xp: 100, special: 'boss', detect: 50
+};
+
+// === DUNGEON GENERATION (BSP) ===
+function generateFloor() {
+  const p = state.player;
+  state.map = new Uint8Array(MAP_W * MAP_H);
+  state.visible = new Uint8Array(MAP_W * MAP_H);
+  state.explored = new Uint8Array(MAP_W * MAP_H);
+  state.entities = [];
+  state.rooms = [];
+
+  if (state.floor === 10) {
+    generateBossFloor();
+  } else {
+    generateBSP();
+  }
+
+  // Place stairs down (except floor 10)
+  if (state.floor < 10) {
+    const farthestRoom = getFarthestRoom(p.x, p.y);
+    const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
+    const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+    setTile(sx, sy, T.STAIRS_DOWN);
+  }
+
+  // Spawn enemies
+  spawnEnemies();
+
+  // Spawn items
+  spawnItems();
+
+  // Place ghost from previous run
+  if (state.ghost && state.ghost.floor === state.floor) {
+    placeGhost();
+  }
+
+  // Merchant on floors 3, 6, 9
+  if ([3, 6, 9].includes(state.floor)) {
+    spawnMerchant();
+  }
+
+  // Spawn special tiles (risk/reward)
+  if (state.floor >= 2) {
+    spawnSpecialTiles();
+  }
+
+  computeFOV();
+  render();
+}
+
+function generateBSP() {
+  const root = { x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2, left: null, right: null, room: null };
+  splitNode(root, 0);
+  createRooms(root);
+  connectRooms(root);
+
+  // Place player in first room
+  const firstRoom = state.rooms[0];
+  state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
+  state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
+
+  // Add some doors
+  addDoors();
+}
+
+function splitNode(node, depth) {
+  if (depth > 5) return;
+  if (node.w < 16 || node.h < 16) return;
+  if (node.w < 10 && node.h < 10) return;
+
+  // Choose split direction — prefer splitting longer axis
+  let splitH;
+  if (node.w > node.h * 1.3) splitH = false;
+  else if (node.h > node.w * 1.3) splitH = true;
+  else splitH = Math.random() < 0.5;
+
+  if (splitH) {
+    const split = Math.floor(node.h * (0.35 + Math.random() * 0.3));
+    if (split < 8 || node.h - split < 8) return;
+    node.left = { x: node.x, y: node.y, w: node.w, h: split, left: null, right: null, room: null };
+    node.right = { x: node.x, y: node.y + split, w: node.w, h: node.h - split, left: null, right: null, room: null };
+  } else {
+    const split = Math.floor(node.w * (0.35 + Math.random() * 0.3));
+    if (split < 8 || node.w - split < 8) return;
+    node.left = { x: node.x, y: node.y, w: split, h: node.h, left: null, right: null, room: null };
+    node.right = { x: node.x + split, y: node.y, w: node.w - split, h: node.h, left: null, right: null, room: null };
+  }
+
+  splitNode(node.left, depth + 1);
+  splitNode(node.right, depth + 1);
+}
+
+function createRooms(node) {
+  if (node.left || node.right) {
+    if (node.left) createRooms(node.left);
+    if (node.right) createRooms(node.right);
+    return;
+  }
+  // Leaf node — create a room
+  const padX = 2, padY = 2;
+  const rw = Math.max(4, Math.floor(Math.random() * (node.w - padX * 2 - 2)) + 4);
+  const rh = Math.max(4, Math.floor(Math.random() * (node.h - padY * 2 - 2)) + 4);
+  const rx = node.x + padX + Math.floor(Math.random() * Math.max(1, node.w - padX * 2 - rw));
+  const ry = node.y + padY + Math.floor(Math.random() * Math.max(1, node.h - padY * 2 - rh));
+
+  node.room = { x: rx, y: ry, w: Math.min(rw, node.w - padX * 2), h: Math.min(rh, node.h - padY * 2) };
+  state.rooms.push(node.room);
+
+  // Carve room
+  for (let y = ry; y < ry + node.room.h && y < MAP_H - 1; y++) {
+    for (let x = rx; x < rx + node.room.w && x < MAP_W - 1; x++) {
+      setTile(x, y, T.FLOOR);
+    }
+  }
+}
+
+function getRoom(node) {
+  if (node.room) return node.room;
+  const rooms = [];
+  if (node.left) { const r = getRoom(node.left); if (r) rooms.push(r); }
+  if (node.right) { const r = getRoom(node.right); if (r) rooms.push(r); }
+  return rooms.length > 0 ? rooms[Math.floor(Math.random() * rooms.length)] : null;
+}
+
+function connectRooms(node) {
+  if (!node.left || !node.right) return;
+  connectRooms(node.left);
+  connectRooms(node.right);
+
+  const r1 = getRoom(node.left);
+  const r2 = getRoom(node.right);
+  if (!r1 || !r2) return;
+
+  const x1 = r1.x + Math.floor(r1.w / 2);
+  const y1 = r1.y + Math.floor(r1.h / 2);
+  const x2 = r2.x + Math.floor(r2.w / 2);
+  const y2 = r2.y + Math.floor(r2.h / 2);
+
+  // L-shaped corridor
+  if (Math.random() < 0.5) {
+    carveCorridor(x1, y1, x2, y1);
+    carveCorridor(x2, y1, x2, y2);
+  } else {
+    carveCorridor(x1, y1, x1, y2);
+    carveCorridor(x1, y2, x2, y2);
+  }
+}
+
+function carveCorridor(x1, y1, x2, y2) {
+  let x = x1, y = y1;
+  while (x !== x2 || y !== y2) {
+    if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) {
+      if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR);
+    }
+    if (x < x2) x++; else if (x > x2) x--;
+    if (y < y2) y++; else if (y > y2) y--;
+  }
+  if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) {
+    if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR);
+  }
+}
+
+function addDoors() {
+  for (let y = 1; y < MAP_H - 1; y++) {
+    for (let x = 1; x < MAP_W - 1; x++) {
+      if (getTile(x, y) !== T.CORRIDOR) continue;
+      // Check if this corridor tile is adjacent to a room and could be a door
+      const isHDoor = getTile(x - 1, y) === T.WALL && getTile(x + 1, y) === T.WALL &&
+                      (getTile(x, y - 1) === T.FLOOR || getTile(x, y - 1) === T.CORRIDOR) &&
+                      (getTile(x, y + 1) === T.FLOOR || getTile(x, y + 1) === T.CORRIDOR);
+      const isVDoor = getTile(x, y - 1) === T.WALL && getTile(x, y + 1) === T.WALL &&
+                      (getTile(x - 1, y) === T.FLOOR || getTile(x - 1, y) === T.CORRIDOR) &&
+                      (getTile(x + 1, y) === T.FLOOR || getTile(x + 1, y) === T.CORRIDOR);
+      if ((isHDoor || isVDoor) && Math.random() < 0.5) {
+        setTile(x, y, T.DOOR_CLOSED);
+      }
+    }
+  }
+}
+
+function generateBossFloor() {
+  // Big open arena with pillars
+  state.rooms = [];
+  // Fill with walls first (already done by Uint8Array init)
+  // Create a big room in the center
+  const room = { x: 10, y: 10, w: 30, h: 30 };
+  state.rooms.push(room);
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      setTile(x, y, T.FLOOR);
+    }
+  }
+  // Add pillars
+  for (let py = 15; py <= 35; py += 5) {
+    for (let px = 15; px <= 35; px += 5) {
+      setTile(px, py, T.WALL);
+    }
+  }
+  // Entrance corridor
+  for (let y = room.y + Math.floor(room.h / 2) - 1; y <= room.y + Math.floor(room.h / 2) + 1; y++) {
+    for (let x = 1; x < room.x; x++) {
+      setTile(x, y, T.CORRIDOR);
+    }
+  }
+  // Stairs up at entrance
+  setTile(2, room.y + Math.floor(room.h / 2), T.STAIRS_UP);
+  // Player start
+  state.player.x = 5;
+  state.player.y = room.y + Math.floor(room.h / 2);
+  // Boss in center
+  const boss = createEnemy(BOSS, 25, 25);
+  state.entities.push(boss);
+  Audio.boss();
+}
+
+// === TILE HELPERS ===
+function getTile(x, y) {
+  if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return T.WALL;
+  return state.map[y * MAP_W + x];
+}
+
+function setTile(x, y, t) {
+  if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return;
+  state.map[y * MAP_W + x] = t;
+}
+
+function isWalkable(x, y) {
+  const t = getTile(x, y);
+  return t !== T.WALL && t !== T.DOOR_CLOSED;
+}
+
+function isTransparent(x, y) {
+  const t = getTile(x, y);
+  return t !== T.WALL && t !== T.DOOR_CLOSED;
+}
+
+function getFarthestRoom(fromX, fromY) {
+  let best = state.rooms[0];
+  let bestDist = 0;
+  for (const room of state.rooms) {
+    const cx = room.x + Math.floor(room.w / 2);
+    const cy = room.y + Math.floor(room.h / 2);
+    const d = Math.abs(cx - fromX) + Math.abs(cy - fromY);
+    if (d > bestDist) { bestDist = d; best = room; }
+  }
+  return best;
+}
+
+// === ENTITY SYSTEM ===
+function createEnemy(template, x, y) {
+  return {
+    type: 'enemy',
+    x, y,
+    glyph: template.glyph,
+    name: template.name,
+    hp: template.hp,
+    maxHp: template.hp,
+    attack: template.attack,
+    defense: template.defense,
+    ai: template.ai,
+    xp: template.xp,
+    special: template.special,
+    detect: template.detect,
+    alertness: 0, // 0=unaware, 1=suspicious, 2=hostile
+    turnSkip: false, // for slow enemies
+    summonCooldown: 0,
+    patrolTarget: null,
+    isAlly: false,
+    allyTurns: 0,
+    confused: 0,
+    // Boss specific
+    phase: 1,
+    teleportCooldown: 0
+  };
+}
+
+function createItemEntity(item, x, y) {
+  return {
+    type: 'item',
+    x, y,
+    glyph: item.glyph,
+    name: item.name || item.fakeName || 'Item',
+    item: { ...item }
+  };
+}
+
+function entityAt(x, y, excludeItems) {
+  for (const e of state.entities) {
+    if (e.x === x && e.y === y) {
+      if (excludeItems && e.type === 'item') continue;
+      return e;
+    }
+  }
+  return null;
+}
+
+function enemyAt(x, y) {
+  for (const e of state.entities) {
+    if (e.x === x && e.y === y && e.type === 'enemy' && e.hp > 0) return e;
+  }
+  return null;
+}
+
+function itemsAt(x, y) {
+  return state.entities.filter(e => e.x === x && e.y === y && e.type === 'item');
+}
+
+function removeEntity(e) {
+  const idx = state.entities.indexOf(e);
+  if (idx >= 0) state.entities.splice(idx, 1);
+}
+
+// === SPAWNING ===
+function spawnEnemies() {
+  if (state.floor === 10) return; // Boss already placed
+  const floorConfig = getFloorConfig(state.floor);
+  const count = floorConfig.minEnemies + Math.floor(Math.random() * (floorConfig.maxEnemies - floorConfig.minEnemies + 1));
+  const tier = floorConfig.tier;
+  const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[1];
+  // Maybe add one from next tier
+  const nextTemplates = floorConfig.nextTier ? (ENEMY_TIERS[floorConfig.nextTier] || []) : [];
+
+  for (let i = 0; i < count; i++) {
+    const pos = randomFloorTile();
+    if (!pos) continue;
+    // Don't spawn on player
+    if (pos.x === state.player.x && pos.y === state.player.y) continue;
+    let template;
+    if (nextTemplates.length > 0 && i === count - 1) {
+      template = nextTemplates[Math.floor(Math.random() * nextTemplates.length)];
+    } else {
+      template = templates[Math.floor(Math.random() * templates.length)];
+    }
+    state.entities.push(createEnemy(template, pos.x, pos.y));
+  }
+}
+
+function spawnItems() {
+  const floorConfig = getFloorConfig(state.floor);
+  const count = floorConfig.minItems + Math.floor(Math.random() * (floorConfig.maxItems - floorConfig.minItems + 1));
+
+  for (let i = 0; i < count; i++) {
+    const pos = randomFloorTile();
+    if (!pos) continue;
+    const item = generateRandomItem(state.floor);
+    if (item) {
+      state.entities.push(createItemEntity(item, pos.x, pos.y));
+    }
+  }
+
+  // Food
+  const foodCount = floorConfig.food;
+  for (let i = 0; i < foodCount; i++) {
+    const pos = randomFloorTile();
+    if (pos) state.entities.push(createItemEntity({ ...FOOD }, pos.x, pos.y));
+  }
+
+  // Gold piles
+  const goldCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < goldCount; i++) {
+    const pos = randomFloorTile();
+    if (pos) {
+      const amount = 5 + Math.floor(Math.random() * (5 + state.floor * 3));
+      state.entities.push(createItemEntity({ name: `${amount} Gold`, glyph: '💰', itemType: 'gold', goldAmount: amount, value: 0 }, pos.x, pos.y));
+    }
+  }
+}
+
+function spawnMerchant() {
+  const room = state.rooms[Math.floor(Math.random() * state.rooms.length)];
+  const x = room.x + Math.floor(room.w / 2);
+  const y = room.y + 1;
+  state.entities.push({
+    type: 'merchant',
+    x, y,
+    glyph: '🧙',
+    name: 'Merchant',
+    shopItems: generateShopItems(state.floor)
+  });
+}
+
+function generateShopItems(floor) {
+  const items = [];
+  // Always have a healing potion
+  const healPotion = potionNames.find(p => p.id === 'healing');
+  items.push({ item: makePotion(healPotion), price: 15 });
+  // Random weapon or armor
+  const weaponPool = WEAPONS.filter(w => w.tier <= Math.ceil(floor / 3));
+  if (weaponPool.length > 0) {
+    const w = weaponPool[Math.floor(Math.random() * weaponPool.length)];
+    items.push({ item: { ...w }, price: w.value });
+  }
+  // Food
+  items.push({ item: { ...FOOD }, price: 8 });
+  return items;
+}
+
+function spawnSpecialTiles() {
+  const count = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < count; i++) {
+    const pos = randomFloorTile();
+    if (pos) setTile(pos.x, pos.y, T.SPECIAL);
+  }
+}
+
+function randomFloorTile() {
+  for (let attempts = 0; attempts < 100; attempts++) {
+    const x = Math.floor(Math.random() * MAP_W);
+    const y = Math.floor(Math.random() * MAP_H);
+    const t = getTile(x, y);
+    if (t === T.FLOOR || t === T.CORRIDOR) {
+      if (x === state.player.x && y === state.player.y) continue;
+      if (enemyAt(x, y)) continue;
+      return { x, y };
+    }
+  }
+  return null;
+}
+
+function getFloorConfig(floor) {
+  const configs = {
+    1:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
+    2:  { tier: 1, nextTier: null,  minEnemies: 4, maxEnemies: 5, minItems: 2, maxItems: 3, food: 1 },
+    3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
+    4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
+    5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
+    6:  { tier: 2, nextTier: 3,     minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    7:  { tier: 3, nextTier: null,  minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    8:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    9:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
+    10: { tier: 3, nextTier: null,  minEnemies: 0, maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
+  };
+  return configs[floor] || configs[1];
+}
+
+function generateRandomItem(floor) {
+  const roll = Math.random();
+  const tier = Math.ceil(floor / 3);
+  if (roll < 0.25) {
+    // Weapon
+    const pool = WEAPONS.filter(w => w.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
+    return { ...pool[Math.floor(Math.random() * pool.length)] };
+  } else if (roll < 0.4) {
+    // Armor
+    const pool = ARMORS.filter(a => a.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
+    return { ...pool[Math.floor(Math.random() * pool.length)] };
+  } else if (roll < 0.6) {
+    // Potion
+    const p = potionNames[Math.floor(Math.random() * potionNames.length)];
+    return makePotion(p);
+  } else if (roll < 0.8) {
+    // Scroll
+    const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
+    return makeScroll(s);
+  } else if (roll < 0.9) {
+    // Ring
+    return { ...RINGS[Math.floor(Math.random() * RINGS.length)] };
+  } else {
+    // Food
+    return { ...FOOD };
+  }
+}
+
+function makePotion(p) {
+  const identified = potionIdentified[p.id];
+  return {
+    itemType: 'potion',
+    glyph: '🧪',
+    name: identified ? p.name : p.fakeName,
+    trueName: p.name,
+    effectId: p.id,
+    desc: identified ? p.desc : '???',
+    color: p.color,
+    identified: !!identified,
+    value: 12
+  };
+}
+
+function makeScroll(s) {
+  const identified = scrollIdentified[s.id];
+  return {
+    itemType: 'scroll',
+    glyph: '📜',
+    name: identified ? s.name : s.fakeName,
+    trueName: s.name,
+    effectId: s.id,
+    desc: identified ? s.desc : '???',
+    identified: !!identified,
+    value: 15
+  };
+}
+
+// === FOV — RECURSIVE SHADOWCASTING ===
+const OCTANT_TRANSFORMS = [
+  { xx: 1, xy: 0, yx: 0, yy: 1 },
+  { xx: 0, xy: 1, yx: 1, yy: 0 },
+  { xx: 0, xy: -1, yx: 1, yy: 0 },
+  { xx: -1, xy: 0, yx: 0, yy: 1 },
+  { xx: -1, xy: 0, yx: 0, yy: -1 },
+  { xx: 0, xy: -1, yx: -1, yy: 0 },
+  { xx: 0, xy: 1, yx: -1, yy: 0 },
+  { xx: 1, xy: 0, yx: 0, yy: -1 }
+];
+
+function computeFOV() {
+  const p = state.player;
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0);
+  state.visible.fill(0);
+
+  // Player's tile is always visible
+  state.visible[p.y * MAP_W + p.x] = 1;
+  state.explored[p.y * MAP_W + p.x] = 1;
+
+  for (const oct of OCTANT_TRANSFORMS) {
+    castLight(p.x, p.y, 1, 1.0, 0.0, radius, oct);
+  }
+}
+
+function castLight(cx, cy, row, startSlope, endSlope, radius, oct) {
+  if (startSlope < endSlope) return;
+
+  let nextStartSlope = startSlope;
+
+  for (let i = row; i <= radius; i++) {
+    let blocked = false;
+
+    for (let dx = -i, dy = -i; dx <= 0; dx++) {
+      const mapX = cx + dx * oct.xx + dy * oct.xy;
+      const mapY = cy + dx * oct.yx + dy * oct.yy;
+
+      const leftSlope = (dx - 0.5) / (dy + 0.5);
+      const rightSlope = (dx + 0.5) / (dy - 0.5);
+
+      if (startSlope < rightSlope) continue;
+      if (endSlope > leftSlope) break;
+
+      // Within radius?
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > radius) continue;
+
+      if (mapX >= 0 && mapX < MAP_W && mapY >= 0 && mapY < MAP_H) {
+        state.visible[mapY * MAP_W + mapX] = 1;
+        state.explored[mapY * MAP_W + mapX] = 1;
+      }
+
+      if (blocked) {
+        if (!isTransparent(mapX, mapY)) {
+          nextStartSlope = rightSlope;
+          continue;
+        } else {
+          blocked = false;
+          startSlope = nextStartSlope;
+        }
+      } else if (!isTransparent(mapX, mapY) && i < radius) {
+        blocked = true;
+        castLight(cx, cy, i + 1, startSlope, rightSlope, radius, oct);
+        nextStartSlope = rightSlope;
+      }
+    }
+    if (blocked) break;
+  }
+}
+
+// === A* PATHFINDING (BOUNDED) ===
+function findPath(sx, sy, gx, gy, phaseThrough) {
+  const open = [{ x: sx, y: sy, g: 0, h: Math.abs(gx - sx) + Math.abs(gy - sy), parent: null }];
+  const closed = new Set();
+  let expansions = 0;
+
+  while (open.length > 0 && expansions < 25) {
+    open.sort((a, b) => (a.g + a.h) - (b.g + b.h));
+    const cur = open.shift();
+    const key = cur.x + ',' + cur.y;
+    if (closed.has(key)) continue;
+    closed.add(key);
+    expansions++;
+
+    if (cur.x === gx && cur.y === gy) {
+      // Trace back to first step
+      let node = cur;
+      while (node.parent && node.parent.parent) node = node.parent;
+      return { x: node.x - sx, y: node.y - sy };
+    }
+
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nx = cur.x + dx, ny = cur.y + dy;
+      const nk = nx + ',' + ny;
+      if (closed.has(nk)) continue;
+      if (!phaseThrough && !isWalkable(nx, ny)) {
+        // Allow walking to goal even if it's the player's position
+        if (nx !== gx || ny !== gy) continue;
+      }
+      if (phaseThrough && (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H)) continue;
+      // Don't walk into other enemies
+      const other = enemyAt(nx, ny);
+      if (other && (nx !== gx || ny !== gy)) continue;
+
+      open.push({ x: nx, y: ny, g: cur.g + 1, h: Math.abs(gx - nx) + Math.abs(gy - ny), parent: cur });
+    }
+  }
+
+  // Fallback: greedy move toward goal
+  return greedyStep(sx, sy, gx, gy, phaseThrough);
+}
+
+function greedyStep(sx, sy, gx, gy, phaseThrough) {
+  const dx = Math.sign(gx - sx);
+  const dy = Math.sign(gy - sy);
+  const candidates = [];
+  if (dx !== 0) candidates.push({ x: dx, y: 0 });
+  if (dy !== 0) candidates.push({ x: 0, y: dy });
+  if (dx !== 0 && dy !== 0) candidates.push({ x: dx, y: dy });
+
+  for (const c of candidates) {
+    const nx = sx + c.x, ny = sy + c.y;
+    if (phaseThrough || isWalkable(nx, ny)) {
+      if (!enemyAt(nx, ny)) return c;
+    }
+  }
+  return null;
+}
+
+// === COMBAT ===
+function attackEntity(attacker, defender) {
+  const atk = getEffectiveAttack(attacker);
+  const def = getEffectiveDefense(defender);
+  const isCrit = Math.random() < 0.1;
+  let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
+  if (isCrit) damage *= 2;
+
+  // Ghost miss chance
+  if (defender.special === 'phase' && Math.random() < 0.5) {
+    addMessage(`Your attack passes through the ${defender.name}!`, '');
+    Audio.miss();
+    return;
+  }
+
+  defender.hp -= damage;
+
+  const isPlayer = attacker === state.player;
+  const targetIsPlayer = defender === state.player;
+
+  if (isCrit) {
+    addMessage(`${isPlayer ? 'You' : attacker.name} critically hit${isPlayer ? '' : 's'} ${targetIsPlayer ? 'you' : defender.name} for ${damage}!`, 'damage');
+    Audio.crit();
+    screenShake();
+  } else {
+    addMessage(`${isPlayer ? 'You' : attacker.name} hit${isPlayer ? '' : 's'} ${targetIsPlayer ? 'you' : defender.name} for ${damage}.`, targetIsPlayer ? 'damage' : '');
+    if (targetIsPlayer) Audio.playerHit(); else Audio.hit();
+  }
+
+  if (targetIsPlayer) {
+    screenShake();
+    haptic(50);
+  } else {
+    haptic(30);
+  }
+
+  // Weapon specials
+  if (isPlayer && state.player.equipped.weapon) {
+    applyWeaponSpecial(state.player.equipped.weapon, defender);
+  }
+
+  // Thorned armor
+  if (targetIsPlayer && state.player.equipped.armor?.special === 'thorns') {
+    attacker.hp -= 1;
+    addMessage(`Thorns deal 1 damage to ${attacker.name}!`, '');
+  }
+
+  // Wraith drain
+  if (attacker.special === 'drain' && targetIsPlayer) {
+    state.player.maxHp = Math.max(5, state.player.maxHp - 1);
+    addMessage('You feel your life force drain away!', 'damage');
+  }
+
+  // Spider web
+  if (attacker.special === 'web' && targetIsPlayer && Math.random() < 0.4) {
+    addStatusEffect(state.player, 'webbed', 1);
+    addMessage('You are caught in a web!', 'damage');
+  }
+
+  // Check death
+  if (defender.hp <= 0) {
+    if (targetIsPlayer) {
+      playerDeath(attacker.name);
+    } else {
+      killEnemy(defender);
+      // Vampiric weapon
+      if (isPlayer && state.player.equipped.weapon?.special === 'vampiric') {
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1);
+        addMessage('You drain life from your foe!', 'good');
+      }
+    }
+  }
+}
+
+function getEffectiveAttack(entity) {
+  if (entity === state.player) {
+    let atk = state.player.attack;
+    if (state.player.equipped.weapon) atk += state.player.equipped.weapon.attack;
+    // Chaos hammer penalty to defense but we handle attack bonus here
+    if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
+    // Strength potion
+    if (hasStatusEffect(state.player, 'strength')) atk += 2;
+    return Math.max(1, atk);
+  }
+  return entity.attack;
+}
+
+function getEffectiveDefense(entity) {
+  if (entity === state.player) {
+    let def = state.player.defense;
+    if (state.player.equipped.armor) def += state.player.equipped.armor.defense;
+    if (state.player.equipped.ring?.special === 'protection') def += 1;
+    if (state.player.equipped.weapon?.special === 'chaos') def -= 1;
+    return Math.max(0, def);
+  }
+  return entity.defense;
+}
+
+function applyWeaponSpecial(weapon, target) {
+  if (!weapon.special || target.hp <= 0) return;
+  switch (weapon.special) {
+    case 'burn':
+      addStatusEffect(target, 'burning', 3);
+      addMessage(`${target.name} catches fire!`, 'damage');
+      break;
+    case 'freeze':
+      if (Math.random() < 0.3) {
+        addStatusEffect(target, 'frozen', 1);
+        addMessage(`${target.name} is frozen solid!`, '');
+      }
+      break;
+  }
+}
+
+function killEnemy(enemy) {
+  state.player.xp += enemy.xp;
+  state.enemiesKilled++;
+  state.score += enemy.xp * 10;
+  Audio.kill();
+
+  // Slime split
+  if (enemy.special === 'split') {
+    const template = { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5 };
+    for (const [dx, dy] of [[0, 1], [1, 0]]) {
+      const nx = enemy.x + dx, ny = enemy.y + dy;
+      if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+        const mini = createEnemy(template, nx, ny);
+        mini.alertness = 2;
+        state.entities.push(mini);
+      }
+    }
+    addMessage('The Slime splits in two!', 'damage');
+  }
+
+  addMessage(`${enemy.name} is destroyed! (+${enemy.xp} XP)`, 'good');
+  removeEntity(enemy);
+
+  // Check level up
+  while (state.player.xp >= state.player.xpToNext) {
+    state.player.xp -= state.player.xpToNext;
+    state.player.level++;
+    state.player.xpToNext = 15 + state.player.level * 10;
+    showLevelUp();
+  }
+}
+
+function playerDeath(killerName) {
+  state.gameOver = true;
+  state.score += state.player.gold + state.floor * 50 + state.player.level * 20;
+  Audio.death();
+  haptic(100);
+
+  $('death-cause').textContent = `Slain by a ${killerName} on Floor ${state.floor}`;
+  $('death-stats').innerHTML = `
+    Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
+    Enemies slain: <span>${state.enemiesKilled}</span><br>
+    Items found: <span>${state.itemsFound}</span><br>
+    Floors explored: <span>${state.floor}</span>
+  `;
+  $('last-words-input').value = '';
+
+  setTimeout(() => {
+    $('death-overlay').classList.add('active');
+  }, 300);
+}
+
+function showVictory() {
+  state.victory = true;
+  state.score += state.player.gold + 500 + state.player.hp * 5 + state.player.level * 50;
+  Audio.victory();
+  haptic(100);
+
+  $('victory-stats').innerHTML = `
+    Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
+    Enemies slain: <span>${state.enemiesKilled}</span><br>
+    Items found: <span>${state.itemsFound}</span><br>
+    HP remaining: <span>${state.player.hp}/${state.player.maxHp}</span>
+  `;
+
+  setTimeout(() => {
+    $('victory-overlay').classList.add('active');
+  }, 500);
+
+  saveHighScore();
+}
+
+// === LEVEL UP ===
+function showLevelUp() {
+  Audio.levelUp();
+  haptic(50);
+  $('canvas-wrap').classList.add('levelup-flash');
+  setTimeout(() => $('canvas-wrap').classList.remove('levelup-flash'), 500);
+
+  inputLocked = true;
+  $('levelup-label').textContent = `Level ${state.player.level}!`;
+
+  const allPerks = [
+    { name: '+3 Max HP', desc: 'Increase max HP by 3 and heal 3', apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); }},
+    { name: '+1 Attack', desc: 'Increase base attack by 1', apply: () => { state.player.attack += 1; }},
+    { name: '+1 Defense', desc: 'Increase base defense by 1', apply: () => { state.player.defense += 1; }},
+    { name: 'Regeneration', desc: 'Heal 1 HP every 20 turns', apply: () => { state.player.hasRegen = true; }, rare: true, unique: true },
+    { name: '+5 Max HP', desc: 'Increase max HP by 5 and full heal', apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true }
+  ];
+
+  // Filter out already-owned unique perks
+  const available = allPerks.filter(p => {
+    if (p.unique && p.name === 'Regeneration' && state.player.hasRegen) return false;
+    return true;
+  });
+
+  // Pick 3 random perks (weighted: rare perks less likely)
+  const perks = [];
+  const pool = [...available];
+  while (perks.length < 3 && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const perk = pool[idx];
+    if (perk.rare && Math.random() > 0.3) {
+      pool.splice(idx, 1);
+      pool.push(perk); // re-add for another chance
+      continue;
+    }
+    perks.push(perk);
+    pool.splice(idx, 1);
+  }
+
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  for (const perk of perks) {
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    btn.innerHTML = `<div class="perk-name">${perk.name}</div><div class="perk-desc">${perk.desc}</div>`;
+    btn.addEventListener('click', () => {
+      perk.apply();
+      $('levelup-overlay').classList.remove('active');
+      inputLocked = false;
+      updateUI();
+      render();
+    });
+    container.appendChild(btn);
+  }
+
+  $('levelup-overlay').classList.add('active');
+}
+
+// === STATUS EFFECTS ===
+function addStatusEffect(entity, type, turns) {
+  const existing = entity.statusEffects?.find(s => s.type === type);
+  if (existing) { existing.turns = Math.max(existing.turns, turns); return; }
+  if (!entity.statusEffects) entity.statusEffects = [];
+  entity.statusEffects.push({ type, turns });
+}
+
+function hasStatusEffect(entity, type) {
+  return entity.statusEffects?.some(s => s.type === type);
+}
+
+function processStatusEffects() {
+  // Player effects
+  processEntityEffects(state.player);
+
+  // Enemy effects
+  for (const e of state.entities) {
+    if (e.type === 'enemy') processEntityEffects(e);
+  }
+}
+
+function processEntityEffects(entity) {
+  if (!entity.statusEffects) return;
+  const isPlayer = entity === state.player;
+
+  for (let i = entity.statusEffects.length - 1; i >= 0; i--) {
+    const eff = entity.statusEffects[i];
+    switch (eff.type) {
+      case 'burning':
+        entity.hp -= 2;
+        if (isPlayer) addMessage('You burn! (-2 HP)', 'damage');
+        break;
+      case 'poison':
+        entity.hp -= 3;
+        if (isPlayer) addMessage('Poison courses through you! (-3 HP)', 'damage');
+        break;
+    }
+
+    eff.turns--;
+    if (eff.turns <= 0) {
+      entity.statusEffects.splice(i, 1);
+      if (isPlayer && eff.type === 'invisibility') addMessage('You become visible again.', '');
+      if (isPlayer && eff.type === 'strength') addMessage('Your strength fades.', '');
+    }
+  }
+
+  // Check death from status effects
+  if (entity.hp <= 0 && isPlayer) {
+    playerDeath('status effects');
+  } else if (entity.hp <= 0 && !isPlayer) {
+    addMessage(`${entity.name} succumbs to their wounds!`, 'good');
+    removeEntity(entity);
+    state.enemiesKilled++;
+  }
+}
+
+// === ENEMY AI ===
+function processEnemies() {
+  // Sort by distance to player (closest first)
+  const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0);
+  enemies.sort((a, b) => {
+    const da = Math.abs(a.x - state.player.x) + Math.abs(a.y - state.player.y);
+    const db = Math.abs(b.x - state.player.x) + Math.abs(b.y - state.player.y);
+    return da - db;
+  });
+
+  for (const enemy of enemies) {
+    if (state.gameOver) return;
+    if (enemy.hp <= 0) continue;
+
+    // Frozen — skip turn
+    if (hasStatusEffect(enemy, 'frozen')) continue;
+
+    // Slow enemies skip every other turn
+    if (enemy.special === 'slow') {
+      enemy.turnSkip = !enemy.turnSkip;
+      if (enemy.turnSkip) continue;
+    }
+
+    // Ally behavior
+    if (enemy.isAlly) {
+      enemy.allyTurns--;
+      if (enemy.allyTurns <= 0) {
+        addMessage(`Your ${enemy.name} crumbles to dust.`, '');
+        removeEntity(enemy);
+        continue;
+      }
+      allyAI(enemy);
+      continue;
+    }
+
+    // Confused — move randomly
+    if (enemy.confused > 0) {
+      enemy.confused--;
+      const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      tryMoveEnemy(enemy, enemy.x + d[0], enemy.y + d[1]);
+      continue;
+    }
+
+    // Detection
+    const dist = Math.abs(enemy.x - state.player.x) + Math.abs(enemy.y - state.player.y);
+    const playerInvis = hasStatusEffect(state.player, 'invisibility');
+    const stealthBonus = state.player.equipped.armor?.special === 'stealth' ? 2 : 0;
+    const canDetect = dist <= enemy.detect - stealthBonus && !playerInvis;
+
+    if (canDetect && hasLOS(enemy.x, enemy.y, state.player.x, state.player.y)) {
+      enemy.alertness = 2;
+    } else if (enemy.alertness > 0 && dist > enemy.detect + 3) {
+      enemy.alertness = Math.max(0, enemy.alertness - 1);
+    }
+
+    // Execute AI
+    switch (enemy.ai) {
+      case 'wander': wanderAI(enemy); break;
+      case 'chase': chaseAI(enemy); break;
+      case 'patrol': patrolAI(enemy); break;
+      case 'ambush': ambushAI(enemy); break;
+      case 'flee': fleeAI(enemy); break;
+      case 'boss': bossAI(enemy); break;
+      default: wanderAI(enemy);
+    }
+  }
+}
+
+function wanderAI(enemy) {
+  if (enemy.alertness >= 2) {
+    chaseAI(enemy);
+    return;
+  }
+  // Rat flees at low HP
+  if (enemy.special === 'flee' && enemy.hp <= 1) {
+    fleeAI(enemy);
+    return;
+  }
+  // Random movement
+  if (Math.random() < 0.4) {
+    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    // Bats move erratically
+    if (enemy.special === 'erratic') {
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      tryMoveEnemy(enemy, enemy.x + d[0], enemy.y + d[1]);
+    } else {
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      tryMoveEnemy(enemy, enemy.x + d[0], enemy.y + d[1]);
+    }
+  }
+}
+
+function chaseAI(enemy) {
+  if (enemy.alertness < 2) { wanderAI(enemy); return; }
+
+  const px = state.player.x, py = state.player.y;
+  const dist = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
+
+  // Adjacent — attack
+  if (dist === 1) {
+    attackEntity(enemy, state.player);
+    return;
+  }
+
+  // Demon fire trail
+  if (enemy.special === 'fire_trail' && getTile(enemy.x, enemy.y) === T.FLOOR) {
+    // Leave a burning effect that damages player if stepped on
+    state.entities.push({
+      type: 'hazard',
+      x: enemy.x, y: enemy.y,
+      glyph: '🔥',
+      name: 'Fire',
+      hazardType: 'fire',
+      turns: 5
+    });
+  }
+
+  const step = findPath(enemy.x, enemy.y, px, py, enemy.special === 'phase');
+  if (step) {
+    tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
+  }
+}
+
+function patrolAI(enemy) {
+  if (enemy.alertness >= 2) { chaseAI(enemy); return; }
+
+  if (!enemy.patrolTarget || (enemy.x === enemy.patrolTarget.x && enemy.y === enemy.patrolTarget.y)) {
+    // Pick new patrol target
+    const room = state.rooms[Math.floor(Math.random() * state.rooms.length)];
+    enemy.patrolTarget = { x: room.x + Math.floor(Math.random() * room.w), y: room.y + Math.floor(Math.random() * room.h) };
+  }
+
+  const step = findPath(enemy.x, enemy.y, enemy.patrolTarget.x, enemy.patrolTarget.y, false);
+  if (step) {
+    tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
+  }
+}
+
+function ambushAI(enemy) {
+  const dist = Math.abs(enemy.x - state.player.x) + Math.abs(enemy.y - state.player.y);
+  if (dist <= 1) {
+    enemy.alertness = 2;
+    attackEntity(enemy, state.player);
+  } else if (enemy.alertness >= 2) {
+    chaseAI(enemy);
+  }
+  // Otherwise sit still
+}
+
+function fleeAI(enemy) {
+  // Necromancer: summon and flee
+  if (enemy.special === 'summon' && enemy.alertness >= 2) {
+    if (enemy.summonCooldown <= 0) {
+      // Summon a skeleton
+      const template = ENEMY_TIERS[1][1]; // Skeleton
+      for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+        const nx = enemy.x + dx, ny = enemy.y + dy;
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+          const minion = createEnemy(template, nx, ny);
+          minion.alertness = 2;
+          state.entities.push(minion);
+          addMessage(`${enemy.name} summons a ${template.name}!`, 'damage');
+          break;
+        }
+      }
+      enemy.summonCooldown = 3;
+    } else {
+      enemy.summonCooldown--;
+    }
+  }
+
+  if (enemy.alertness < 2) { wanderAI(enemy); return; }
+
+  // Move away from player
+  const dx = Math.sign(enemy.x - state.player.x);
+  const dy = Math.sign(enemy.y - state.player.y);
+  const candidates = [[dx, 0], [0, dy], [dx, dy]].filter(c => c[0] !== 0 || c[1] !== 0);
+
+  for (const [mx, my] of candidates) {
+    const nx = enemy.x + mx, ny = enemy.y + my;
+    if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+      enemy.x = nx;
+      enemy.y = ny;
+      return;
+    }
+  }
+}
+
+function bossAI(enemy) {
+  const px = state.player.x, py = state.player.y;
+  const dist = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
+
+  // Phase 2
+  if (enemy.hp <= 20 && enemy.phase === 1) {
+    enemy.phase = 2;
+    addMessage('The Glyph King enters a fury!', 'damage');
+    screenShake();
+  }
+
+  // Summon minions
+  if (enemy.summonCooldown <= 0) {
+    const template = ENEMY_TIERS[1][1]; // Skeleton
+    for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      const nx = enemy.x + dx, ny = enemy.y + dy;
+      if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+        const minion = createEnemy(template, nx, ny);
+        minion.alertness = 2;
+        state.entities.push(minion);
+        addMessage('The Glyph King summons a minion!', 'damage');
+        break;
+      }
+    }
+    enemy.summonCooldown = enemy.phase === 1 ? 5 : 3;
+  } else {
+    enemy.summonCooldown--;
+  }
+
+  // Phase 2: teleport
+  if (enemy.phase === 2 && enemy.teleportCooldown <= 0 && dist > 2) {
+    const pos = randomFloorTile();
+    if (pos) {
+      enemy.x = pos.x;
+      enemy.y = pos.y;
+      addMessage('The Glyph King teleports!', 'damage');
+      enemy.teleportCooldown = 3;
+    }
+  } else {
+    enemy.teleportCooldown--;
+  }
+
+  // Phase 2: projectile
+  if (enemy.phase === 2 && dist > 1 && Math.random() < 0.4) {
+    const dx = Math.sign(px - enemy.x);
+    const dy = Math.sign(py - enemy.y);
+    // Trace line
+    let bx = enemy.x + dx, by = enemy.y + dy;
+    for (let i = 0; i < 10; i++) {
+      if (!isWalkable(bx, by)) break;
+      if (bx === px && by === py) {
+        state.player.hp -= 3;
+        addMessage('A dark bolt strikes you! (-3 HP)', 'damage');
+        screenShake();
+        Audio.playerHit();
+        haptic(50);
+        if (state.player.hp <= 0) { playerDeath('Glyph King'); return; }
+        break;
+      }
+      bx += dx;
+      by += dy;
+    }
+  }
+
+  // Melee
+  if (dist === 1) {
+    attackEntity(enemy, state.player);
+  } else {
+    const step = findPath(enemy.x, enemy.y, px, py, false);
+    if (step) tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
+  }
+}
+
+function allyAI(ally) {
+  // Find nearest enemy
+  let nearestEnemy = null, nearestDist = 999;
+  for (const e of state.entities) {
+    if (e.type !== 'enemy' || e.isAlly || e.hp <= 0) continue;
+    const d = Math.abs(e.x - ally.x) + Math.abs(e.y - ally.y);
+    if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
+  }
+
+  if (!nearestEnemy) return;
+
+  if (nearestDist === 1) {
+    // Attack
+    const dmg = Math.max(1, ally.attack - nearestEnemy.defense + Math.floor(Math.random() * 3) - 1);
+    nearestEnemy.hp -= dmg;
+    addMessage(`Your ${ally.name} hits ${nearestEnemy.name} for ${dmg}!`, '');
+    if (nearestEnemy.hp <= 0) {
+      addMessage(`${nearestEnemy.name} is destroyed!`, 'good');
+      removeEntity(nearestEnemy);
+      state.enemiesKilled++;
+    }
+  } else {
+    const step = findPath(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y, false);
+    if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
+  }
+}
+
+function tryMoveEnemy(enemy, nx, ny) {
+  const phaseThrough = enemy.special === 'phase';
+  if (phaseThrough) {
+    if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
+  } else {
+    if (!isWalkable(nx, ny)) return;
+  }
+
+  // Don't move onto other enemies (unless phasing)
+  const other = enemyAt(nx, ny);
+  if (other && other !== enemy) return;
+
+  // Don't move onto player — that's handled by attack
+  if (nx === state.player.x && ny === state.player.y) return;
+
+  enemy.x = nx;
+  enemy.y = ny;
+}
+
+function hasLOS(x1, y1, x2, y2) {
+  // Bresenham line check
+  let dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+  let sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
+  let err = dx - dy;
+  let x = x1, y = y1;
+
+  while (true) {
+    if (x === x2 && y === y2) return true;
+    if (!isTransparent(x, y) && !(x === x1 && y === y1)) return false;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+}
+
+// === PLAYER ACTIONS ===
+function playerMove(dx, dy) {
+  if (inputLocked || state.gameOver || state.victory) return;
+
+  const p = state.player;
+  const nx = p.x + dx, ny = p.y + dy;
+
+  // Webbed — skip movement
+  if (hasStatusEffect(p, 'webbed')) {
+    addMessage('You struggle free from the web!', '');
+    endTurn();
+    return;
+  }
+
+  // Check for enemy at destination
+  const enemy = enemyAt(nx, ny);
+  if (enemy) {
+    attackEntity(p, enemy);
+    endTurn();
+    return;
+  }
+
+  // Check for closed door
+  if (getTile(nx, ny) === T.DOOR_CLOSED) {
+    setTile(nx, ny, T.DOOR_OPEN);
+    addMessage('You open the door.', '');
+    Audio.door();
+    endTurn();
+    return;
+  }
+
+  // Check walkable
+  if (!isWalkable(nx, ny)) return;
+
+  p.x = nx;
+  p.y = ny;
+  Audio.step();
+  haptic(10);
+
+  // Check for items on ground
+  autoPickup();
+
+  // Check for special tile
+  if (getTile(nx, ny) === T.SPECIAL) {
+    triggerSpecialEvent();
+    setTile(nx, ny, T.FLOOR);
+  }
+
+  // Check for hazards
+  const hazard = state.entities.find(e => e.type === 'hazard' && e.x === nx && e.y === ny);
+  if (hazard && hazard.hazardType === 'fire') {
+    state.player.hp -= 1;
+    addMessage('You step in fire! (-1 HP)', 'damage');
+    if (state.player.hp <= 0) { playerDeath('fire'); return; }
+  }
+
+  // Check for merchant
+  const merchant = state.entities.find(e => e.type === 'merchant' && e.x === nx && e.y === ny);
+  if (merchant) {
+    showMerchant(merchant);
+    return; // Don't end turn yet, merchant UI is open
+  }
+
+  // Ring of haste: 30% chance for free extra move
+  if (hasRingEffect('haste') && Math.random() < 0.3) {
+    addMessage('You move with haste!', 'good');
+    computeFOV();
+    updateUI();
+    render();
+    return; // Free move — don't end turn
+  }
+
+  endTurn();
+}
+
+function playerWait() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  addMessage('You wait...', '');
+  endTurn();
+}
+
+function playerPickup() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const items = itemsAt(state.player.x, state.player.y);
+  if (items.length === 0) {
+    addMessage('Nothing to pick up here.', '');
+    return;
+  }
+  for (const item of items) {
+    pickupItem(item);
+  }
+  endTurn();
+}
+
+function autoPickup() {
+  const items = itemsAt(state.player.x, state.player.y);
+  for (const item of [...items]) {
+    if (item.item.itemType === 'gold') {
+      state.player.gold += item.item.goldAmount;
+      addMessage(`You pick up ${item.item.goldAmount} gold!`, 'gold');
+      Audio.gold();
+      removeEntity(item);
+      state.score += item.item.goldAmount;
+    }
+  }
+}
+
+function pickupItem(itemEntity) {
+  if (itemEntity.item.itemType === 'gold') {
+    state.player.gold += itemEntity.item.goldAmount;
+    addMessage(`You pick up ${itemEntity.item.goldAmount} gold!`, 'gold');
+    Audio.gold();
+    removeEntity(itemEntity);
+    return;
+  }
+  if (state.player.inventory.length >= MAX_INVENTORY) {
+    addMessage('Inventory full!', 'damage');
+    return;
+  }
+  state.player.inventory.push(itemEntity.item);
+  state.itemsFound++;
+  addMessage(`You pick up ${itemEntity.item.name}.`, 'good');
+  Audio.pickup();
+  removeEntity(itemEntity);
+}
+
+function playerDescend() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const t = getTile(state.player.x, state.player.y);
+  if (t !== T.STAIRS_DOWN) {
+    addMessage('No stairs here.', '');
+    return;
+  }
+
+  state.floor++;
+  Audio.descend();
+  haptic(30);
+
+  // Fade transition
+  $('fade').classList.add('active');
+  inputLocked = true;
+
+  setTimeout(() => {
+    generateFloor();
+    // Place player at stairs up position or first room
+    if (state.floor < 10) {
+      const firstRoom = state.rooms[0];
+      state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
+      state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
+      setTile(state.player.x, state.player.y, T.STAIRS_UP);
+    }
+    addMessage(`You descend to floor ${state.floor}...`, '');
+    if (state.floor === 10) addMessage('You sense an overwhelming presence...', 'damage');
+    computeFOV();
+    updateUI();
+    render();
+    $('fade').classList.remove('active');
+    inputLocked = false;
+  }, 400);
+}
+
+function useItem(item, index) {
+  const p = state.player;
+
+  switch (item.itemType) {
+    case 'weapon':
+      // Unequip current weapon, equip new one
+      if (p.equipped.weapon) p.inventory.push(p.equipped.weapon);
+      p.equipped.weapon = item;
+      p.inventory.splice(index, 1);
+      addMessage(`You equip the ${item.name}.`, 'good');
+      Audio.useItem();
+      break;
+
+    case 'armor':
+      if (p.equipped.armor) p.inventory.push(p.equipped.armor);
+      p.equipped.armor = item;
+      p.inventory.splice(index, 1);
+      addMessage(`You equip the ${item.name}.`, 'good');
+      Audio.useItem();
+      break;
+
+    case 'ring':
+      if (p.equipped.ring) p.inventory.push(p.equipped.ring);
+      p.equipped.ring = item;
+      p.inventory.splice(index, 1);
+      addMessage(`You put on the ${item.name}.`, 'good');
+      Audio.useItem();
+      break;
+
+    case 'potion':
+      applyPotionEffect(item);
+      p.inventory.splice(index, 1);
+      // Identify this potion type
+      if (!item.identified) {
+        potionIdentified[item.effectId] = true;
+        addMessage(`It was a ${item.trueName}!`, 'good');
+        // Update names of matching potions in inventory
+        for (const inv of p.inventory) {
+          if (inv.itemType === 'potion' && inv.effectId === item.effectId) {
+            inv.name = inv.trueName;
+            inv.identified = true;
+          }
+        }
+      }
+      break;
+
+    case 'scroll':
+      applyScrollEffect(item);
+      p.inventory.splice(index, 1);
+      if (!item.identified) {
+        scrollIdentified[item.effectId] = true;
+        addMessage(`It was a ${item.trueName}!`, 'good');
+        for (const inv of p.inventory) {
+          if (inv.itemType === 'scroll' && inv.effectId === item.effectId) {
+            inv.name = inv.trueName;
+            inv.identified = true;
+          }
+        }
+      }
+      break;
+
+    case 'food':
+      p.hunger = Math.min(100, p.hunger + 30);
+      p.inventory.splice(index, 1);
+      addMessage('You eat a ration. (+30 hunger)', 'good');
+      Audio.useItem();
+      break;
+  }
+
+  updateUI();
+  render();
+}
+
+function dropItem(index) {
+  const item = state.player.inventory[index];
+  state.entities.push(createItemEntity(item, state.player.x, state.player.y));
+  state.player.inventory.splice(index, 1);
+  addMessage(`You drop the ${item.name}.`, '');
+  updateUI();
+  render();
+}
+
+function applyPotionEffect(potion) {
+  const p = state.player;
+  Audio.useItem();
+  switch (potion.effectId) {
+    case 'healing':
+      p.hp = Math.min(p.maxHp, p.hp + 10);
+      addMessage('You feel much better! (+10 HP)', 'good');
+      break;
+    case 'strength':
+      addStatusEffect(p, 'strength', 30);
+      addMessage('You feel incredibly strong!', 'good');
+      break;
+    case 'invisibility':
+      addStatusEffect(p, 'invisibility', 15);
+      addMessage('You fade from sight!', 'good');
+      break;
+    case 'poison':
+      addStatusEffect(p, 'poison', 5);
+      addMessage('That tasted terrible! You feel sick!', 'damage');
+      break;
+    case 'experience':
+      p.xp += 20;
+      addMessage('Wisdom floods your mind! (+20 XP)', 'good');
+      while (p.xp >= p.xpToNext) {
+        p.xp -= p.xpToNext;
+        p.level++;
+        p.xpToNext = 15 + p.level * 10;
+        showLevelUp();
+      }
+      break;
+    case 'teleport':
+      const pos = randomFloorTile();
+      if (pos) { p.x = pos.x; p.y = pos.y; }
+      addMessage('The world blurs around you!', '');
+      computeFOV();
+      break;
+  }
+}
+
+function applyScrollEffect(scroll) {
+  Audio.useItem();
+  switch (scroll.effectId) {
+    case 'mapping':
+      state.explored.fill(1);
+      addMessage('The layout of this floor is revealed!', 'good');
+      break;
+    case 'fireball': {
+      let hits = 0;
+      for (const e of [...state.entities]) {
+        if (e.type !== 'enemy') continue;
+        const d = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
+        if (d <= 3) {
+          e.hp -= 8;
+          hits++;
+          if (e.hp <= 0) {
+            addMessage(`${e.name} is incinerated!`, 'good');
+            removeEntity(e);
+            state.player.xp += e.xp;
+            state.enemiesKilled++;
+          }
+        }
+      }
+      addMessage(`A fireball erupts! ${hits} enemies hit!`, 'damage');
+      screenShake();
+      break;
+    }
+    case 'enchant':
+      if (state.player.equipped.weapon) {
+        state.player.equipped.weapon.attack += 1;
+        state.player.equipped.weapon.name += ' +';
+        addMessage(`Your ${state.player.equipped.weapon.name} glows brighter!`, 'good');
+      } else {
+        addMessage('You have no weapon to enchant.', '');
+      }
+      break;
+    case 'confusion':
+      for (const e of state.entities) {
+        if (e.type !== 'enemy') continue;
+        if (state.visible[e.y * MAP_W + e.x]) {
+          e.confused = 10;
+        }
+      }
+      addMessage('Visible enemies look dazed!', 'good');
+      break;
+    case 'identify':
+      // Identify all potions and scrolls in inventory
+      for (const item of state.player.inventory) {
+        if (item.itemType === 'potion' && !item.identified) {
+          potionIdentified[item.effectId] = true;
+          item.name = item.trueName;
+          item.identified = true;
+        }
+        if (item.itemType === 'scroll' && !item.identified) {
+          scrollIdentified[item.effectId] = true;
+          item.name = item.trueName;
+          item.identified = true;
+        }
+      }
+      addMessage('Your items shimmer with clarity!', 'good');
+      break;
+    case 'summon': {
+      const pos = randomFloorTile();
+      if (pos) {
+        const golem = createEnemy({ name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 }, pos.x, pos.y);
+        golem.isAlly = true;
+        golem.allyTurns = 20;
+        golem.alertness = 2;
+        state.entities.push(golem);
+        addMessage('A stone golem materializes to aid you!', 'good');
+      }
+      break;
+    }
+  }
+}
+
+// === SPECIAL EVENT TILES ===
+function triggerSpecialEvent() {
+  const roll = Math.random();
+  if (roll < 0.35) {
+    // Treasure
+    const item = generateRandomItem(state.floor + 1);
+    if (item) {
+      state.player.inventory.push(item);
+      state.itemsFound++;
+      addMessage(`A hidden cache! You find a ${item.name}!`, 'gold');
+      Audio.pickup();
+    }
+  } else if (roll < 0.6) {
+    // Ambush
+    const template = (ENEMY_TIERS[Math.ceil(state.floor / 3)] || ENEMY_TIERS[1])[0];
+    for (let i = 0; i < 2; i++) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = state.player.x + dx * (i + 1), ny = state.player.y + dy * (i + 1);
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+          const e = createEnemy(template, nx, ny);
+          e.alertness = 2;
+          state.entities.push(e);
+          break;
+        }
+      }
+    }
+    addMessage('An ambush! Enemies emerge from the shadows!', 'damage');
+    screenShake();
+  } else {
+    // Sacrifice shrine
+    showShrineChoice();
+  }
+}
+
+function showShrineChoice() {
+  inputLocked = true;
+  const sacrifices = [
+    { text: 'Sacrifice 5 Max HP for +2 Attack', apply: () => { state.player.maxHp -= 5; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.attack += 2; }},
+    { text: 'Sacrifice 10 Gold for +1 Defense', apply: () => { state.player.gold = Math.max(0, state.player.gold - 10); state.player.defense += 1; }},
+    { text: 'Leave the shrine alone', apply: () => {} }
+  ];
+
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  $('levelup-overlay').querySelector('h1').textContent = '⛩️ SHRINE';
+  $('levelup-label').textContent = 'Make an offering?';
+
+  for (const sac of sacrifices) {
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    btn.innerHTML = `<div class="perk-name">${sac.text}</div>`;
+    btn.addEventListener('click', () => {
+      sac.apply();
+      $('levelup-overlay').classList.remove('active');
+      $('levelup-overlay').querySelector('h1').textContent = '⬆️ LEVEL UP';
+      inputLocked = false;
+      addMessage('The shrine glows...', 'good');
+      updateUI();
+      render();
+    });
+    container.appendChild(btn);
+  }
+
+  $('levelup-overlay').classList.add('active');
+}
+
+// === MERCHANT ===
+function showMerchant(merchant) {
+  inputLocked = true;
+  Audio.merchant();
+  $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+
+  const container = $('shop-items');
+  container.innerHTML = '';
+
+  for (const shopItem of merchant.shopItems) {
+    const div = document.createElement('div');
+    div.className = 'shop-item';
+    div.innerHTML = `<span>${shopItem.item.glyph} ${shopItem.item.name}</span><span class="price">${shopItem.item.itemType === 'food' ? '🍖' : ''} ${shopItem.price}💰</span>`;
+    div.addEventListener('click', () => {
+      if (state.player.gold >= shopItem.price) {
+        if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food') {
+          addMessage('Inventory full!', 'damage');
+          return;
+        }
+        state.player.gold -= shopItem.price;
+        if (shopItem.item.itemType === 'food') {
+          state.player.hunger = Math.min(100, state.player.hunger + 30);
+          addMessage('You eat a ration. (+30 hunger)', 'good');
+        } else {
+          state.player.inventory.push({ ...shopItem.item });
+          addMessage(`You buy ${shopItem.item.name}.`, 'good');
+        }
+        Audio.gold();
+        $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+        div.style.opacity = '0.3';
+        div.style.pointerEvents = 'none';
+        updateUI();
+      } else {
+        addMessage("You can't afford that.", 'damage');
+      }
+    });
+    container.appendChild(div);
+  }
+
+  $('merchant-overlay').classList.add('active');
+}
+
+// === TURN PROCESSING ===
+function endTurn() {
+  if (state.gameOver || state.victory) return;
+
+  state.turnCount++;
+  state.player.turnsSurvived++;
+
+  // Hunger
+  if (state.turnCount % HUNGER_TICK === 0) {
+    const hungerRate = hasRingEffect('hunger') ? 0.5 : 1;
+    if (Math.random() < hungerRate) {
+      state.player.hunger = Math.max(0, state.player.hunger - 1);
+    }
+  }
+
+  if (state.player.hunger <= 0 && state.turnCount % HUNGER_DAMAGE_TICK === 0) {
+    state.player.hp--;
+    addMessage('You are starving! (-1 HP)', 'damage');
+    if (state.player.hp <= 0) { playerDeath('starvation'); return; }
+  }
+
+  // Regeneration perk
+  if (state.player.hasRegen) {
+    state.player.regenCounter++;
+    if (state.player.regenCounter >= 20) {
+      state.player.regenCounter = 0;
+      if (state.player.hp < state.player.maxHp) {
+        state.player.hp++;
+      }
+    }
+  }
+
+  // Process hazards
+  for (let i = state.entities.length - 1; i >= 0; i--) {
+    const e = state.entities[i];
+    if (e.type === 'hazard') {
+      e.turns--;
+      if (e.turns <= 0) state.entities.splice(i, 1);
+    }
+  }
+
+  // Enemy turns
+  processEnemies();
+  if (state.gameOver) return;
+
+  // Status effects
+  processStatusEffects();
+  if (state.gameOver) return;
+
+  // Victory check (boss dead on floor 10)
+  if (state.floor === 10 && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
+    showVictory();
+    return;
+  }
+
+  computeFOV();
+  updateUI();
+  render();
+}
+
+// === HELPERS ===
+function hasRingEffect(effect) {
+  return state.player.equipped.ring?.special === effect;
+}
+
+function addMessage(text, cls) {
+  if (!state) return;
+  state.messages.push({ text, cls });
+  if (state.messages.length > 50) state.messages.shift();
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function screenShake() {
+  $('canvas-wrap').classList.add('shake');
+  setTimeout(() => $('canvas-wrap').classList.remove('shake'), 150);
+}
+
+function haptic(ms) {
+  if (settings.haptics && navigator.vibrate) navigator.vibrate(ms);
+}
+
+// === GHOST (LAST WORDS) SYSTEM ===
+function loadGhost() {
+  try {
+    const data = localStorage.getItem('glyphDepths_ghost');
+    return data ? JSON.parse(data) : null;
+  } catch { return null; }
+}
+
+function saveGhost() {
+  const p = state.player;
+  const lastWords = $('last-words-input').value.trim() || 'No last words...';
+  const item = p.inventory.length > 0 ? p.inventory[Math.floor(Math.random() * p.inventory.length)] : null;
+  const ghost = {
+    floor: state.floor,
+    x: p.x, y: p.y,
+    message: lastWords,
+    item
+  };
+  try { localStorage.setItem('glyphDepths_ghost', JSON.stringify(ghost)); } catch {}
+}
+
+function placeGhost() {
+  const g = state.ghost;
+  const ghostEntity = createEnemy({ name: 'Your Ghost', glyph: '👻', hp: 5, attack: 2, defense: 0, ai: 'wander', xp: 3, special: null, detect: 4 }, g.x, g.y);
+  ghostEntity.ghostData = g;
+  state.entities.push(ghostEntity);
+  if (g.item) {
+    state.entities.push(createItemEntity(g.item, g.x, g.y));
+  }
+  addMessage(`You see the ghost of your past self... "${g.message}"`, '');
+}
+
+function saveHighScore() {
+  try {
+    let scores = JSON.parse(localStorage.getItem('glyphDepths_scores') || '[]');
+    scores.push({
+      score: state.score,
+      floor: state.floor,
+      level: state.player.level,
+      date: new Date().toISOString().split('T')[0]
+    });
+    scores.sort((a, b) => b.score - a.score);
+    scores = scores.slice(0, 10);
+    localStorage.setItem('glyphDepths_scores', JSON.stringify(scores));
+  } catch {}
+}
+
+// === SETTINGS ===
+function loadSettings() {
+  try {
+    const s = localStorage.getItem('glyphDepths_settings');
+    if (s) settings = { ...settings, ...JSON.parse(s) };
+  } catch {}
+}
+
+function saveSettings() {
+  try { localStorage.setItem('glyphDepths_settings', JSON.stringify(settings)); } catch {}
+}
+
+// === RENDERING ===
+function render() {
+  if (!state) return;
+
+  const ctx = ctxC;
+  const ts = tileSize;
+  const p = state.player;
+
+  // Camera offset (center on player)
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+
+  // Clear
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const fontSize = Math.floor(ts * 0.7);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Draw tiles
+  for (let vy = 0; vy < VIEW_ROWS; vy++) {
+    for (let vx = 0; vx < VIEW_COLS; vx++) {
+      const mx = camX + vx, my = camY + vy;
+      if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H) continue;
+
+      const idx = my * MAP_W + mx;
+      const vis = state.visible[idx];
+      const exp = state.explored[idx];
+      const tile = state.map[idx];
+
+      if (!exp) continue; // Unexplored — leave black
+
+      const px = vx * ts + ts / 2;
+      const py = vy * ts + ts / 2;
+
+      // Distance-based brightness
+      const dist = Math.sqrt((mx - p.x) ** 2 + (my - p.y) ** 2);
+      let alpha;
+      if (vis) {
+        alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.7 : 0.5;
+      } else {
+        alpha = 0.2; // Explored but not visible
+      }
+
+      ctx.globalAlpha = alpha;
+
+      // Draw tile background for special tiles
+      if (tile === T.SPECIAL && vis) {
+        ctx.fillStyle = 'rgba(128, 80, 255, 0.15)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
+
+      // Draw tile glyph
+      ctx.font = `${fontSize}px monospace`;
+      let tileGlyph, tileColor;
+      switch (tile) {
+        case T.WALL:
+          tileGlyph = '█';
+          tileColor = vis ? '#3a3a4a' : '#1a1a24';
+          break;
+        case T.FLOOR:
+          tileGlyph = '·';
+          tileColor = vis ? '#2a2a38' : '#151520';
+          break;
+        case T.CORRIDOR:
+          tileGlyph = '·';
+          tileColor = vis ? '#252530' : '#121218';
+          break;
+        case T.STAIRS_DOWN:
+          tileGlyph = '▼';
+          tileColor = '#80ff80';
+          break;
+        case T.STAIRS_UP:
+          tileGlyph = '▲';
+          tileColor = '#ffff80';
+          break;
+        case T.DOOR_CLOSED:
+          tileGlyph = '+';
+          tileColor = '#8B6914';
+          break;
+        case T.DOOR_OPEN:
+          tileGlyph = '/';
+          tileColor = '#6B4914';
+          break;
+        case T.SPECIAL:
+          tileGlyph = '·';
+          tileColor = vis ? '#8060c0' : '#302040';
+          break;
+        default:
+          tileGlyph = ' ';
+          tileColor = '#000';
+      }
+
+      ctx.fillStyle = tileColor;
+      ctx.fillText(tileGlyph, px, py);
+    }
+  }
+
+  ctx.globalAlpha = 1.0;
+
+  // Draw items (only visible ones)
+  for (const e of state.entities) {
+    if (e.type !== 'item' && e.type !== 'hazard') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+
+    ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+  }
+
+  // Draw merchant
+  for (const e of state.entities) {
+    if (e.type !== 'merchant') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+  }
+
+  // Draw enemies (only visible ones)
+  for (const e of state.entities) {
+    if (e.type !== 'enemy') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+
+    // Mimic looks like a chest until adjacent
+    if (e.special === 'mimic' && e.alertness < 2) {
+      const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
+      if (dist > 1) {
+        const sx = (e.x - camX) * ts + ts / 2;
+        const sy = (e.y - camY) * ts + ts / 2;
+        ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+        ctx.fillText('📦', sx, sy);
+        continue;
+      }
+    }
+
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+
+    // HP bar for damaged enemies
+    if (e.hp < e.maxHp) {
+      const barW = ts - 4;
+      const barH = 2;
+      const barX = (e.x - camX) * ts + 2;
+      const barY = (e.y - camY) * ts;
+      ctx.fillStyle = '#c04040';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = '#40c040';
+      ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
+    }
+  }
+
+  // Draw player
+  const playerSX = (p.x - camX) * ts + ts / 2;
+  const playerSY = (p.y - camY) * ts + ts / 2;
+  ctx.font = `${Math.floor(ts * 0.75)}px serif`;
+  if (hasStatusEffect(p, 'invisibility')) {
+    ctx.globalAlpha = 0.4;
+  }
+  ctx.fillText(p.glyph, playerSX, playerSY);
+  ctx.globalAlpha = 1.0;
+
+  // Vignette effect
+  const gradient = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, canvas.width * 0.25,
+    canvas.width / 2, canvas.height / 2, canvas.width * 0.6
+  );
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// === UI UPDATE ===
+function updateUI() {
+  if (!state) return;
+  const p = state.player;
+
+  // Status bar
+  $('floor-label').textContent = `F${state.floor}`;
+  $('level-label').textContent = `Lv.${p.level}`;
+  $('gold-label').textContent = `💰 ${p.gold}`;
+  $('hunger-label').textContent = `🍖 ${p.hunger}`;
+  $('hp-text').textContent = `${p.hp}/${p.maxHp}`;
+
+  // HP bar
+  const hpPct = Math.max(0, p.hp / p.maxHp * 100);
+  $('hp-bar').style.width = hpPct + '%';
+  const hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
+  $('hp-bar').style.backgroundColor = hpColor;
+
+  // Messages
+  const msgLog = $('msg-log');
+  msgLog.innerHTML = '';
+  const recent = state.messages.slice(-2);
+  for (const msg of recent) {
+    const div = document.createElement('div');
+    div.className = 'msg' + (msg.cls ? ' ' + msg.cls : '');
+    div.textContent = msg.text;
+    msgLog.appendChild(div);
+  }
+
+  // Inventory
+  renderInventory();
+}
+
+function renderInventory() {
+  const bar = $('inv-bar');
+  bar.innerHTML = '';
+
+  // Show equipped items first with gold border
+  const equipped = [
+    { label: 'W', item: state.player.equipped.weapon },
+    { label: 'A', item: state.player.equipped.armor },
+    { label: 'R', item: state.player.equipped.ring }
+  ];
+
+  for (const eq of equipped) {
+    const slot = document.createElement('div');
+    slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
+    slot.textContent = eq.item ? eq.item.glyph : eq.label;
+    if (eq.item) {
+      slot.addEventListener('click', (e) => showEquippedMenu(eq, e));
+    }
+    bar.appendChild(slot);
+  }
+
+  // Inventory items
+  for (let i = 0; i < state.player.inventory.length; i++) {
+    const item = state.player.inventory[i];
+    const slot = document.createElement('div');
+    slot.className = 'inv-slot';
+    slot.textContent = item.glyph;
+    const idx = i;
+    slot.addEventListener('click', (e) => showItemMenu(item, idx, e));
+    bar.appendChild(slot);
+  }
+
+  // Empty slots
+  for (let i = state.player.inventory.length; i < MAX_INVENTORY; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'inv-slot empty';
+    slot.textContent = '';
+    bar.appendChild(slot);
+  }
+}
+
+// === ITEM MENUS ===
+function showItemMenu(item, index, event) {
+  event.stopPropagation();
+  const menu = $('item-menu');
+  $('menu-item-name').textContent = `${item.glyph} ${item.name}`;
+  menu.innerHTML = '';
+  menu.appendChild($('menu-item-name').cloneNode(true));
+
+  // Re-create the item-name div
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'item-name';
+  nameDiv.textContent = `${item.glyph} ${item.name}`;
+  if (item.desc && item.desc !== '???') {
+    nameDiv.textContent += ` — ${item.desc}`;
+  } else if (item.attack) {
+    nameDiv.textContent += ` (+${item.attack} ATK)`;
+  } else if (item.defense) {
+    nameDiv.textContent += ` (+${item.defense} DEF)`;
+  }
+  menu.innerHTML = '';
+  menu.appendChild(nameDiv);
+
+  const actions = [];
+  if (['weapon', 'armor', 'ring'].includes(item.itemType)) {
+    actions.push({ label: 'Equip', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (['potion', 'scroll', 'food'].includes(item.itemType)) {
+    actions.push({ label: 'Use', fn: () => { useItem(item, index); closeItemMenu(); }});
+  }
+  actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
+  actions.push({ label: 'Cancel', fn: () => closeItemMenu() });
+
+  for (const act of actions) {
+    const btn = document.createElement('button');
+    btn.textContent = act.label;
+    btn.addEventListener('click', act.fn);
+    menu.appendChild(btn);
+  }
+
+  // Position near the tap
+  const rect = event.target.getBoundingClientRect();
+  menu.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
+  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  menu.style.top = 'auto';
+  menu.classList.add('active');
+
+  // Close on outside tap
+  setTimeout(() => {
+    document.addEventListener('click', closeMenuOnOutside, { once: true });
+  }, 150);
+}
+
+function showEquippedMenu(eq, event) {
+  event.stopPropagation();
+  const item = eq.item;
+  const menu = $('item-menu');
+  menu.innerHTML = '';
+
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'item-name';
+  let desc = `${item.glyph} ${item.name}`;
+  if (item.attack) desc += ` (+${item.attack} ATK)`;
+  if (item.defense) desc += ` (+${item.defense} DEF)`;
+  if (item.special) desc += ` [${item.special}]`;
+  nameDiv.textContent = desc;
+  menu.appendChild(nameDiv);
+
+  const unequipBtn = document.createElement('button');
+  unequipBtn.textContent = 'Unequip';
+  unequipBtn.addEventListener('click', () => {
+    if (state.player.inventory.length >= MAX_INVENTORY) {
+      addMessage('Inventory full!', 'damage');
+      closeItemMenu();
+      return;
+    }
+    state.player.inventory.push(item);
+    if (eq.label === 'W') state.player.equipped.weapon = null;
+    else if (eq.label === 'A') state.player.equipped.armor = null;
+    else state.player.equipped.ring = null;
+    addMessage(`You unequip the ${item.name}.`, '');
+    updateUI();
+    render();
+    closeItemMenu();
+  });
+  menu.appendChild(unequipBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', closeItemMenu);
+  menu.appendChild(cancelBtn);
+
+  const rect = event.target.getBoundingClientRect();
+  menu.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
+  menu.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+  menu.style.top = 'auto';
+  menu.classList.add('active');
+
+  setTimeout(() => {
+    document.addEventListener('click', closeMenuOnOutside, { once: true });
+  }, 150);
+}
+
+function closeItemMenu() {
+  $('item-menu').classList.remove('active');
+}
+
+function closeMenuOnOutside(e) {
+  if (!$('item-menu').contains(e.target)) {
+    closeItemMenu();
+  }
+}
+
+// === INPUT HANDLING ===
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+let longPressTimer = null;
+
+function setupInput() {
+  // Touch events on canvas
+  const wrap = $('canvas-wrap');
+
+  wrap.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    Audio.resume();
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartTime = Date.now();
+
+    // Long press timer
+    longPressTimer = setTimeout(() => {
+      handleLongPress(touch.clientX, touch.clientY);
+    }, 500);
+  }, { passive: false });
+
+  wrap.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    // Cancel long press if moved too much
+    if (longPressTimer) {
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - touchStartX);
+      const dy = Math.abs(touch.clientY - touchStartY);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }
+  }, { passive: false });
+
+  wrap.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const elapsed = Date.now() - touchStartTime;
+
+    if (dist > 20 && elapsed < 400) {
+      // Swipe
+      if (Math.abs(dx) > Math.abs(dy)) {
+        playerMove(dx > 0 ? 1 : -1, 0);
+      } else {
+        playerMove(0, dy > 0 ? 1 : -1);
+      }
+    } else if (dist < 15 && elapsed < 300) {
+      // Tap — try to interact with adjacent tile
+      handleTap(touch.clientX, touch.clientY);
+    }
+  }, { passive: false });
+
+  // Keyboard support (for testing on desktop)
+  document.addEventListener('keydown', (e) => {
+    Audio.resume();
+    switch (e.key) {
+      case 'ArrowUp': case 'w': playerMove(0, -1); break;
+      case 'ArrowDown': case 's': playerMove(0, 1); break;
+      case 'ArrowLeft': case 'a': playerMove(-1, 0); break;
+      case 'ArrowRight': case 'd': playerMove(1, 0); break;
+      case ' ': playerWait(); break;
+      case 'g': playerPickup(); break;
+      case '>': playerDescend(); break;
+    }
+  });
+
+  // D-pad buttons
+  document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      Audio.resume();
+      const dir = btn.dataset.dir;
+      switch (dir) {
+        case 'up': playerMove(0, -1); break;
+        case 'down': playerMove(0, 1); break;
+        case 'left': playerMove(-1, 0); break;
+        case 'right': playerMove(1, 0); break;
+        case 'wait': playerWait(); break;
+      }
+    }, { passive: false });
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      Audio.resume();
+      const dir = btn.dataset.dir;
+      switch (dir) {
+        case 'up': playerMove(0, -1); break;
+        case 'down': playerMove(0, 1); break;
+        case 'left': playerMove(-1, 0); break;
+        case 'right': playerMove(1, 0); break;
+        case 'wait': playerWait(); break;
+      }
+    });
+  });
+
+  // Action buttons
+  $('btn-pickup').addEventListener('click', () => { Audio.resume(); playerPickup(); });
+  $('btn-stairs').addEventListener('click', () => { Audio.resume(); playerDescend(); });
+  $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
+  $('btn-settings').addEventListener('click', showSettings);
+
+  // Prevent default touch behaviors on body
+  document.body.addEventListener('touchmove', (e) => {
+    if (e.target === document.body || e.target === $('app')) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+}
+
+function handleTap(clientX, clientY) {
+  if (!state || state.gameOver || state.victory || inputLocked) return;
+
+  // Convert tap to map coordinates
+  const rect = canvas.getBoundingClientRect();
+  const cx = clientX - rect.left;
+  const cy = clientY - rect.top;
+  const vx = Math.floor(cx / tileSize);
+  const vy = Math.floor(cy / tileSize);
+
+  const p = state.player;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const mx = camX + vx;
+  const my = camY + vy;
+
+  // Tap on self — pickup
+  if (mx === p.x && my === p.y) {
+    playerPickup();
+    return;
+  }
+
+  // Tap on adjacent tile — move there
+  const dx = mx - p.x, dy = my - p.y;
+  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx !== 0 || dy !== 0)) {
+    // Normalize to cardinal direction (prefer the dominant axis)
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      playerMove(Math.sign(dx), 0);
+    } else {
+      playerMove(0, Math.sign(dy));
+    }
+  }
+}
+
+function handleLongPress(clientX, clientY) {
+  if (!state) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const cx = clientX - rect.left;
+  const cy = clientY - rect.top;
+  const vx = Math.floor(cx / tileSize);
+  const vy = Math.floor(cy / tileSize);
+
+  const p = state.player;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const mx = camX + vx;
+  const my = camY + vy;
+
+  if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H) return;
+  if (!state.visible[my * MAP_W + mx]) return;
+
+  // Show inspect tooltip
+  let name = '', desc = '';
+
+  const enemy = enemyAt(mx, my);
+  if (enemy) {
+    name = enemy.glyph + ' ' + enemy.name;
+    desc = `HP: ${enemy.hp}/${enemy.maxHp} | ATK: ${enemy.attack} | DEF: ${enemy.defense}`;
+    if (enemy.ghostData) desc += `\n"${enemy.ghostData.message}"`;
+  } else {
+    const items = itemsAt(mx, my);
+    if (items.length > 0) {
+      const item = items[0];
+      name = item.glyph + ' ' + item.name;
+      if (item.item.desc) desc = item.item.desc;
+      else if (item.item.attack) desc = `+${item.item.attack} Attack`;
+      else if (item.item.defense) desc = `+${item.item.defense} Defense`;
+    } else {
+      const tile = getTile(mx, my);
+      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.SPECIAL]: 'Mysterious Glyph' };
+      name = tileNames[tile] || 'Unknown';
+    }
+  }
+
+  if (name) {
+    $('tip-name').textContent = name;
+    $('tip-desc').textContent = desc;
+    const tip = $('inspect-tip');
+    tip.style.left = Math.min(clientX, window.innerWidth - 210) + 'px';
+    tip.style.top = (clientY - 60) + 'px';
+    tip.classList.add('active');
+
+    haptic(20);
+
+    setTimeout(() => tip.classList.remove('active'), 2000);
+  }
+}
+
+// === UI SETUP ===
+function setupUI() {
+  // Title screen
+  $('btn-start').addEventListener('click', startGame);
+
+  // Death screen
+  $('btn-restart').addEventListener('click', () => {
+    saveGhost();
+    saveHighScore();
+    $('death-overlay').classList.remove('active');
+    newRun();
+  });
+
+  // Victory screen
+  $('btn-victory-restart').addEventListener('click', () => {
+    saveHighScore();
+    $('victory-overlay').classList.remove('active');
+    newRun();
+  });
+
+  // Merchant close
+  $('btn-leave-shop').addEventListener('click', () => {
+    $('merchant-overlay').classList.remove('active');
+    inputLocked = false;
+    endTurn();
+  });
+
+  // Settings
+  $('btn-close-settings').addEventListener('click', () => {
+    $('settings-overlay').classList.remove('active');
+    inputLocked = false;
+  });
+}
+
+function showSettings() {
+  inputLocked = true;
+
+  // Update toggles
+  $('toggle-sound').classList.toggle('on', settings.sound);
+  $('toggle-haptics').classList.toggle('on', settings.haptics);
+  $('toggle-dpad').classList.toggle('on', settings.dpad);
+
+  $('toggle-sound').onclick = () => {
+    settings.sound = !settings.sound;
+    Audio.setEnabled(settings.sound);
+    $('toggle-sound').classList.toggle('on', settings.sound);
+    saveSettings();
+  };
+
+  $('toggle-haptics').onclick = () => {
+    settings.haptics = !settings.haptics;
+    $('toggle-haptics').classList.toggle('on', settings.haptics);
+    saveSettings();
+  };
+
+  $('toggle-dpad').onclick = () => {
+    settings.dpad = !settings.dpad;
+    $('toggle-dpad').classList.toggle('on', settings.dpad);
+    $('dpad').style.display = settings.dpad ? 'grid' : 'none';
+    saveSettings();
+  };
+
+  $('settings-overlay').classList.add('active');
+}
+
+// === BOOT ===
+document.addEventListener('DOMContentLoaded', boot);
+
+})();

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Glyph Depths</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg-dark: #050508;
+      --text: #c8c8d0;
+      --text-dim: #555566;
+      --gold: #f0c040;
+      --hp-high: #40c040;
+      --hp-mid: #c0c040;
+      --hp-low: #c04040;
+      --accent: #7070c0;
+      --danger: #c04040;
+      --panel: #12121a;
+      --panel-border: #2a2a3a;
+      --item-slot: #1a1a28;
+      --btn: #1e1e30;
+      --btn-active: #2e2e48;
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'SF Mono', 'Menlo', monospace;
+      font-size: 14px;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+
+    /* === STATUS BAR === */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+      height: 44px;
+      gap: 8px;
+    }
+
+    #status-bar .stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    #floor-label { color: var(--accent); font-weight: 600; }
+    #level-label { color: var(--gold); }
+    #gold-label { color: var(--gold); }
+    #hunger-label { color: var(--text-dim); }
+
+    #hp-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      max-width: 140px;
+    }
+
+    #hp-bar-bg {
+      flex: 1;
+      height: 10px;
+      background: var(--bg-dark);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    #hp-bar {
+      height: 100%;
+      background: var(--hp-high);
+      border-radius: 5px;
+      transition: width 0.2s, background-color 0.3s;
+    }
+
+    #hp-text { font-size: 11px; color: var(--text-dim); min-width: 40px; text-align: right; }
+
+    /* === GAME CANVAS === */
+    #canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      min-height: 0;
+    }
+
+    #game-canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* Screen shake */
+    #canvas-wrap.shake {
+      animation: shake 0.15s ease-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-2px, 1px); }
+      40% { transform: translate(2px, -1px); }
+      60% { transform: translate(-1px, 2px); }
+      80% { transform: translate(1px, -2px); }
+    }
+
+    /* === MESSAGE LOG === */
+    #msg-log {
+      padding: 4px 12px;
+      background: var(--bg-dark);
+      border-top: 1px solid var(--panel-border);
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+      height: 48px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    #msg-log .msg {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #msg-log .msg:last-child { color: var(--text); }
+    #msg-log .msg.damage { color: var(--danger); }
+    #msg-log .msg.good { color: var(--hp-high); }
+    #msg-log .msg.gold { color: var(--gold); }
+
+    /* === INVENTORY BAR === */
+    #inv-bar {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      gap: 4px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      flex-shrink: 0;
+      height: 56px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    #inv-bar::-webkit-scrollbar { display: none; }
+
+    .inv-slot {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      background: var(--item-slot);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .inv-slot.equipped { border-color: var(--gold); box-shadow: 0 0 4px rgba(240, 192, 64, 0.3); }
+    .inv-slot.empty { opacity: 0.3; }
+
+    /* === CONTROLS === */
+    #controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--panel);
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    /* D-Pad */
+    #dpad {
+      display: grid;
+      grid-template-columns: 48px 48px 48px;
+      grid-template-rows: 48px 48px 48px;
+      gap: 2px;
+    }
+
+    .dpad-btn {
+      background: var(--btn);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .dpad-btn:active { background: var(--btn-active); color: var(--text); }
+    .dpad-btn.empty { background: transparent; border: none; }
+
+    #dpad-center {
+      background: var(--btn);
+      border-radius: 50%;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Action buttons */
+    #action-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .act-btn {
+      width: 56px;
+      height: 44px;
+      background: var(--btn);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .act-btn .icon { font-size: 16px; }
+    .act-btn:active { background: var(--btn-active); color: var(--text); }
+
+    /* === OVERLAYS === */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 5, 8, 0.92);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    .overlay.active { display: flex; }
+
+    .overlay h1 {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .overlay h2 {
+      font-size: 18px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+
+    .overlay .stats {
+      text-align: center;
+      line-height: 1.8;
+      color: var(--text-dim);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .overlay .stats span { color: var(--text); }
+
+    .big-btn {
+      padding: 14px 40px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .big-btn:active { opacity: 0.8; }
+
+    /* Level up overlay */
+    #levelup-overlay .perk-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .perk-btn {
+      padding: 14px 16px;
+      background: var(--btn);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .perk-btn:active { background: var(--btn-active); border-color: var(--gold); }
+
+    .perk-btn .perk-name { font-weight: 600; color: var(--gold); }
+    .perk-btn .perk-desc { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+    /* Item context menu */
+    #item-menu {
+      position: fixed;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 8px;
+      z-index: 110;
+      display: none;
+      min-width: 160px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    #item-menu.active { display: block; }
+
+    #item-menu .item-name {
+      padding: 8px;
+      font-size: 13px;
+      color: var(--gold);
+      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 4px;
+    }
+
+    #item-menu button {
+      display: block;
+      width: 100%;
+      padding: 10px 8px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 14px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+
+    #item-menu button:active { background: var(--btn-active); }
+
+    /* Inspect tooltip */
+    #inspect-tip {
+      position: fixed;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      z-index: 105;
+      display: none;
+      font-size: 12px;
+      max-width: 200px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    #inspect-tip.active { display: block; }
+    #inspect-tip .tip-name { color: var(--gold); font-weight: 600; }
+    #inspect-tip .tip-desc { color: var(--text-dim); margin-top: 4px; }
+
+    /* Title screen */
+    #title-screen .title { font-size: 32px; letter-spacing: 2px; color: var(--gold); }
+    #title-screen .subtitle { font-size: 14px; color: var(--text-dim); margin-bottom: 32px; }
+
+    /* Fade transition */
+    #fade {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    #fade.active { opacity: 1; pointer-events: all; }
+
+    /* Level up flash */
+    #canvas-wrap.levelup-flash {
+      box-shadow: inset 0 0 40px rgba(240, 192, 64, 0.3);
+    }
+
+    /* Merchant overlay */
+    #merchant-overlay .shop-items {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 16px;
+    }
+
+    .shop-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: var(--btn);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .shop-item:active { background: var(--btn-active); }
+    .shop-item .price { color: var(--gold); }
+
+    /* Settings overlay */
+    #settings-overlay .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 260px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .toggle {
+      width: 44px;
+      height: 26px;
+      background: var(--btn);
+      border: 1px solid var(--panel-border);
+      border-radius: 13px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle.on { background: var(--accent); }
+
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle.on::after { transform: translateX(18px); }
+
+    /* Last words input */
+    #death-overlay .last-words-wrap {
+      margin-top: 12px;
+      margin-bottom: 16px;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    #last-words-input {
+      width: 100%;
+      padding: 10px;
+      background: var(--bg-dark);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      text-align: center;
+      outline: none;
+    }
+
+    #last-words-input::placeholder { color: var(--text-dim); }
+    #last-words-input:focus { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="status-bar">
+      <div class="stat"><span id="floor-label">F1</span></div>
+      <div id="hp-wrap">
+        <span style="font-size:14px">❤️</span>
+        <div id="hp-bar-bg"><div id="hp-bar" style="width:100%"></div></div>
+        <span id="hp-text">15/15</span>
+      </div>
+      <div class="stat"><span id="level-label">Lv.1</span></div>
+      <div class="stat"><span id="hunger-label">🍖 100</span></div>
+      <div class="stat"><span id="gold-label">💰 0</span></div>
+    </div>
+
+    <div id="canvas-wrap">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <div id="msg-log">
+      <div class="msg">Welcome to Glyph Depths. Every glyph tells a story.</div>
+      <div class="msg">Swipe or use the d-pad to move. Descend to floor 10 and defeat the Glyph King.</div>
+    </div>
+
+    <div id="inv-bar">
+      <!-- Inventory slots populated by JS -->
+    </div>
+
+    <div id="controls">
+      <div id="dpad">
+        <div class="dpad-btn empty"></div>
+        <div class="dpad-btn" data-dir="up">▲</div>
+        <div class="dpad-btn empty"></div>
+        <div class="dpad-btn" data-dir="left">◀</div>
+        <div class="dpad-btn" id="dpad-center" data-dir="wait">●</div>
+        <div class="dpad-btn" data-dir="right">▶</div>
+        <div class="dpad-btn empty"></div>
+        <div class="dpad-btn" data-dir="down">▼</div>
+        <div class="dpad-btn empty"></div>
+      </div>
+
+      <div id="action-btns">
+        <div class="action-row">
+          <div class="act-btn" id="btn-pickup"><span class="icon">✋</span>Get</div>
+          <div class="act-btn" id="btn-stairs"><span class="icon">🚪</span>Stairs</div>
+        </div>
+        <div class="action-row">
+          <div class="act-btn" id="btn-wait"><span class="icon">⏳</span>Wait</div>
+          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Set</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div class="overlay" id="title-screen">
+    <div class="title">GLYPH DEPTHS</div>
+    <div class="subtitle">Every glyph tells a story</div>
+    <button class="big-btn" id="btn-start">Descend</button>
+  </div>
+
+  <div class="overlay" id="death-overlay">
+    <h1>☠️ YOU HAVE PERISHED</h1>
+    <h2 id="death-cause"></h2>
+    <div class="stats" id="death-stats"></div>
+    <div class="last-words-wrap">
+      <input type="text" id="last-words-input" placeholder="Last words... (optional)" maxlength="50">
+    </div>
+    <button class="big-btn" id="btn-restart">Try Again</button>
+  </div>
+
+  <div class="overlay" id="victory-overlay">
+    <h1>👑 VICTORY</h1>
+    <h2>The Glyph King has fallen!</h2>
+    <div class="stats" id="victory-stats"></div>
+    <button class="big-btn" id="btn-victory-restart">Play Again</button>
+  </div>
+
+  <div class="overlay" id="levelup-overlay">
+    <h1 style="color: var(--gold);">⬆️ LEVEL UP</h1>
+    <h2 id="levelup-label"></h2>
+    <div class="perk-choices" id="perk-choices"></div>
+  </div>
+
+  <div class="overlay" id="merchant-overlay">
+    <h1>🧙 MERCHANT</h1>
+    <h2 id="merchant-gold"></h2>
+    <div class="shop-items" id="shop-items"></div>
+    <button class="big-btn" id="btn-leave-shop">Leave</button>
+  </div>
+
+  <div class="overlay" id="settings-overlay">
+    <h1>⚙️ Settings</h1>
+    <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
+    <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
+    <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
+    <div style="margin-top: 20px;">
+      <button class="big-btn" id="btn-close-settings">Close</button>
+    </div>
+  </div>
+
+  <div id="item-menu">
+    <div class="item-name" id="menu-item-name"></div>
+  </div>
+
+  <div id="inspect-tip">
+    <div class="tip-name" id="tip-name"></div>
+    <div class="tip-desc" id="tip-desc"></div>
+  </div>
+
+  <div id="fade"></div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
