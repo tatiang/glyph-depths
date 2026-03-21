@@ -1084,7 +1084,7 @@ const OCTANT_TRANSFORMS = [
 
 function computeFOV() {
   const p = state.player;
-  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0);
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0);
   state.visible.fill(0);
 
   // Player's tile is always visible
@@ -1530,7 +1530,7 @@ function showLevelUp() {
   $('levelup-label').textContent = `Level ${state.player.level}!`;
 
   const allPerks = [
-    { name: '+3 Max HP',   desc: 'Increase max HP by 3 and heal 3',      apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); } },
+    { name: 'Extended Vision', desc: 'See 1 tile further in all directions', apply: () => { state.player.fovBonus = (state.player.fovBonus || 0) + 1; computeFOV(); } },
     { name: '+1 Attack',   desc: 'Increase base attack by 1',             apply: () => { state.player.attack += 1; } },
     { name: '+1 Defense',  desc: 'Increase base defense by 1',            apply: () => { state.player.defense += 1; } },
     { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns',      apply: () => { state.player.hasRegen = true; }, rare: true, unique: true, flag: 'hasRegen' },
