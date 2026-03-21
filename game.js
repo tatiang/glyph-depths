@@ -14,7 +14,7 @@ const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9 };
 
 // === GAME STATE ===
 let state = null; // main game state object
@@ -404,20 +404,72 @@ function carveCorridor(x1, y1, x2, y2) {
 }
 
 function addDoors() {
+  // Only place doors where a corridor meets a room (at least one adjacent FLOOR tile)
+  // This prevents multiple doors along mid-corridor stretches
   for (let y = 1; y < MAP_H - 1; y++) {
     for (let x = 1; x < MAP_W - 1; x++) {
       if (getTile(x, y) !== T.CORRIDOR) continue;
-      // Check if this corridor tile is adjacent to a room and could be a door
+
+      // Horizontal door: walls left & right, passage above & below
       const isHDoor = getTile(x - 1, y) === T.WALL && getTile(x + 1, y) === T.WALL &&
                       (getTile(x, y - 1) === T.FLOOR || getTile(x, y - 1) === T.CORRIDOR) &&
                       (getTile(x, y + 1) === T.FLOOR || getTile(x, y + 1) === T.CORRIDOR);
+      // Vertical door: walls above & below, passage left & right
       const isVDoor = getTile(x, y - 1) === T.WALL && getTile(x, y + 1) === T.WALL &&
                       (getTile(x - 1, y) === T.FLOOR || getTile(x - 1, y) === T.CORRIDOR) &&
                       (getTile(x + 1, y) === T.FLOOR || getTile(x + 1, y) === T.CORRIDOR);
-      if ((isHDoor || isVDoor) && Math.random() < 0.5) {
+
+      if (!isHDoor && !isVDoor) continue;
+
+      // Must be adjacent to at least one room FLOOR tile (not just corridor-to-corridor)
+      const adjFloor = (isHDoor && (getTile(x, y - 1) === T.FLOOR || getTile(x, y + 1) === T.FLOOR)) ||
+                       (isVDoor && (getTile(x - 1, y) === T.FLOOR || getTile(x + 1, y) === T.FLOOR));
+      if (!adjFloor) continue;
+
+      // Don't place a door if there's already a door within 3 tiles along this corridor
+      let nearbyDoor = false;
+      if (isHDoor) {
+        for (let dy = -3; dy <= 3; dy++) {
+          if (dy === 0) continue;
+          const t = getTile(x, y + dy);
+          if (t === T.DOOR_CLOSED || t === T.DOOR_ONEWAY) { nearbyDoor = true; break; }
+          if (t === T.WALL) break; // hit a wall, stop checking this direction
+        }
+      } else {
+        for (let dx = -3; dx <= 3; dx++) {
+          if (dx === 0) continue;
+          const t = getTile(x + dx, y);
+          if (t === T.DOOR_CLOSED || t === T.DOOR_ONEWAY) { nearbyDoor = true; break; }
+          if (t === T.WALL) break;
+        }
+      }
+      if (nearbyDoor) continue;
+
+      if (Math.random() < 0.5) {
         setTile(x, y, T.DOOR_CLOSED);
       }
     }
+  }
+
+  // Add rare one-way doors (close permanently behind you)
+  addOneWayDoors();
+}
+
+function addOneWayDoors() {
+  if (state.floor <= 1 || state.floor >= 10) return; // Not on first or boss floor
+  const candidates = [];
+  for (let y = 1; y < MAP_H - 1; y++) {
+    for (let x = 1; x < MAP_W - 1; x++) {
+      if (getTile(x, y) !== T.DOOR_CLOSED) continue;
+      candidates.push({ x, y });
+    }
+  }
+  // Convert 1-2 random doors to one-way doors
+  const count = Math.min(candidates.length, Math.random() < 0.5 ? 1 : 2);
+  for (let i = 0; i < count; i++) {
+    const idx = Math.floor(Math.random() * candidates.length);
+    const { x, y } = candidates.splice(idx, 1)[0];
+    setTile(x, y, T.DOOR_ONEWAY);
   }
 }
 
@@ -469,12 +521,13 @@ function setTile(x, y, t) {
 
 function isWalkable(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED;
+  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED;
 }
 
 function isTransparent(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED;
+  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED;
+  // One-way doors are visible (transparent) but handled specially for movement
 }
 
 function getFarthestRoom(fromX, fromY) {
@@ -981,7 +1034,7 @@ function getEffectiveDefense(entity) {
   if (entity === state.player) {
     let def = state.player.defense;
     if (state.player.equipped.armor) def += state.player.equipped.armor.defense;
-    if (state.player.equipped.ring?.special === 'protection') def += 1;
+    if (state.player.equipped.ring?.special === 'protection') def += 3;
     if (state.player.equipped.weapon?.special === 'chaos') def -= 1;
     return Math.max(0, def);
   }
@@ -1015,17 +1068,15 @@ function killEnemy(enemy) {
     state.toughestKill = { name: enemy.name, glyph: enemy.glyph, xp: enemy.xp };
   }
 
-  // Slime split
-  if (enemy.special === 'split') {
-    // On early floors (F1-F2), limit mini slimes to avoid overwhelming new players
+  // Slime split — disabled on floors 1-2 so new players aren't overwhelmed
+  if (enemy.special === 'split' && state.floor >= 3) {
     const existingMinis = state.entities.filter(e => e.type === 'enemy' && e.name === 'Mini Slime' && e.hp > 0).length;
-    const maxMinis = state.floor <= 2 ? 2 : 6;
+    const maxMinis = 6;
     if (existingMinis < maxMinis) {
       const template = { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true };
-      const splitCount = state.floor <= 2 ? 1 : 2; // Only 1 mini on early floors
       let spawned = 0;
       for (const [dx, dy] of [[0, 1], [1, 0]]) {
-        if (spawned >= splitCount) break;
+        if (spawned >= 2) break;
         const nx = enemy.x + dx, ny = enemy.y + dy;
         if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
           const mini = createEnemy(template, nx, ny);
@@ -1078,6 +1129,28 @@ function playerDeath(killerName, killerGlyph) {
     Enemies slain: <span>${state.enemiesKilled}</span> | Items found: <span>${state.itemsFound}</span>
   `;
   $('last-words-input').value = '';
+
+  // Populate full character stats for "View Stats" button
+  const p = state.player;
+  function sr(label, val) { return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`; }
+  $('death-char-stats').innerHTML = [
+    sr('Level', p.level),
+    sr('XP', `${p.xp}/${p.xpToNext}`),
+    sr('HP', `${p.hp}/${p.maxHp}`),
+    sr('Attack', p.attack + (p.equipped.weapon?.attack || 0)),
+    sr('Defense', p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)),
+    sr('Turns', p.turnsSurvived),
+    sr('Gold', p.gold),
+  ].join('');
+  const w = p.equipped.weapon, a = p.equipped.armor, r = p.equipped.ring;
+  $('death-equip-stats').innerHTML = [
+    sr('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
+    sr('🛡️ Armor', a ? `${a.name} (+${a.defense})` : 'None'),
+    sr('💍 Ring', r ? r.name : 'None'),
+  ].join('');
+  const invItems = p.inventory.length > 0 ? p.inventory.map(it => `${it.glyph} ${it.name}`).join('<br>') : 'Empty';
+  $('death-inv-stats').innerHTML = `<div style="font-size:12px;color:var(--text-dim);padding:4px 8px;">${invItems}</div>`;
+  $('death-full-stats').style.display = 'none';
 
   setTimeout(() => {
     $('death-overlay').classList.add('active');
@@ -1576,6 +1649,22 @@ function playerMove(dx, dy) {
     return;
   }
 
+  // Check for one-way door — opens, then seals behind you
+  if (getTile(nx, ny) === T.DOOR_ONEWAY) {
+    setTile(nx, ny, T.FLOOR);
+    // Seal the tile we came from (place a sealed wall behind)
+    const ox = state.player.x, oy = state.player.y;
+    state.player.x = nx;
+    state.player.y = ny;
+    setTile(ox, oy, T.DOOR_SEALED);
+    addMessage('The door slams shut behind you! There is no going back.', 'damage');
+    Audio.door();
+    haptic(50);
+    autoPickup();
+    endTurn();
+    return;
+  }
+
   // Check walkable
   if (!isWalkable(nx, ny)) return;
 
@@ -1737,6 +1826,10 @@ function useItem(item, index) {
       p.equipped.ring = item;
       p.inventory.splice(index, 1);
       addMessage(`You put on the ${item.name}.`, 'good');
+      if (item.special === 'protection') addMessage('You feel a magical barrier (+3 DEF).', 'good');
+      else if (item.special === 'sight') addMessage('Your vision sharpens.', 'good');
+      else if (item.special === 'haste') addMessage('You feel quicker on your feet.', 'good');
+      else if (item.special === 'hunger') addMessage('Your hunger fades slightly.', 'good');
       Audio.useItem();
       break;
 
@@ -1894,14 +1987,26 @@ function applyScrollEffect(scroll) {
       addMessage('Your items shimmer with clarity!', 'good');
       break;
     case 'summon': {
-      const pos = randomFloorTile();
+      // Spawn golem adjacent to player so it's visible and useful
+      let pos = null;
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,-1],[1,-1],[-1,1]];
+      for (const [dx, dy] of dirs) {
+        const nx = state.player.x + dx, ny = state.player.y + dy;
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+          pos = { x: nx, y: ny };
+          break;
+        }
+      }
+      if (!pos) pos = randomFloorTile(); // fallback
       if (pos) {
         const golem = createEnemy({ name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 }, pos.x, pos.y);
         golem.isAlly = true;
-        golem.allyTurns = 20;
+        golem.allyTurns = 25;
         golem.alertness = 2;
         state.entities.push(golem);
         addMessage('A stone golem materializes to aid you!', 'good');
+      } else {
+        addMessage('The scroll fizzles... no room for a summon.', 'damage');
       }
       break;
     }
@@ -2287,6 +2392,14 @@ function render() {
         case T.DOOR_OPEN:
           tileGlyph = '/';
           tileColor = '#6B4914';
+          break;
+        case T.DOOR_ONEWAY:
+          tileGlyph = '⊳';
+          tileColor = '#c06030';
+          break;
+        case T.DOOR_SEALED:
+          tileGlyph = '▓';
+          tileColor = '#4a2020';
           break;
         case T.SPECIAL:
           tileGlyph = '·';
@@ -2785,7 +2898,7 @@ function handleLongPress(clientX, clientY) {
       else if (item.item.defense) desc = `+${item.item.defense} Defense`;
     } else {
       const tile = getTile(mx, my);
-      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.SPECIAL]: 'Mysterious Glyph' };
+      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.DOOR_ONEWAY]: 'One-Way Door', [T.DOOR_SEALED]: 'Sealed Passage', [T.SPECIAL]: 'Mysterious Glyph' };
       name = tileNames[tile] || 'Unknown';
     }
   }
@@ -2810,10 +2923,23 @@ function setupUI() {
   $('btn-start').addEventListener('click', startGame);
 
   // Death screen
+  $('btn-death-stats').addEventListener('click', () => {
+    const panel = $('death-full-stats');
+    const btn = $('btn-death-stats');
+    if (panel.style.display === 'none') {
+      panel.style.display = 'block';
+      btn.textContent = 'Hide Stats';
+    } else {
+      panel.style.display = 'none';
+      btn.textContent = 'View Stats';
+    }
+  });
   $('btn-restart').addEventListener('click', () => {
     saveGhost();
     saveHighScore();
     $('death-overlay').classList.remove('active');
+    $('death-full-stats').style.display = 'none';
+    $('btn-death-stats').textContent = 'View Stats';
     newRun();
   });
 
@@ -2861,7 +2987,7 @@ function showSettings() {
     statRow('HP', p ? `${p.hp}/${p.maxHp}` : noGame),
     statRow('Hunger', p ? p.hunger : noGame),
     statRow('Attack', p ? `${p.attack + (p.equipped.weapon?.attack || 0)}` : noGame),
-    statRow('Defense', p ? `${p.defense + (p.equipped.armor?.defense || 0)}` : noGame),
+    statRow('Defense', p ? `${p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)}` : noGame),
   ].join('');
 
   $('run-stats').innerHTML = [
@@ -2958,6 +3084,12 @@ function renderMinimap() {
         case T.DOOR_CLOSED:
         case T.DOOR_OPEN:
           ctx.fillStyle = '#8B6914';
+          break;
+        case T.DOOR_ONEWAY:
+          ctx.fillStyle = '#c06030';
+          break;
+        case T.DOOR_SEALED:
+          ctx.fillStyle = '#4a2020';
           break;
         case T.SPECIAL:
           ctx.fillStyle = '#8060c0';

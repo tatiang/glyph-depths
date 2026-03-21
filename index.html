@@ -637,10 +637,21 @@
     <h1>☠️ YOU HAVE PERISHED</h1>
     <h2 id="death-cause"></h2>
     <div class="stats" id="death-stats"></div>
+    <div id="death-full-stats" style="display:none; width:100%; max-width:280px; margin:8px auto;">
+      <div class="stats-heading">CHARACTER</div>
+      <div id="death-char-stats" class="stats-grid"></div>
+      <div class="stats-heading" style="margin-top:8px;">EQUIPPED</div>
+      <div id="death-equip-stats" class="stats-grid"></div>
+      <div class="stats-heading" style="margin-top:8px;">INVENTORY</div>
+      <div id="death-inv-stats" class="stats-grid"></div>
+    </div>
     <div class="last-words-wrap">
       <input type="text" id="last-words-input" placeholder="Last words... (optional)" maxlength="50">
     </div>
-    <button class="big-btn" id="btn-restart">Try Again</button>
+    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <button class="big-btn" id="btn-death-stats" style="font-size:14px; padding:10px 20px;">View Stats</button>
+      <button class="big-btn" id="btn-restart">Try Again</button>
+    </div>
   </div>
 
   <div class="overlay" id="victory-overlay">
