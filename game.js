@@ -149,7 +149,9 @@ function newRun() {
     lastIdleY: -1,
     minimapOpen: false,
     throwMode: false,
-    throwItem: null
+    throwItem: null,
+    floorData: Array.from({length: 11}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
+    peakHp: 15
   };
   // Welcome messages with player name
   addMessage(`${state.playerName} descends into the Unnamed Depths.`, 'gold');
@@ -173,6 +175,9 @@ function createPlayer() {
     equipped: { weapon: null, armor: null, ring: null },
     statusEffects: [],
     hasRegen: false,
+    hasVampire: false,
+    ironSkin: false,
+    hasFury: false,
     regenCounter: 0,
     turnsSurvived: 0
   };
@@ -190,7 +195,8 @@ const POTION_COLORS = [
 
 const SCROLL_LABELS = [
   'Scroll labeled XYZZY', 'Scroll labeled LOREM', 'Scroll labeled FOOBAR',
-  'Scroll labeled ZELGO', 'Scroll labeled KRUNK', 'Scroll labeled NIMHE'
+  'Scroll labeled ZELGO', 'Scroll labeled KRUNK', 'Scroll labeled NIMHE',
+  'Scroll labeled QUUX'
 ];
 
 const POTION_EFFECTS = [
@@ -208,7 +214,8 @@ const SCROLL_EFFECTS = [
   { id: 'enchant', name: 'Scroll of Enchant', desc: '+1 to equipped weapon' },
   { id: 'confusion', name: 'Scroll of Confusion', desc: 'Confuse visible enemies' },
   { id: 'identify', name: 'Scroll of Identify', desc: 'Identify an item type' },
-  { id: 'summon', name: 'Scroll of Summoning', desc: 'Summon a golem ally' }
+  { id: 'summon', name: 'Scroll of Summoning', desc: 'Summon a golem ally' },
+  { id: 'remove_curse', name: 'Scroll of Remove Curse', desc: 'Uncurse all equipped items' }
 ];
 
 function randomizePotionScrollNames() {
@@ -720,8 +727,21 @@ function spawnMerchant() {
     x, y,
     glyph: '🧙',
     name: 'Merchant',
-    shopItems: generateShopItems(state.floor)
+    shopItems: generateShopItems(state.floor),
+    refreshesLeft: 2
   });
+}
+
+// Apply a curse to a weapon/armor copy (15% chance on floor 3+)
+function maybeCurse(item, floor) {
+  if (floor < 3) return item;
+  if (['weapon', 'armor'].includes(item.itemType) && Math.random() < 0.15) {
+    item.cursed = true;
+    if (item.attack !== undefined) item.attack += 1;
+    if (item.defense !== undefined) item.defense += 1;
+    item.name = 'Cursed ' + item.name;
+  }
+  return item;
 }
 
 function generateShopItems(floor) {
@@ -784,11 +804,11 @@ function generateRandomItem(floor) {
   if (roll < 0.25) {
     // Weapon
     const pool = WEAPONS.filter(w => w.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return { ...pool[Math.floor(Math.random() * pool.length)] };
+    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
   } else if (roll < 0.4) {
     // Armor
     const pool = ARMORS.filter(a => a.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return { ...pool[Math.floor(Math.random() * pool.length)] };
+    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
   } else if (roll < 0.6) {
     // Potion
     const p = potionNames[Math.floor(Math.random() * potionNames.length)];
@@ -830,7 +850,7 @@ function generateMonsterDrop(floor, enemyXp) {
   } else {
     // Equipment appropriate to floor
     const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier)];
-    if (pool.length > 0) return { ...pool[Math.floor(Math.random() * pool.length)] };
+    if (pool.length > 0) return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, state.floor);
     return { ...FOOD };
   }
 }
@@ -1002,6 +1022,11 @@ function attackEntity(attacker, defender) {
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
 
+  // Iron Skin perk: reduce incoming damage to player by 1
+  if (defender === state.player && state.player.ironSkin) {
+    damage = Math.max(1, damage - 1);
+  }
+
   // Ghost miss chance
   if (defender.special === 'phase' && Math.random() < 0.5) {
     addMessage(`Your attack passes through the ${defender.name}!`, '');
@@ -1022,6 +1047,18 @@ function attackEntity(attacker, defender) {
 
   const isPlayer = attacker === state.player;
   const targetIsPlayer = defender === state.player;
+
+  // Track damage for death recap
+  const floorIdx = Math.min(state.floor, 10);
+  if (isPlayer && !targetIsPlayer) state.floorData[floorIdx].damageDealt += damage;
+  else if (!isPlayer && targetIsPlayer) state.floorData[floorIdx].damageTaken += damage;
+
+  // Vampiric Strikes perk: heal 20% of damage dealt
+  if (isPlayer && !targetIsPlayer && state.player.hasVampire) {
+    const vHeal = Math.max(1, Math.floor(damage * 0.2));
+    state.player.hp = Math.min(state.player.maxHp, state.player.hp + vHeal);
+    if (vHeal > 1) addMessage(`Vampiric: +${vHeal} HP`, 'good');
+  }
 
   if (isCrit) {
     addMessage(`${isPlayer ? 'You' : attacker.name} critically hit${isPlayer ? '' : 's'} ${targetIsPlayer ? 'you' : defender.name} for ${damage}!`, 'damage');
@@ -1085,6 +1122,8 @@ function getEffectiveAttack(entity) {
     if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
     // Strength potion
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
+    // Battle Fury perk: +3 attack when below 30% HP
+    if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) atk += 3;
     return Math.max(1, atk);
   }
   return entity.attack;
@@ -1120,6 +1159,7 @@ function applyWeaponSpecial(weapon, target) {
 function killEnemy(enemy) {
   state.player.xp += enemy.xp;
   state.enemiesKilled++;
+  state.floorData[Math.min(state.floor, 10)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
 
@@ -1204,15 +1244,52 @@ function playerDeath(killerName, killerGlyph) {
   // Populate full character stats for "View Stats" button
   const p = state.player;
   function sr(label, val) { return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`; }
+
+  const totalDealt = state.floorData.reduce((acc, f) => acc + f.damageDealt, 0);
+  const totalTaken = state.floorData.reduce((acc, f) => acc + f.damageTaken, 0);
+
   $('death-char-stats').innerHTML = [
     sr('Level', p.level),
     sr('XP', `${p.xp}/${p.xpToNext}`),
     sr('HP', `${p.hp}/${p.maxHp}`),
+    sr('Peak HP', state.peakHp),
     sr('Attack', p.attack + (p.equipped.weapon?.attack || 0)),
     sr('Defense', p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)),
+    sr('Dmg Dealt', totalDealt),
+    sr('Dmg Taken', totalTaken),
     sr('Turns', p.turnsSurvived),
     sr('Gold', p.gold),
   ].join('');
+
+  // Floor-by-floor history
+  const activeFloors = state.floorData
+    .map((f, i) => ({ floor: i, ...f }))
+    .filter(f => f.floor >= 1 && f.floor <= state.floor && (f.kills > 0 || f.damageDealt > 0 || f.damageTaken > 0));
+  let historyHtml = '';
+  if (activeFloors.length > 0) {
+    historyHtml = `<div class="stats-heading" style="margin-top:10px;">FLOOR HISTORY</div>
+      <div style="font-size:11px;font-family:monospace;">
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:3px 0;color:var(--gold);border-bottom:1px solid var(--panel-border);">
+          <span>Floor</span><span>Kills</span><span>Dealt</span><span>Taken</span>
+        </div>`;
+    for (const f of activeFloors) {
+      historyHtml += `<div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:2px 0;color:var(--text-dim);">
+        <span style="color:var(--accent)">F${f.floor}</span>
+        <span>${f.kills}</span>
+        <span style="color:var(--hp-high)">${f.damageDealt}</span>
+        <span style="color:var(--danger)">${f.damageTaken}</span>
+      </div>`;
+    }
+    historyHtml += '</div>';
+    historyHtml += `<div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:3px 0;font-size:11px;border-top:1px solid var(--panel-border);font-weight:600;">
+      <span style="color:var(--text-dim)">Total</span>
+      <span style="color:var(--text)">${state.enemiesKilled}</span>
+      <span style="color:var(--hp-high)">${totalDealt}</span>
+      <span style="color:var(--danger)">${totalTaken}</span>
+    </div>`;
+  }
+  // Inject floor history after equip stats
+  $('death-floor-history').innerHTML = historyHtml;
   const w = p.equipped.weapon, a = p.equipped.armor, r = p.equipped.ring;
   $('death-equip-stats').innerHTML = [
     sr('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
@@ -1261,16 +1338,20 @@ function showLevelUp() {
   $('levelup-label').textContent = `Level ${state.player.level}!`;
 
   const allPerks = [
-    { name: '+3 Max HP', desc: 'Increase max HP by 3 and heal 3', apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); }},
-    { name: '+1 Attack', desc: 'Increase base attack by 1', apply: () => { state.player.attack += 1; }},
-    { name: '+1 Defense', desc: 'Increase base defense by 1', apply: () => { state.player.defense += 1; }},
-    { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns (double speed)', apply: () => { state.player.hasRegen = true; }, rare: true, unique: true },
-    { name: '+5 Max HP', desc: 'Increase max HP by 5 and full heal', apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true }
+    { name: '+3 Max HP',   desc: 'Increase max HP by 3 and heal 3',      apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); } },
+    { name: '+1 Attack',   desc: 'Increase base attack by 1',             apply: () => { state.player.attack += 1; } },
+    { name: '+1 Defense',  desc: 'Increase base defense by 1',            apply: () => { state.player.defense += 1; } },
+    { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns',      apply: () => { state.player.hasRegen = true; }, rare: true, unique: true, flag: 'hasRegen' },
+    { name: '+5 Max HP',   desc: 'Increase max HP by 5 and full heal',    apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true },
+    { name: 'Glass Cannon', desc: 'Double your attack — but halve max HP', apply: () => { state.player.attack *= 2; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp / 2)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
+    { name: 'Vampiric Strikes', desc: 'Heal 20% of all damage you deal',  apply: () => { state.player.hasVampire = true; }, rare: true, unique: true, flag: 'hasVampire' },
+    { name: 'Iron Skin',   desc: 'Reduce all incoming damage by 1',       apply: () => { state.player.ironSkin = true; }, rare: true, unique: true, flag: 'ironSkin' },
+    { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' }
   ];
 
   // Filter out already-owned unique perks
   const available = allPerks.filter(p => {
-    if (p.unique && p.name === 'Regeneration' && state.player.hasRegen) return false;
+    if (p.unique && p.flag && state.player[p.flag]) return false;
     return true;
   });
 
@@ -2099,6 +2180,19 @@ function applyScrollEffect(scroll) {
       }
       addMessage('Your items shimmer with clarity!', 'good');
       break;
+    case 'remove_curse': {
+      const p2 = state.player;
+      let removed = 0;
+      for (const slot of ['weapon', 'armor', 'ring']) {
+        if (p2.equipped[slot]?.cursed) {
+          p2.equipped[slot].cursed = false;
+          p2.equipped[slot].name = p2.equipped[slot].name.replace(/^Cursed /, '');
+          removed++;
+        }
+      }
+      addMessage(removed > 0 ? `${removed} item${removed === 1 ? '' : 's'} uncursed!` : 'Nothing to uncurse.', removed > 0 ? 'good' : '');
+      break;
+    }
     case 'summon': {
       // Spawn golem adjacent to player so it's visible and useful
       let pos = null;
@@ -2196,15 +2290,19 @@ function showShrineChoice() {
 function showMerchant(merchant) {
   inputLocked = true;
   Audio.merchant();
-  $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+  renderShopItems(merchant);
+  $('merchant-overlay').classList.add('active');
+}
 
+function renderShopItems(merchant) {
+  $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
   const container = $('shop-items');
   container.innerHTML = '';
 
   for (const shopItem of merchant.shopItems) {
     const div = document.createElement('div');
     div.className = 'shop-item';
-    div.innerHTML = `<span>${shopItem.item.glyph} ${shopItem.item.name}</span><span class="price">${shopItem.item.itemType === 'food' ? '🍖' : ''} ${shopItem.price}💰</span>`;
+    div.innerHTML = `<span>${shopItem.item.glyph} ${shopItem.item.name}</span><span class="price">${shopItem.price}💰</span>`;
     div.addEventListener('click', () => {
       if (state.player.gold >= shopItem.price) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food') {
@@ -2231,7 +2329,31 @@ function showMerchant(merchant) {
     container.appendChild(div);
   }
 
-  $('merchant-overlay').classList.add('active');
+  // Refresh stock button
+  const REFRESH_COST = 25;
+  const refreshDiv = document.createElement('div');
+  refreshDiv.className = 'shop-item';
+  if (merchant.refreshesLeft > 0) {
+    refreshDiv.innerHTML = `<span>🔄 Refresh Stock</span><span class="price" style="color:var(--accent)">${REFRESH_COST}💰 (${merchant.refreshesLeft} left)</span>`;
+    refreshDiv.addEventListener('click', () => {
+      if (state.player.gold >= REFRESH_COST) {
+        state.player.gold -= REFRESH_COST;
+        merchant.shopItems = generateShopItems(state.floor);
+        merchant.refreshesLeft--;
+        addMessage('The merchant reveals new wares!', 'good');
+        Audio.gold();
+        renderShopItems(merchant);
+        updateUI();
+      } else {
+        addMessage("Not enough gold to refresh.", 'damage');
+      }
+    });
+  } else {
+    refreshDiv.innerHTML = `<span style="color:var(--text-dim)">🔄 No more refreshes</span><span></span>`;
+    refreshDiv.style.opacity = '0.4';
+    refreshDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(refreshDiv);
 }
 
 // === TURN PROCESSING ===
@@ -2240,6 +2362,7 @@ function endTurn() {
 
   state.turnCount++;
   state.player.turnsSurvived++;
+  if (state.player.hp > state.peakHp) state.peakHp = state.player.hp;
 
   // Hunger
   if (state.turnCount % HUNGER_TICK === 0) {
@@ -2677,6 +2800,7 @@ function renderInventory() {
   for (const eq of equipped) {
     const slot = document.createElement('div');
     slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
+    if (eq.item?.cursed) slot.style.boxShadow = '0 0 6px rgba(200,40,40,0.7), inset 0 0 6px rgba(200,40,40,0.2)';
     slot.textContent = eq.item ? eq.item.glyph : eq.label;
     if (eq.item) {
       makeTappable(slot, (e) => showEquippedMenu(eq, e));
@@ -2689,7 +2813,11 @@ function renderInventory() {
     const item = state.player.inventory[i];
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
-    slot.textContent = item.glyph;
+    if (item.itemType === 'thrown') {
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#60ffb0;font-weight:bold;">${item.ammo}</span>`;
+    } else {
+      slot.textContent = item.glyph;
+    }
     const idx = i;
     makeTappable(slot, (e) => showItemMenu(item, idx, e));
     bar.appendChild(slot);
@@ -2771,10 +2899,17 @@ function showEquippedMenu(eq, event) {
   if (item.attack) desc += ` (+${item.attack} ATK)`;
   if (item.defense) desc += ` (+${item.defense} DEF)`;
   if (item.special) desc += ` [${item.special}]`;
+  if (item.cursed) desc += ' ⚠ CURSED';
   nameDiv.textContent = desc;
+  if (item.cursed) nameDiv.style.color = '#ff6040';
   menu.appendChild(nameDiv);
 
   const unequipFn = () => {
+    if (item.cursed) {
+      addMessage(`The ${item.name} is cursed! Read a Scroll of Remove Curse first.`, 'damage');
+      closeItemMenu();
+      return;
+    }
     if (state.player.inventory.length >= MAX_INVENTORY) {
       addMessage('Inventory full!', 'damage');
       closeItemMenu();
@@ -2900,6 +3035,7 @@ function setupInput() {
       case 'g': playerPickup(); break;
       case '>': playerDescend(); break;
       case 'm': toggleMinimap(); break;
+      case 'u': showQuickUse(); break;
     }
   });
 
@@ -2937,6 +3073,7 @@ function setupInput() {
   $('btn-pickup').addEventListener('click', () => { Audio.resume(); playerPickup(); });
   $('btn-stairs').addEventListener('click', () => { Audio.resume(); playerDescend(); });
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
+  $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
 
   // Prevent default touch behaviors on body
@@ -3255,6 +3392,58 @@ function renderMinimap() {
   // Draw player as bright dot
   ctx.fillStyle = '#f0c040';
   ctx.fillRect(state.player.x * scale - 1, state.player.y * scale - 1, scale + 2, scale + 2);
+}
+
+// === QUICKCAST ===
+function showQuickUse() {
+  if (!state || state.gameOver || state.victory || inputLocked) return;
+
+  const consumables = state.player.inventory
+    .map((item, idx) => ({ item, idx }))
+    .filter(({ item }) => ['potion', 'scroll', 'food', 'thrown'].includes(item.itemType));
+
+  if (consumables.length === 0) {
+    addMessage('No consumables in inventory.', '');
+    return;
+  }
+
+  const menu = $('item-menu');
+  menu.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'item-name';
+  title.textContent = '🧪 Quick Use';
+  menu.appendChild(title);
+
+  for (const { item, idx } of consumables) {
+    const btn = document.createElement('button');
+    let label = `${item.glyph} ${item.name}`;
+    if (item.itemType === 'thrown') label += ` (${item.ammo})`;
+    btn.textContent = label;
+    const captureIdx = idx;
+    const fn = () => { closeItemMenu(); useItem(item, captureIdx); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
+    menu.appendChild(btn);
+  }
+
+  const cancel = document.createElement('button');
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+  menu.appendChild(cancel);
+
+  menu.style.left = '50%';
+  menu.style.transform = 'translateX(-50%)';
+  menu.style.bottom = '180px';
+  menu.style.top = 'auto';
+  menu.classList.add('active');
+
+  setTimeout(() => {
+    const closer = (e) => { if (!$('item-menu').contains(e.target)) closeItemMenu(); };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
 }
 
 // === FLOOR BIOMES ===
