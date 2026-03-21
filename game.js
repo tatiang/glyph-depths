@@ -165,22 +165,27 @@ function showTitle() {
     particles.appendChild(p);
   }
 
+  // Reset sections so title is visible, class section is hidden
+  $('title-section').style.display = 'flex';
+  $('class-section').style.display = 'none';
   $('title-screen').classList.add('active');
 }
 
 function startGame() {
-  $('title-screen').classList.remove('active');
   Audio.init();
-  Audio.setEnabled(settings.sound); // respect saved preference before playing anything
+  Audio.setEnabled(settings.sound);
   Audio.resume();
   Audio.titleMusic();
+  // Swap to class selection within the same overlay — no separate overlay needed
+  $('title-section').style.display = 'none';
+  $('class-section').style.display = 'flex';
   showClassSelect();
 }
 
 function showClassSelect() {
-  const overlay = $('class-select');
   const cardsEl = $('class-cards');
   const beginBtn = $('btn-begin');
+  if (!cardsEl || !beginBtn) return;
   let selectedClass = null;
 
   cardsEl.innerHTML = '';
@@ -212,20 +217,17 @@ function showClassSelect() {
     cardsEl.appendChild(card);
   }
 
-  // Use onclick assignment to cleanly replace any prior handler
   beginBtn.onclick = () => {
     if (!selectedClass) return;
-    overlay.classList.remove('active');
+    $('title-screen').classList.remove('active');
     newRun(selectedClass);
   };
   beginBtn.ontouchend = (e) => {
     e.preventDefault();
     if (!selectedClass) return;
-    overlay.classList.remove('active');
+    $('title-screen').classList.remove('active');
     newRun(selectedClass);
   };
-
-  overlay.classList.add('active');
 }
 
 // === NEW RUN ===
@@ -256,7 +258,8 @@ function newRun(classId = 'adventurer') {
     throwMode: false,
     throwItem: null,
     floorData: Array.from({length: 11}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
-    peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15
+    peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
+    doorBashes: {}
   };
   applyClassStartingItems(classId);
   const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
@@ -408,7 +411,7 @@ const THROWING_DAGGERS = { name: 'Throwing Daggers', glyph: '🎯', itemType: 't
 const ENEMY_TIERS = {
   1: [
     { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
-    { name: 'Skeleton', glyph: '💀', hp: 6, attack: 2, defense: 1, ai: 'patrol', xp: 5, special: null, detect: 6 },
+    { name: 'Skeleton', glyph: '💀', hp: 4, attack: 2, defense: 0, ai: 'patrol', xp: 4, special: null, detect: 6 },
     { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
     { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true }
   ],
@@ -656,16 +659,51 @@ function addDoors() {
   addOneWayDoors();
 }
 
+// BFS reachability check — used to ensure one-way doors don't create dead ends
+function bfsReachable(sx, sy, tx, ty) {
+  const visited = new Set();
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    if (x === tx && y === ty) return true;
+    const k = y * MAP_W + x;
+    if (visited.has(k)) continue;
+    visited.add(k);
+    for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      const nx = x + dx, ny = y + dy;
+      const t = getTile(nx, ny);
+      // Treat closed doors and corridors as passable for connectivity check
+      if (t === T.WALL || t === T.DOOR_SEALED) continue;
+      q.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= 10) return; // Not on first or boss floor
+  if (state.floor <= 1 || state.floor >= 10) return;
+
+  // Find stairs
+  let stx = -1, sty = -1;
+  outer: for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outer; }
+    }
+  }
+  if (stx < 0) return;
+
+  // Only use doors where removing them still leaves stairs reachable from the player
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
     for (let x = 1; x < MAP_W - 1; x++) {
       if (getTile(x, y) !== T.DOOR_CLOSED) continue;
-      candidates.push({ x, y });
+      setTile(x, y, T.WALL); // temporarily block
+      const safe = bfsReachable(state.player.x, state.player.y, stx, sty);
+      setTile(x, y, T.DOOR_CLOSED); // restore
+      if (safe) candidates.push({ x, y }); // non-critical path — safe to make one-way
     }
   }
-  // Convert 1-2 random doors to one-way doors
+
   const count = Math.min(candidates.length, Math.random() < 0.5 ? 1 : 2);
   for (let i = 0; i < count; i++) {
     const idx = Math.floor(Math.random() * candidates.length);
@@ -932,8 +970,8 @@ function randomFloorTile() {
 
 function getFloorConfig(floor) {
   const configs = {
-    1:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
-    2:  { tier: 1, nextTier: null,  minEnemies: 4, maxEnemies: 5, minItems: 2, maxItems: 3, food: 1 },
+    1:  { tier: 1, nextTier: null,  minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 1 },
+    2:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
     3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
     4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
     5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
@@ -1166,7 +1204,9 @@ function greedyStep(sx, sy, gx, gy, phaseThrough) {
 function attackEntity(attacker, defender) {
   const atk = getEffectiveAttack(attacker);
   const def = getEffectiveDefense(defender);
-  const critChance = (attacker === state.player) ? (state.player.critChance || 0.10) : 0.10;
+  const critChance = (attacker === state.player)
+    ? (state.player.critChance || 0.10)
+    : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
   const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
@@ -1970,15 +2010,35 @@ function playerMove(dx, dy) {
   // Check for one-way door — opens, then seals behind you
   if (getTile(nx, ny) === T.DOOR_ONEWAY) {
     setTile(nx, ny, T.FLOOR);
-    // Seal the tile we came from (place a sealed wall behind)
     const ox = state.player.x, oy = state.player.y;
     state.player.x = nx;
     state.player.y = ny;
     setTile(ox, oy, T.DOOR_SEALED);
-    addMessage('The door slams shut behind you! There is no going back.', 'damage');
+    addMessage('The door slams shut behind you! Bash it 5 times to break through.', 'damage');
     Audio.door();
     haptic(50);
     autoPickup();
+    endTurn();
+    return;
+  }
+
+  // Bash sealed doors — costs 1 HP per hit, breaks after 5 hits
+  if (getTile(nx, ny) === T.DOOR_SEALED) {
+    const key = ny * MAP_W + nx;
+    state.doorBashes[key] = (state.doorBashes[key] || 0) + 1;
+    const hitsLeft = 5 - state.doorBashes[key];
+    state.player.hp = Math.max(0, state.player.hp - 1);
+    if (hitsLeft <= 0) {
+      setTile(nx, ny, T.FLOOR);
+      delete state.doorBashes[key];
+      addMessage('You bash through the sealed door! (-1 HP)', 'good');
+      Audio.door();
+    } else {
+      addMessage(`You bash the sealed door... ${hitsLeft} more hit${hitsLeft === 1 ? '' : 's'} to break it (-1 HP)`, 'damage');
+      Audio.hit();
+    }
+    if (state.player.hp <= 0) { playerDeath('a sealed door', '🚪'); return; }
+    haptic(40);
     endTurn();
     return;
   }

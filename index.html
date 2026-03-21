@@ -507,7 +507,7 @@
     #title-screen {
       gap: 0;
     }
-    #title-screen .title-graphic {
+    #title-section .title-graphic {
       font-size: 28px;
       line-height: 1.15;
       letter-spacing: 1px;
@@ -516,7 +516,7 @@
       transform: translateY(10px);
       animation: titleFadeIn 1.5s ease-out 0.3s forwards;
     }
-    #title-screen .title {
+    #title-section .title {
       font-size: 28px;
       letter-spacing: 3px;
       color: var(--gold);
@@ -525,7 +525,7 @@
       opacity: 0;
       animation: titleFadeIn 1s ease-out 1.2s forwards;
     }
-    #title-screen .subtitle {
+    #title-section .subtitle {
       font-size: 13px;
       color: var(--text-dim);
       margin-bottom: 28px;
@@ -533,17 +533,17 @@
       opacity: 0;
       animation: titleFadeIn 1s ease-out 1.8s forwards;
     }
-    #title-screen .big-btn {
+    #title-section .big-btn {
       opacity: 0;
       animation: titleFadeIn 0.8s ease-out 2.4s forwards;
     }
-    #title-screen .title-particles {
+    #title-section .title-particles {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       pointer-events: none;
       overflow: hidden;
     }
-    #title-screen .title-particles .particle {
+    #title-section .title-particles .particle {
       position: absolute;
       font-size: 14px;
       opacity: 0;
@@ -777,21 +777,23 @@
     </div>
   </div>
 
-  <!-- Class Selection Overlay -->
-  <div class="overlay" id="class-select" style="justify-content: flex-start; padding-top: 24px; overflow-y: auto; align-items: center;">
-    <div class="title" style="font-size:19px;margin-bottom:4px;letter-spacing:0.12em;">CHOOSE YOUR PATH</div>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Each class plays differently. Choose wisely.</div>
-    <div id="class-cards"></div>
-    <button class="big-btn" id="btn-begin" disabled style="margin-top:14px;">Begin Descent</button>
-  </div>
-
   <!-- Overlays -->
-  <div class="overlay" id="title-screen">
-    <div class="title-particles" id="title-particles"></div>
-    <div class="title-graphic" id="title-graphic"></div>
-    <div class="title">THE UNNAMED DEPTHS</div>
-    <div class="subtitle">What lies below has no name until you give it one.</div>
-    <button class="big-btn" id="btn-start">Descend</button>
+  <div class="overlay" id="title-screen" style="justify-content:flex-start;padding-top:24px;overflow-y:auto;">
+    <!-- Step 1: Title -->
+    <div id="title-section" style="display:flex;flex-direction:column;align-items:center;width:100%;">
+      <div class="title-particles" id="title-particles"></div>
+      <div class="title-graphic" id="title-graphic"></div>
+      <div class="title">THE UNNAMED DEPTHS</div>
+      <div class="subtitle">What lies below has no name until you give it one.</div>
+      <button class="big-btn" id="btn-start">Descend</button>
+    </div>
+    <!-- Step 2: Class selection (shown after clicking Descend) -->
+    <div id="class-section" style="display:none;flex-direction:column;align-items:center;width:100%;">
+      <div style="color:var(--gold);font-weight:800;font-size:19px;letter-spacing:0.12em;margin-bottom:4px;">CHOOSE YOUR PATH</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Each class plays differently. Choose wisely.</div>
+      <div id="class-cards"></div>
+      <button class="big-btn" id="btn-begin" disabled style="margin-top:14px;">Begin Descent</button>
+    </div>
   </div>
 
   <div class="overlay" id="death-overlay">
