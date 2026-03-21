@@ -454,6 +454,31 @@
     .shop-item:active { background: var(--btn-active); }
     .shop-item .price { color: var(--gold); }
 
+    /* Stats section */
+    .stats-heading {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 16px;
+      font-size: 13px;
+    }
+
+    .stats-grid .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stats-grid .stat-label { color: var(--text-dim); }
+    .stats-grid .stat-val { color: var(--text); font-weight: 600; }
+
     /* Settings overlay */
     #settings-overlay .setting-row {
       display: flex;
@@ -545,6 +570,17 @@
     </div>
 
     <div id="controls">
+      <div id="action-btns">
+        <div class="action-row">
+          <div class="act-btn" id="btn-pickup"><span class="icon">✋</span>Get</div>
+          <div class="act-btn" id="btn-stairs"><span class="icon">🚪</span>Stairs</div>
+        </div>
+        <div class="action-row">
+          <div class="act-btn" id="btn-wait"><span class="icon">⏳</span>Wait</div>
+          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Stats</div>
+        </div>
+      </div>
+
       <div id="dpad">
         <div class="dpad-btn empty"></div>
         <div class="dpad-btn" data-dir="up">▲</div>
@@ -555,17 +591,6 @@
         <div class="dpad-btn empty"></div>
         <div class="dpad-btn" data-dir="down">▼</div>
         <div class="dpad-btn empty"></div>
-      </div>
-
-      <div id="action-btns">
-        <div class="action-row">
-          <div class="act-btn" id="btn-pickup"><span class="icon">✋</span>Get</div>
-          <div class="act-btn" id="btn-stairs"><span class="icon">🚪</span>Stairs</div>
-        </div>
-        <div class="action-row">
-          <div class="act-btn" id="btn-wait"><span class="icon">⏳</span>Wait</div>
-          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Set</div>
-        </div>
       </div>
     </div>
   </div>
@@ -607,11 +632,25 @@
     <button class="big-btn" id="btn-leave-shop">Leave</button>
   </div>
 
-  <div class="overlay" id="settings-overlay">
-    <h1>⚙️ Settings</h1>
-    <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
-    <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
-    <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
+  <div class="overlay" id="settings-overlay" style="justify-content: flex-start; padding-top: 40px; overflow-y: auto;">
+    <h1 style="margin-bottom: 16px;">📊 Stats &amp; Settings</h1>
+
+    <div id="stats-section" style="width:100%;max-width:280px;margin-bottom:16px;">
+      <div class="stats-heading">CHARACTER</div>
+      <div id="char-stats" class="stats-grid"></div>
+      <div class="stats-heading" style="margin-top:12px;">THIS RUN</div>
+      <div id="run-stats" class="stats-grid"></div>
+      <div class="stats-heading" style="margin-top:12px;">EQUIPPED</div>
+      <div id="equip-stats" class="stats-grid"></div>
+    </div>
+
+    <div style="width:100%;max-width:280px;border-top:1px solid var(--panel-border);padding-top:12px;">
+      <div class="stats-heading" style="margin-bottom:8px;">SETTINGS</div>
+      <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
+      <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
+      <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
+    </div>
+
     <div style="margin-top: 20px;">
       <button class="big-btn" id="btn-close-settings">Close</button>
     </div>

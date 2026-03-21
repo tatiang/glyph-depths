@@ -82,8 +82,8 @@ function newRun() {
     explored: null,
     rooms: [],
     messages: [
-      { text: 'You descend into the Glyph Depths...', cls: '' },
-      { text: 'Swipe to move. Bump enemies to attack.', cls: '' }
+      { text: 'You descend into the Glyph Depths. Swipe or use the d-pad to move.', cls: '' },
+      { text: 'Bump into enemies to attack. Tap items in the bar below to use/equip/drop them.', cls: '' }
     ],
     gameOver: false,
     victory: false,
@@ -2113,7 +2113,7 @@ function render() {
       if (vis) {
         alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.7 : 0.5;
       } else {
-        alpha = 0.2; // Explored but not visible
+        alpha = 0.55; // Explored but not visible — clearly readable, slightly dimmed
       }
 
       ctx.globalAlpha = alpha;
@@ -2295,9 +2295,9 @@ function renderInventory() {
 
   // Show equipped items first with gold border
   const equipped = [
-    { label: 'W', item: state.player.equipped.weapon },
-    { label: 'A', item: state.player.equipped.armor },
-    { label: 'R', item: state.player.equipped.ring }
+    { label: '⚔️', slot: 'weapon', item: state.player.equipped.weapon },
+    { label: '🛡️', slot: 'armor', item: state.player.equipped.armor },
+    { label: '💍', slot: 'ring', item: state.player.equipped.ring }
   ];
 
   for (const eq of equipped) {
@@ -2405,8 +2405,8 @@ function showEquippedMenu(eq, event) {
       return;
     }
     state.player.inventory.push(item);
-    if (eq.label === 'W') state.player.equipped.weapon = null;
-    else if (eq.label === 'A') state.player.equipped.armor = null;
+    if (eq.slot === 'weapon') state.player.equipped.weapon = null;
+    else if (eq.slot === 'armor') state.player.equipped.armor = null;
     else state.player.equipped.ring = null;
     addMessage(`You unequip the ${item.name}.`, '');
     updateUI();
@@ -2684,6 +2684,41 @@ function setupUI() {
 
 function showSettings() {
   inputLocked = true;
+
+  // Populate stats if game is in progress
+  const p = state ? state.player : null;
+  const noGame = '—';
+
+  function statRow(label, val) {
+    return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
+  }
+
+  $('char-stats').innerHTML = [
+    statRow('Level', p ? p.level : noGame),
+    statRow('XP', p ? `${p.xp}/${p.xpToNext}` : noGame),
+    statRow('HP', p ? `${p.hp}/${p.maxHp}` : noGame),
+    statRow('Hunger', p ? p.hunger : noGame),
+    statRow('Attack', p ? `${p.attack + (p.equipped.weapon?.attack || 0)}` : noGame),
+    statRow('Defense', p ? `${p.defense + (p.equipped.armor?.defense || 0)}` : noGame),
+  ].join('');
+
+  $('run-stats').innerHTML = [
+    statRow('Floor', state ? state.floor : noGame),
+    statRow('Gold', p ? p.gold : noGame),
+    statRow('Score', state ? state.score : noGame),
+    statRow('Enemies', state ? state.enemiesKilled : noGame),
+    statRow('Items', state ? state.itemsFound : noGame),
+    statRow('Turns', p ? p.turnsSurvived : noGame),
+  ].join('');
+
+  const w = p?.equipped.weapon;
+  const a = p?.equipped.armor;
+  const r = p?.equipped.ring;
+  $('equip-stats').innerHTML = [
+    statRow('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
+    statRow('🛡️ Armor', a ? `${a.name} (+${a.defense})` : 'None'),
+    statRow('💍 Ring', r ? r.name : 'None'),
+  ].join('');
 
   // Update toggles
   $('toggle-sound').classList.toggle('on', settings.sound);
