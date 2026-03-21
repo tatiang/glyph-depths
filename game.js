@@ -170,6 +170,7 @@ function showTitle() {
 function startGame() {
   $('title-screen').classList.remove('active');
   Audio.init();
+  Audio.setEnabled(settings.sound); // respect saved preference before playing anything
   Audio.resume();
   Audio.titleMusic();
   showClassSelect();
@@ -210,21 +211,18 @@ function showClassSelect() {
     cardsEl.appendChild(card);
   }
 
-  // Remove any old listener by replacing the button
-  const newBegin = beginBtn.cloneNode(true);
-  newBegin.disabled = true;
-  beginBtn.parentNode.replaceChild(newBegin, beginBtn);
-  newBegin.addEventListener('click', () => {
+  // Use onclick assignment to cleanly replace any prior handler
+  beginBtn.onclick = () => {
     if (!selectedClass) return;
     overlay.classList.remove('active');
     newRun(selectedClass);
-  });
-  newBegin.addEventListener('touchend', (e) => {
+  };
+  beginBtn.ontouchend = (e) => {
     e.preventDefault();
     if (!selectedClass) return;
     overlay.classList.remove('active');
     newRun(selectedClass);
-  }, { passive: false });
+  };
 
   overlay.classList.add('active');
 }
