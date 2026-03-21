@@ -355,6 +355,39 @@
     .big-btn:active { opacity: 0.8; }
     #btn-begin:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Help overlay */
+    #help-overlay {
+      position: fixed; inset: 0;
+      background: rgba(5,5,8,0.96);
+      display: none; flex-direction: column; align-items: center;
+      justify-content: flex-start;
+      padding: 28px 20px 24px;
+      overflow-y: auto;
+      z-index: 120;
+    }
+    #help-overlay.active { display: flex; }
+    .help-section { width: 100%; max-width: 340px; margin-bottom: 14px; }
+    .help-heading {
+      font-size: 10px; letter-spacing: 0.12em; color: var(--gold);
+      font-weight: 700; text-transform: uppercase;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 3px; margin-bottom: 6px;
+    }
+    .help-row {
+      display: flex; gap: 8px; align-items: baseline;
+      font-size: 12px; color: var(--text-dim); margin-bottom: 4px; line-height: 1.4;
+    }
+    .help-row .hk { color: var(--accent); font-family: monospace; min-width: 32px; flex-shrink: 0; }
+    .help-row .hl { color: var(--text); font-weight: 600; min-width: 60px; flex-shrink: 0; }
+    .help-note { font-size: 11px; color: var(--text-dim); font-style: italic; margin-bottom: 4px; line-height: 1.4; }
+    .help-btn {
+      background: none; border: 1px solid var(--panel-border);
+      color: var(--text-dim); border-radius: 6px;
+      padding: 3px 9px; font-size: 12px; cursor: pointer;
+      font-family: inherit;
+    }
+    .help-btn:hover { border-color: var(--gold); color: var(--gold); }
+
     /* Class selection */
     #class-cards {
       display: grid;
@@ -786,6 +819,7 @@
       <div class="title">THE UNNAMED DEPTHS</div>
       <div class="subtitle">What lies below has no name until you give it one.</div>
       <button class="big-btn" id="btn-start">Descend</button>
+      <button class="help-btn" id="btn-help-from-title" style="margin-top:12px;animation:none;opacity:1;">📖 How to Play</button>
     </div>
     <!-- Step 2: Class selection (shown after clicking Descend) -->
     <div id="class-section" style="display:none;flex-direction:column;align-items:center;width:100%;">
@@ -860,8 +894,9 @@
       <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
     </div>
 
-    <div style="margin-top: 20px;">
+    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
       <button class="big-btn" id="btn-close-settings">Close</button>
+      <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">📖 How to Play</button>
     </div>
     <div id="game-version" style="margin-top:12px;font-size:10px;color:var(--text-dim);text-align:center;opacity:0.6;font-family:monospace;"></div>
   </div>
@@ -879,6 +914,88 @@
   </div>
 
   <div id="fade"></div>
+
+  <!-- Help / Instructions Overlay -->
+  <div id="help-overlay">
+    <div style="width:100%;max-width:340px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h1 style="font-size:18px;margin:0;">📖 How to Play</h1>
+        <button class="help-btn" id="btn-close-help">✕ Close</button>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Objective</div>
+        <p class="help-note">Descend 10 floors of the Unnamed Depths and defeat the boss on Floor 10 to escape.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Movement &amp; Combat</div>
+        <div class="help-row"><span class="hl">Move</span><span>D-pad, WASD, or arrow keys. Every move advances one turn.</span></div>
+        <div class="help-row"><span class="hl">Attack</span><span>Bump into an enemy to attack it. Enemies act each turn you do.</span></div>
+        <div class="help-row"><span class="hl">Wait</span><span>⏳ button or Space — skip your turn without moving.</span></div>
+        <div class="help-row"><span class="hl">Crits</span><span>10% chance to deal double damage (enemies crit less on early floors).</span></div>
+        <div class="help-row"><span class="hl">Dodge</span><span>Base 5% chance to evade; Rogue class has +15% dodge.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Items</div>
+        <div class="help-row"><span class="hl">Pick up</span><span>Walk over items or tap ✋ Get. Auto-pickup is on by default.</span></div>
+        <div class="help-row"><span class="hl">Use / Equip</span><span>Tap any slot in the inventory bar at the bottom. Choose Equip, Use, Throw, or Drop.</span></div>
+        <div class="help-row"><span class="hl">Quick Use</span><span>🧪 Use button or <kbd>U</kbd> — opens a fast-select for potions &amp; scrolls.</span></div>
+        <div class="help-row"><span class="hl">Potions 🧪</span><span>Unknown until used. Effects are randomized each run.</span></div>
+        <div class="help-row"><span class="hl">Scrolls 📜</span><span>Randomized labels each run. Wizards start with identified scrolls.</span></div>
+        <div class="help-row"><span class="hl">Daggers 🗡️</span><span>Thrown at enemies — enter throw mode then pick a direction.</span></div>
+        <div class="help-row"><span class="hl">Cursed ⚠</span><span>Cursed gear gives bonus stats but locks to your slot. Use a Scroll of Remove Curse to free it.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Hunger</div>
+        <div class="help-row"><span class="hl">Drain</span><span>Hunger falls over time. At 0 you lose 1 HP every 5 turns.</span></div>
+        <div class="help-row"><span class="hl">Restore</span><span>Eat food rations 🍖 or use a Ring of Hunger to halve drain rate.</span></div>
+        <div class="help-row"><span class="hl">Berserker</span><span>Hunger drains 2× faster — plan food carefully.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Special Tiles</div>
+        <div class="help-row"><span class="hl">▼ One-Way</span><span>Entering a one-way door seals it behind you. Bash the sealed door 5 times (–1 HP each) to break through.</span></div>
+        <div class="help-row"><span class="hl">✦ Glyph</span><span>Mysterious runes — step on for a random effect. Usually helpful, occasionally harmful.</span></div>
+        <div class="help-row"><span class="hl">≡ Stairs</span><span>Descend with 🚪 Stairs button or <kbd>S</kbd>. No going back up.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Classes</div>
+        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>Balanced. Free Rapid Regeneration. Leather Armor + Healing Potion.</span></div>
+        <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP / +5 ATK. Rage grants +3 ATK below 40% HP. Eats 2× food.</span></div>
+        <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP. 15% dodge, 20% crit. Starts with 6 Throwing Daggers.</span></div>
+        <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP / +1 ATK. Scrolls deal double effect. Starts with 3 identified scrolls.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Level Ups &amp; Perks</div>
+        <p class="help-note">Killing enemies gives XP. On level up pick one of three perks. Rare perks include: Glass Cannon (2× ATK, half HP), Vampiric Strikes (heal 20% of damage dealt), Iron Skin (–1 incoming damage), Battle Fury (+3 ATK below 30% HP).</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Merchant</div>
+        <p class="help-note">Shops on floors 3, 6, and 9. Buy with gold 💰. Tap 🔄 Refresh Stock (25💰, 2 uses) to reroll wares.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Keyboard Shortcuts</div>
+        <div class="help-row"><span class="hk">WASD</span><span>Move</span></div>
+        <div class="help-row"><span class="hk">Space</span><span>Wait one turn</span></div>
+        <div class="help-row"><span class="hk">G</span><span>Pick up items</span></div>
+        <div class="help-row"><span class="hk">S</span><span>Use stairs</span></div>
+        <div class="help-row"><span class="hk">M</span><span>Toggle minimap</span></div>
+        <div class="help-row"><span class="hk">U</span><span>Quick-use consumable</span></div>
+        <div class="help-row"><span class="hk">H / ?</span><span>This help screen</span></div>
+      </div>
+
+      <div style="text-align:center;margin-top:8px;">
+        <button class="big-btn" id="btn-close-help-bottom">Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="audio.js"></script>
   <script src="game.js"></script>

@@ -3266,6 +3266,7 @@ function setupInput() {
       case '>': playerDescend(); break;
       case 'm': toggleMinimap(); break;
       case 'u': showQuickUse(); break;
+      case 'h': case '?': showHelp(); break;
     }
   });
 
@@ -3452,6 +3453,15 @@ function setupUI() {
     $('settings-overlay').classList.remove('active');
     inputLocked = false;
   });
+
+  // Help screen
+  $('btn-help-from-title').addEventListener('click', showHelp);
+  $('btn-help-from-settings').addEventListener('click', () => {
+    $('settings-overlay').classList.remove('active');
+    showHelp();
+  });
+  $('btn-close-help').addEventListener('click', closeHelp);
+  $('btn-close-help-bottom').addEventListener('click', closeHelp);
 }
 
 function showSettings() {
@@ -3545,6 +3555,17 @@ function showSettings() {
   };
 
   $('settings-overlay').classList.add('active');
+}
+
+// === HELP SCREEN ===
+function showHelp() {
+  inputLocked = true;
+  $('help-overlay').classList.add('active');
+}
+
+function closeHelp() {
+  $('help-overlay').classList.remove('active');
+  inputLocked = false;
 }
 
 // === MINIMAP ===
