@@ -5194,6 +5194,56 @@ function showSettings() {
     statRow('Defense', p ? `${p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)}` : noGame),
   ].join('');
 
+  // Class abilities & bonuses panel
+  const classSection = $('class-abilities');
+  if (classSection) {
+    if (p) {
+      classSection.style.display = '';
+      const cls = CLASS_DEFS.find(c => c.id === p.classId);
+      const abilities = [];
+      switch (p.classId) {
+        case 'adventurer':
+          abilities.push({ icon: '♻️', name: 'Regeneration', desc: `Heals 1 HP every 15 turns` });
+          abilities.push({ icon: '🎲', name: 'Balanced Stats', desc: '10% crit chance' });
+          break;
+        case 'berserker':
+          abilities.push({ icon: '💢', name: 'Rage', desc: '+3 ATK when below 40% HP' });
+          abilities.push({ icon: '⚡', name: 'Enrage', desc: `+5 ATK for 5 turns (1/floor)${p.enrageFloorUsed ? ' — USED' : ' — Ready'}` });
+          abilities.push({ icon: '🍖', name: 'Ravenous', desc: '2× hunger drain rate' });
+          break;
+        case 'rogue':
+          abilities.push({ icon: '👁', name: 'Evasion', desc: `${Math.round((p.dodgeBonus || 0) * 100)}% dodge chance` });
+          abilities.push({ icon: '🗡️', name: 'Critical Strikes', desc: `${Math.round((p.critChance || 0) * 100)}% crit chance` });
+          abilities.push({ icon: '💨', name: 'Stealth', desc: 'Lower enemy detection range' });
+          break;
+        case 'wizard':
+          abilities.push({ icon: '✨', name: 'Arcane Affinity', desc: 'Scroll effects are doubled' });
+          abilities.push({ icon: '💥', name: 'Arcane Blast', desc: `AoE spell (${p.spellCooldown > 0 ? p.spellCooldown + 't CD' : 'Ready'})` });
+          break;
+        case 'ranger':
+          abilities.push({ icon: '👁', name: 'Eagle Eye', desc: `+${p.fovBonus || 2} FOV radius` });
+          abilities.push({ icon: '🌿', name: 'Forager', desc: '50% chance for bonus food/arrows per floor' });
+          abilities.push({ icon: '🎯', name: 'Aimed Shot', desc: `2× bow damage (${p.aimedShotCooldown > 0 ? p.aimedShotCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '♾️', name: 'Infinite Arrows', desc: 'Basic arrows never run out' });
+          break;
+        case 'cleric':
+          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead enemies' });
+          abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
+          abilities.push({ icon: '💛', name: 'Divine Heal', desc: `Full HP heal (1/run)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
+          break;
+      }
+      const classAbilList = $('class-ability-list');
+      classAbilList.innerHTML = abilities.map(a =>
+        `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
+        + `<span style="font-size:15px;flex-shrink:0;">${a.icon}</span>`
+        + `<span style="font-size:12px;"><strong style="color:var(--gold);">${a.name}</strong> — <span style="color:var(--text-dim);">${a.desc}</span></span>`
+        + `</div>`
+      ).join('');
+    } else {
+      classSection.style.display = 'none';
+    }
+  }
+
   $('run-stats').innerHTML = [
     statRow('Floor', state ? state.floor : noGame),
     statRow('Gold', p ? p.gold : noGame),
