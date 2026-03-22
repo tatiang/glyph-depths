@@ -189,7 +189,7 @@
     }
 
     #msg-log.expanded {
-      max-height: 200px;
+      max-height: 40vh;
       justify-content: flex-start;
       cursor: pointer;
     }
@@ -343,6 +343,8 @@
       justify-content: center;
       z-index: 100;
       padding: 24px;
+      padding-top: calc(24px + var(--safe-top));
+      padding-bottom: calc(24px + var(--safe-bottom));
     }
 
     .overlay.active { display: flex; }
@@ -391,6 +393,8 @@
       display: none; flex-direction: column; align-items: center;
       justify-content: flex-start;
       padding: 28px 20px 24px;
+      padding-top: calc(28px + var(--safe-top));
+      padding-bottom: calc(24px + var(--safe-bottom));
       overflow-y: auto;
       z-index: 120;
     }
@@ -546,6 +550,8 @@
       justify-content: center;
       z-index: 95;
       cursor: pointer;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
     }
 
     #minimap-overlay.active { display: flex; }
@@ -870,6 +876,7 @@
       <div class="stat"><span id="gold-label">💰 0</span></div>
     </div>
 
+    <div id="rune-bar" style="display:none;text-align:center;padding:2px 4px;font-size:14px;letter-spacing:2px;color:#c0a0ff;"></div>
     <div id="fx-bar"></div>
 
     <div id="canvas-wrap">
@@ -1087,8 +1094,16 @@
         <div class="help-row"><span class="hl">Quick Use</span><span>🧪 Use button or <kbd>U</kbd> — opens a fast-select for potions &amp; scrolls.</span></div>
         <div class="help-row"><span class="hl">Potions 🧪</span><span>Unknown until used. Effects are randomized each run.</span></div>
         <div class="help-row"><span class="hl">Scrolls 📜</span><span>Randomized labels each run. Wizards start with identified scrolls.</span></div>
-        <div class="help-row"><span class="hl">Daggers 🗡️</span><span>Thrown at enemies — enter throw mode then pick a direction.</span></div>
-        <div class="help-row"><span class="hl">Cursed ⚠</span><span>Cursed gear gives bonus stats but locks to your slot. Use a Scroll of Remove Curse to free it.</span></div>
+        <div class="help-row"><span class="hl">Daggers 🗡️</span><span>Thrown at enemies — press <kbd>T</kbd> then pick a direction.</span></div>
+        <div class="help-row"><span class="hl">Cursed ⚠</span><span>Hidden until equipped! Cursed gear locks to your slot. Use a Scroll of Remove Curse to free it.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Ranged Combat</div>
+        <div class="help-row"><span class="hl">Bows 🏹</span><span>Equip in the ranged slot (green border). Press <kbd>F</kbd> or tap 🏹 Fire, then choose a direction.</span></div>
+        <div class="help-row"><span class="hl">Arrows ➶</span><span>Rangers have unlimited arrows. Other classes find arrows on floors or buy from merchants.</span></div>
+        <div class="help-row"><span class="hl">Special ➶</span><span>🔥 Fire, ❄️ Frost, 💥 Blast, 🗡️ Piercing arrows — load from inventory before firing.</span></div>
+        <div class="help-row"><span class="hl">Bow types</span><span>Short Bow → Hunting Bow → Longbow/Crossbow/Elven Bow. Higher tier = more damage &amp; range.</span></div>
       </div>
 
       <div class="help-section">
@@ -1101,16 +1116,18 @@
       <div class="help-section">
         <div class="help-heading">Special Tiles</div>
         <div class="help-row"><span class="hl">▼ One-Way</span><span>Entering a one-way door seals it behind you. Bash the sealed door 5 times (–1 HP each) to break through.</span></div>
-        <div class="help-row"><span class="hl">✦ Glyph</span><span>Mysterious runes — step on for a random effect. Usually helpful, occasionally harmful.</span></div>
+        <div class="help-row"><span class="hl">✦ Glyph Rune</span><span>Collectible runes with permanent passive effects. One spawns per floor. Walk over to collect.</span></div>
         <div class="help-row"><span class="hl">≡ Stairs</span><span>Descend with 🚪 Stairs button or <kbd>S</kbd>. No going back up.</span></div>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Classes</div>
-        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>Balanced. Free Rapid Regeneration. Leather Armor + Healing Potion.</span></div>
-        <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP / +5 ATK. Rage grants +3 ATK below 40% HP. Eats 2× food.</span></div>
-        <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP. 15% dodge, 20% crit. Starts with 6 Throwing Daggers.</span></div>
-        <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP / +1 ATK. Scrolls deal double effect. Starts with 3 identified scrolls.</span></div>
+        <div class="help-heading">Classes (6)</div>
+        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>15 HP, +2 ATK. Passive regeneration. Leather Armor + Healing Potion.</span></div>
+        <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP, +4 ATK. Rage (+3 ATK below 40% HP). Enrage ability. Eats 2× food.</span></div>
+        <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP, +3 ATK. 15% dodge, 20% crit. Starts with 6 Throwing Daggers.</span></div>
+        <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP, +1 ATK. Scrolls deal double effect. Arcane Blast AoE ability.</span></div>
+        <div class="help-row"><span class="hl">🏹 Ranger</span><span>13 HP, +2 ATK, +1 DEF. +2 FOV, unlimited arrows, forager. Aimed Shot ability.</span></div>
+        <div class="help-row"><span class="hl">⛪ Cleric</span><span>18 HP, +2 ATK, +1 DEF. Holy Aura vs undead, curse immune. Divine Heal (1/floor).</span></div>
       </div>
 
       <div class="help-section">
@@ -1119,18 +1136,48 @@
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Merchant</div>
-        <p class="help-note">Shops on floors 3, 6, and 9. Buy with gold 💰. Tap 🔄 Refresh Stock (25💰, 2 uses) to reroll wares.</p>
+        <div class="help-heading">NPCs</div>
+        <div class="help-row"><span class="hl">🧙 Merchant</span><span>Shops on floors 3, 6, 9. Buy gear, arrows, food. 🔄 Refresh (20💰) to reroll.</span></div>
+        <div class="help-row"><span class="hl">🔮 Sage</span><span>On floors 2, 5, 8. Offers uncursing (30💰), identifying (15💰), and healing (20💰).</span></div>
+        <div class="help-row"><span class="hl">🗣️ Lore NPCs</span><span>Stationary friendly spirits. Bump to hear a hint. Cyan background glow.</span></div>
+        <div class="help-row"><span class="hl">🗿 Golem</span><span>Summoned ally from Scroll of Summoning. Fights for you. Walk into to swap places.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Badges 🏆</div>
+        <p class="help-note">30 badges across Combat, Exploration, Class Mastery, and Challenge categories. Earned across all runs and saved permanently. Press <kbd>B</kbd> or find 🏆 Badges in the Stats screen to view progress.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Glyph Runes ✦</div>
+        <p class="help-note">One rune spawns per floor (glowing purple). Walk over it to collect its permanent passive effect. Collected runes display as symbols below the status bar.</p>
+        <div class="help-row"><span class="hl">🔶 Flame</span><span>15% chance to burn enemies on hit</span></div>
+        <div class="help-row"><span class="hl">🔷 Frost</span><span>15% chance to freeze enemies on hit</span></div>
+        <div class="help-row"><span class="hl">🟢 Thorns</span><span>Reflect 1 damage when hit</span></div>
+        <div class="help-row"><span class="hl">❤️ Vitality</span><span>+3 max HP (immediate)</span></div>
+        <div class="help-row"><span class="hl">⚡ Swiftness</span><span>+8% dodge chance</span></div>
+        <div class="help-row"><span class="hl">👁️ Sight</span><span>+1 FOV radius</span></div>
+        <div class="help-row"><span class="hl">💎 Greed</span><span>Enemies drop 50% more gold</span></div>
+        <div class="help-row"><span class="hl">🍞 Sustenance</span><span>Hunger drains 25% slower</span></div>
+        <div class="help-row"><span class="hl">💢 Wrath</span><span>+1 base attack</span></div>
+        <div class="help-row"><span class="hl">🛡️ Warding</span><span>+1 base defense</span></div>
+        <div class="help-row"><span class="hl">🩸 Vampirism</span><span>Heal 1 HP per kill</span></div>
+        <div class="help-row"><span class="hl">🍀 Fortune</span><span>+5% crit chance</span></div>
       </div>
 
       <div class="help-section">
         <div class="help-heading">Keyboard Shortcuts</div>
-        <div class="help-row"><span class="hk">WASD</span><span>Move</span></div>
+        <div class="help-row"><span class="hk">WASD</span><span>Move (hold D-pad on mobile for continuous movement)</span></div>
         <div class="help-row"><span class="hk">Space</span><span>Wait one turn</span></div>
         <div class="help-row"><span class="hk">G</span><span>Pick up items</span></div>
         <div class="help-row"><span class="hk">S</span><span>Use stairs</span></div>
-        <div class="help-row"><span class="hk">M</span><span>Toggle minimap</span></div>
+        <div class="help-row"><span class="hk">F</span><span>Fire ranged weapon (bow)</span></div>
+        <div class="help-row"><span class="hk">T</span><span>Throw daggers</span></div>
+        <div class="help-row"><span class="hk">E</span><span>Quick equip</span></div>
         <div class="help-row"><span class="hk">U</span><span>Quick-use consumable</span></div>
+        <div class="help-row"><span class="hk">M</span><span>Toggle minimap</span></div>
+        <div class="help-row"><span class="hk">B</span><span>View badges</span></div>
+        <div class="help-row"><span class="hk">ESC</span><span>Close menus / cancel aim</span></div>
         <div class="help-row"><span class="hk">H / ?</span><span>This help screen</span></div>
       </div>
 

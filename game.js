@@ -24,7 +24,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'UI polish + danger border'; // updated each push
-const LAST_UPDATED = '2026-03-22 18:00';
+const LAST_UPDATED = '2026-03-22 19:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -559,6 +559,7 @@ function createPlayer(classId = 'adventurer') {
     arrows: 0,
     infiniteArrows: classId === 'ranger',
     loadedSpecialArrow: null, // reference to special arrow item in inventory
+    runes: [], // collected glyph runes for this run
     statusEffects: [],
     hasRegen: classId === 'adventurer',
     hasVampire: false,
@@ -727,6 +728,26 @@ const SPECIAL_ARROWS = [
 
 const ARROW_BUNDLE = { name: 'Arrows', glyph: '➶', itemType: 'arrows', count: 4, value: 8 };
 
+// === GLYPH RUNE SYSTEM ===
+// One rune per floor, hidden as ✦ tiles. Persistent passive effects for the run.
+const GLYPH_RUNES = [
+  { id: 'flame',     name: 'Glyph of Flame',     symbol: '🔶', desc: '15% chance to burn enemies on hit', effect: 'flame' },
+  { id: 'frost',     name: 'Glyph of Frost',      symbol: '🔷', desc: '15% chance to freeze enemies on hit', effect: 'frost' },
+  { id: 'thorns',    name: 'Glyph of Thorns',     symbol: '🟢', desc: 'Reflect 1 damage when hit', effect: 'thorns' },
+  { id: 'vitality',  name: 'Glyph of Vitality',   symbol: '❤️', desc: '+3 max HP', effect: 'vitality' },
+  { id: 'swiftness', name: 'Glyph of Swiftness',  symbol: '⚡', desc: '+8% dodge chance', effect: 'swiftness' },
+  { id: 'sight',     name: 'Glyph of Sight',      symbol: '👁️', desc: '+1 FOV radius', effect: 'sight' },
+  { id: 'greed',     name: 'Glyph of Greed',      symbol: '💎', desc: 'Enemies drop 50% more gold', effect: 'greed' },
+  { id: 'hunger',    name: 'Glyph of Sustenance',  symbol: '🍞', desc: 'Hunger drains 25% slower', effect: 'hunger' },
+  { id: 'wrath',     name: 'Glyph of Wrath',      symbol: '💢', desc: '+1 base attack', effect: 'wrath' },
+  { id: 'warding',   name: 'Glyph of Warding',    symbol: '🛡️', desc: '+1 base defense', effect: 'warding' },
+  { id: 'vampirism', name: 'Glyph of Vampirism',  symbol: '🩸', desc: 'Heal 1 HP per kill', effect: 'vampirism' },
+  { id: 'fortune',   name: 'Glyph of Fortune',    symbol: '🍀', desc: '+5% crit chance', effect: 'fortune' },
+];
+
+// Rune tile type — we'll use a special entity, not a tile type, to avoid changing T constants
+// Rune entities: { type: 'rune', x, y, glyph: '✦', rune: GLYPH_RUNES[i] }
+
 // === ENEMY DEFINITIONS ===
 const ENEMY_TIERS = {
   1: [
@@ -841,6 +862,9 @@ function generateFloor() {
   if (state.floor >= 2) {
     spawnSpecialTiles();
   }
+
+  // Spawn a glyph rune on each floor (from pool of runes player hasn't collected yet)
+  spawnGlyphRune();
 
   computeFOV();
   render();
@@ -1199,7 +1223,14 @@ function entityAt(x, y, excludeItems) {
 
 function enemyAt(x, y) {
   for (const e of state.entities) {
-    if (e.x === x && e.y === y && e.type === 'enemy' && e.hp > 0) return e;
+    if (e.x === x && e.y === y && e.type === 'enemy' && e.hp > 0 && !e.isAlly) return e;
+  }
+  return null;
+}
+
+function allyAt(x, y) {
+  for (const e of state.entities) {
+    if (e.x === x && e.y === y && e.type === 'enemy' && e.hp > 0 && e.isAlly) return e;
   }
   return null;
 }
@@ -1517,6 +1548,54 @@ function spawnSpecialTiles() {
   }
 }
 
+function collectGlyphRune(runeEntity) {
+  const rune = runeEntity.rune;
+  const p = state.player;
+  p.runes.push(rune);
+  removeEntity(runeEntity);
+
+  // Apply immediate effects
+  switch (rune.effect) {
+    case 'vitality':
+      p.maxHp += 3;
+      p.hp = Math.min(p.maxHp, p.hp + 3);
+      break;
+    case 'wrath':
+      p.attack += 1;
+      break;
+    case 'warding':
+      p.defense += 1;
+      break;
+    case 'sight':
+      p.fovBonus = (p.fovBonus || 0) + 1;
+      computeFOV();
+      break;
+    // Passive effects (flame, frost, thorns, swiftness, greed, hunger, vampirism, fortune)
+    // are checked dynamically in combat/hunger/etc.
+  }
+
+  addMessage(`${rune.symbol} ${rune.name} — ${rune.desc}`, 'gold');
+  haptic(50);
+  // Animation: expanding glyph circle
+  animateAoeBlast(p.x, p.y, 2, '#f0c040');
+}
+
+function hasRune(id) {
+  return state.player.runes.some(r => r.id === id);
+}
+
+function spawnGlyphRune() {
+  // Pick a rune the player hasn't collected yet
+  const collected = new Set(state.player.runes.map(r => r.id));
+  const available = GLYPH_RUNES.filter(r => !collected.has(r.id));
+  if (available.length === 0) return; // all 12 collected!
+  const rune = available[Math.floor(Math.random() * available.length)];
+  const pos = randomRoomFloorTile();
+  if (pos) {
+    state.entities.push({ type: 'rune', x: pos.x, y: pos.y, glyph: '✦', rune });
+  }
+}
+
 function randomFloorTile() {
   for (let attempts = 0; attempts < 100; attempts++) {
     const x = Math.floor(Math.random() * MAP_W);
@@ -1607,8 +1686,9 @@ function generateMonsterDrop(floor, enemyXp) {
   const roll = Math.random();
   const tier = Math.ceil(floor / 3);
   if (roll < 0.3) {
-    // Gold
-    const amount = 3 + Math.floor(Math.random() * (2 + floor * 2));
+    // Gold (Greed rune: +50%)
+    let amount = 3 + Math.floor(Math.random() * (2 + floor * 2));
+    if (state && hasRune('greed')) amount = Math.floor(amount * 1.5);
     return { name: `${amount} Gold`, glyph: '💰', itemType: 'gold', goldAmount: amount, value: 0 };
   } else if (roll < 0.5) {
     // Food
@@ -1799,9 +1879,10 @@ function isUndead(entity) {
 function attackEntity(attacker, defender) {
   const atk = getEffectiveAttack(attacker);
   const def = getEffectiveDefense(defender);
-  const critChance = (attacker === state.player)
+  let critChance = (attacker === state.player)
     ? (state.player.critChance || 0.10)
     : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
+  if (attacker === state.player && hasRune('fortune')) critChance += 0.05;
   const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
@@ -1887,6 +1968,25 @@ function attackEntity(attacker, defender) {
     applyWeaponSpecial(state.player.equipped.weapon, defender);
   }
 
+  // Glyph Rune effects: flame, frost on player attack
+  if (isPlayer && !targetIsPlayer && defender.hp > 0) {
+    if (hasRune('flame') && Math.random() < 0.15) {
+      addStatusEffect(defender, 'burning', 2);
+      addMessage(`🔶 Flame glyph ignites ${defender.name}!`, 'good');
+    }
+    if (hasRune('frost') && Math.random() < 0.15) {
+      addStatusEffect(defender, 'frozen', 1);
+      addMessage(`🔷 Frost glyph freezes ${defender.name}!`, 'good');
+    }
+  }
+
+  // Glyph Rune: thorns reflect when player is hit
+  if (targetIsPlayer && hasRune('thorns')) {
+    attacker.hp -= 1;
+    addMessage(`🟢 Thorns glyph reflects 1 damage!`, '');
+    if (attacker.hp <= 0) killEnemy(attacker);
+  }
+
   // Thorned armor
   if (targetIsPlayer && state.player.equipped.armor?.special === 'thorns') {
     attacker.hp -= 1;
@@ -1915,6 +2015,11 @@ function attackEntity(attacker, defender) {
       if (isPlayer && state.player.equipped.weapon?.special === 'vampiric') {
         state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1);
         addMessage('You drain life from your foe!', 'good');
+      }
+      // Glyph Rune: vampirism — heal 1 HP on kill
+      if (isPlayer && hasRune('vampirism')) {
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1);
+        addMessage('🩸 Vampirism glyph heals you!', 'good');
       }
     }
   }
@@ -2620,6 +2725,20 @@ function playerMove(dx, dy) {
     return;
   }
 
+  // Check for friendly ally at destination — swap positions
+  const ally = allyAt(nx, ny);
+  if (ally) {
+    ally.x = p.x;
+    ally.y = p.y;
+    p.x = nx;
+    p.y = ny;
+    addMessage(`You swap places with your ${ally.name}.`, '');
+    computeFOV();
+    autoPickup();
+    endTurn();
+    return;
+  }
+
   // Check for enemy at destination
   const enemy = enemyAt(nx, ny);
   if (enemy) {
@@ -2696,6 +2815,12 @@ function playerMove(dx, dy) {
 
   // Check for items on ground
   autoPickup();
+
+  // Check for glyph rune
+  const runeEntity = state.entities.find(e => e.type === 'rune' && e.x === nx && e.y === ny);
+  if (runeEntity) {
+    collectGlyphRune(runeEntity);
+  }
 
   // Check for special tile
   if (getTile(nx, ny) === T.SPECIAL) {
@@ -3396,9 +3521,11 @@ function endTurn() {
   // Hunger (Berserker drains 2x faster; Ring of Hunger halves drain)
   if (state.turnCount % HUNGER_TICK === 0) {
     const ringBonus = hasRingEffect('hunger') ? 0.5 : 1;
+    const runeBonus = hasRune('hunger') ? 0.75 : 1;
     const classRate = state.player.hungerRate || 1;
-    const drainBase = Math.floor(classRate * ringBonus);
-    const drainFrac = (classRate * ringBonus) % 1;
+    const rate = classRate * ringBonus * runeBonus;
+    const drainBase = Math.floor(rate);
+    const drainFrac = rate % 1;
     const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
     state.player.hunger = Math.max(0, state.player.hunger - drain);
   }
@@ -3508,7 +3635,7 @@ function hasRingEffect(effect) {
 function addMessage(text, cls) {
   if (!state) return;
   state.messages.push({ text, cls });
-  if (state.messages.length > 50) state.messages.shift();
+  if (state.messages.length > 500) state.messages.shift();
 }
 
 function shuffle(arr) {
@@ -3818,6 +3945,27 @@ function render() {
     ctx.fillText(e.glyph, sx, sy);
   }
 
+  // Draw glyph runes (shimmer effect)
+  for (const e of state.entities) {
+    if (e.type !== 'rune') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+    // Pulsing glow behind the rune
+    const pulse = 0.3 + 0.2 * Math.sin(Date.now() / 300);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#c0a0ff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, ts * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillStyle = '#e0c0ff';
+    ctx.fillText(e.rune ? e.rune.symbol : '✦', sx, sy);
+  }
+
   // Draw merchant
   for (const e of state.entities) {
     if (e.type !== 'merchant') continue;
@@ -4011,7 +4159,7 @@ function updateUI() {
   const msgLog = $('msg-log');
   const expanded = msgLog.classList.contains('expanded');
   msgLog.innerHTML = '';
-  const msgs = expanded ? state.messages.slice(-20) : state.messages.slice(-3);
+  const msgs = expanded ? state.messages : state.messages.slice(-3);
   for (const msg of msgs) {
     const div = document.createElement('div');
     div.className = 'msg' + (msg.cls ? ' ' + msg.cls : '');
@@ -4019,6 +4167,18 @@ function updateUI() {
     msgLog.appendChild(div);
   }
   if (expanded) msgLog.scrollTop = msgLog.scrollHeight;
+
+  // Rune bar
+  const runeBar = $('rune-bar');
+  if (runeBar) {
+    if (p.runes && p.runes.length > 0) {
+      runeBar.style.display = '';
+      runeBar.textContent = p.runes.map(r => r.symbol).join(' ');
+      runeBar.title = p.runes.map(r => r.name).join(', ');
+    } else {
+      runeBar.style.display = 'none';
+    }
+  }
 
   // Inventory
   renderInventory();
@@ -4117,7 +4277,14 @@ function renderInventory() {
     slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
     if (eq.item?.cursed && eq.item?.curseRevealed) slot.style.boxShadow = '0 0 6px rgba(200,40,40,0.7), inset 0 0 6px rgba(200,40,40,0.2)';
     else if (eq.slot === 'ranged' && eq.item) slot.style.borderColor = '#4a9';
-    slot.textContent = eq.item ? eq.item.glyph : eq.label;
+    // Ranged weapon slot: show arrow count overlay
+    if (eq.slot === 'ranged' && eq.item) {
+      const arrowStr = state.player.infiniteArrows ? '∞' : state.player.arrows;
+      slot.style.position = 'relative';
+      slot.innerHTML = `${eq.item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#4a9;font-weight:bold;">${arrowStr}</span>`;
+    } else {
+      slot.textContent = eq.item ? eq.item.glyph : eq.label;
+    }
     if (eq.item) {
       makeTappable(slot, (e) => showEquippedMenu(eq, e));
     }
@@ -4428,32 +4595,49 @@ function setupInput() {
   });
 
   // D-pad buttons
+  // D-pad with hold-to-repeat: first action fires immediately, then repeats after
+  // a short delay (350ms) at a steady interval (120ms) while held down.
+  let dpadRepeatTimer = null;
+  let dpadRepeatInterval = null;
+  function dpadAction(dir) {
+    Audio.resume();
+    switch (dir) {
+      case 'up': playerMove(0, -1); break;
+      case 'down': playerMove(0, 1); break;
+      case 'left': playerMove(-1, 0); break;
+      case 'right': playerMove(1, 0); break;
+      case 'wait': playerWait(); break;
+    }
+  }
+  function stopDpadRepeat() {
+    if (dpadRepeatTimer) { clearTimeout(dpadRepeatTimer); dpadRepeatTimer = null; }
+    if (dpadRepeatInterval) { clearInterval(dpadRepeatInterval); dpadRepeatInterval = null; }
+  }
   document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
     btn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      Audio.resume();
+      stopDpadRepeat();
       const dir = btn.dataset.dir;
-      switch (dir) {
-        case 'up': playerMove(0, -1); break;
-        case 'down': playerMove(0, 1); break;
-        case 'left': playerMove(-1, 0); break;
-        case 'right': playerMove(1, 0); break;
-        case 'wait': playerWait(); break;
-      }
+      dpadAction(dir);
+      // Start repeat after hold delay
+      dpadRepeatTimer = setTimeout(() => {
+        dpadRepeatInterval = setInterval(() => dpadAction(dir), 120);
+      }, 350);
     }, { passive: false });
+
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      stopDpadRepeat();
+    }, { passive: false });
+
+    btn.addEventListener('touchcancel', () => stopDpadRepeat());
 
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       Audio.resume();
       const dir = btn.dataset.dir;
-      switch (dir) {
-        case 'up': playerMove(0, -1); break;
-        case 'down': playerMove(0, 1); break;
-        case 'left': playerMove(-1, 0); break;
-        case 'right': playerMove(1, 0); break;
-        case 'wait': playerWait(); break;
-      }
+      dpadAction(dir);
     });
   });
 
@@ -4910,6 +5094,15 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale + 1, e.y * scale + 1, scale - 2, scale - 2);
   }
 
+  // Draw runes as purple dots
+  for (const e of state.entities) {
+    if (e.type !== 'rune') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    ctx.fillStyle = '#c0a0ff';
+    ctx.fillRect(e.x * scale + 1, e.y * scale + 1, scale - 2, scale - 2);
+  }
+
   // Draw merchants as gold dots
   for (const e of state.entities) {
     if (e.type !== 'merchant') continue;
@@ -5159,6 +5352,7 @@ function getDodgeChance(attacker, defender) {
     let dodge = 0.05; // base 5% for all
     if (state.player.equipped.armor?.special === 'stealth') dodge += 0.15;
     dodge += (state.player.dodgeBonus || 0); // class-based bonus (Rogue: +15%)
+    if (hasRune('swiftness')) dodge += 0.08; // Glyph of Swiftness
     return dodge;
   }
   // Evasive enemies can dodge player attacks
