@@ -23,7 +23,7 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = '6ac84d9 — Replace +3 HP perk with Extended Vision'; // updated each push
+const GAME_VERSION = 'ce8f971 — Fix 11 gameplay issues'; // updated each push
 
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
