@@ -3511,6 +3511,7 @@ function handleLongPress(clientX, clientY) {
 function setupUI() {
   // Title screen
   $('btn-start').addEventListener('click', startGame);
+  $('btn-start').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); }, { passive: false });
 
   // Death screen
   $('btn-death-stats').addEventListener('click', () => {
@@ -3530,14 +3531,14 @@ function setupUI() {
     $('death-overlay').classList.remove('active');
     $('death-full-stats').style.display = 'none';
     $('btn-death-stats').textContent = 'View Stats';
-    newRun();
+    showTitle();
   });
 
   // Victory screen
   $('btn-victory-restart').addEventListener('click', () => {
     saveHighScore();
     $('victory-overlay').classList.remove('active');
-    newRun();
+    showTitle();
   });
 
   // Minimap
