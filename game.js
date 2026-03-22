@@ -3271,6 +3271,36 @@ function showItemMenu(item, index, event) {
     actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
+  actions.push({ label: 'Destroy', fn: () => {
+    // Replace menu content with an inline confirmation
+    menu.innerHTML = '';
+    const warn = document.createElement('div');
+    warn.className = 'item-name';
+    warn.style.color = '#ff6040';
+    warn.textContent = `Destroy ${item.glyph} ${item.name}?`;
+    menu.appendChild(warn);
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:10px;color:var(--text-dim);margin-bottom:6px;';
+    note.textContent = 'This cannot be undone.';
+    menu.appendChild(note);
+    const yesBtn = document.createElement('button');
+    yesBtn.textContent = '🗑 Yes, Destroy';
+    yesBtn.style.color = '#ff6040';
+    const doDestroy = () => {
+      state.player.inventory.splice(index, 1);
+      addMessage(`You destroy the ${item.name}.`, 'damage');
+      updateUI();
+      closeItemMenu();
+    };
+    yesBtn.addEventListener('click', (e) => { e.stopPropagation(); doDestroy(); });
+    yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); doDestroy(); }, { passive: false });
+    menu.appendChild(yesBtn);
+    const noBtn = document.createElement('button');
+    noBtn.textContent = 'Cancel';
+    noBtn.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+    noBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+    menu.appendChild(noBtn);
+  }});
   actions.push({ label: 'Cancel', fn: () => closeItemMenu() });
 
   for (const act of actions) {
