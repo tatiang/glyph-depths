@@ -23,7 +23,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'ce8f971 — Fix 11 gameplay issues'; // updated each push
+const GAME_VERSION = 'Add class special abilities'; // updated each push
+const LAST_UPDATED = '2026-03-22';
 
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
@@ -49,7 +50,7 @@ const CLASS_DEFS = [
     passive: '⚡ Rage: +3 ATK below 40% HP',
     startItems: 'Short Sword · 2× Strength Potions',
     statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+5 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '2× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }]
+    passBadges: [{ label: '2× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
   },
   {
     id: 'rogue',
@@ -61,7 +62,7 @@ const CLASS_DEFS = [
     passive: '👁 15% Dodge · 20% Crit',
     startItems: '6 Throwing Daggers · Invis Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }]
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '👁 Stealth', cls: 'pos' }]
   },
   {
     id: 'wizard',
@@ -73,7 +74,7 @@ const CLASS_DEFS = [
     passive: '✨ Arcane Affinity: scrolls ×2',
     startItems: 'Arcane Staff · 3 identified scrolls',
     statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }]
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: '✨ AoE Blast', cls: 'pos' }]
   }
 ];
 
@@ -295,7 +296,12 @@ function createPlayer(classId = 'adventurer') {
     critChance: cls.critChance,
     hungerRate: cls.hungerRate,
     regenCounter: 0,
-    turnsSurvived: 0
+    turnsSurvived: 0,
+    // Class special abilities
+    enrageActive: false,
+    engageTurnsLeft: 0,
+    enrageFloorUsed: false,
+    spellCooldown: 0
   };
 }
 
@@ -448,6 +454,10 @@ function generateFloor() {
   state.visible = new Uint8Array(MAP_W * MAP_H);
   state.explored = new Uint8Array(MAP_W * MAP_H);
   state.entities = [];
+  // Reset per-floor Berserker enrage (recharges each floor)
+  p.enrageFloorUsed = false;
+  p.enrageActive = false;
+  p.engageTurnsLeft = 0;
   state.rooms = [];
 
   if (state.floor === 10) {
@@ -1752,7 +1762,8 @@ function processEnemies() {
     const dist = Math.abs(enemy.x - state.player.x) + Math.abs(enemy.y - state.player.y);
     const playerInvis = hasStatusEffect(state.player, 'invisibility');
     const stealthBonus = state.player.equipped.armor?.special === 'stealth' ? 2 : 0;
-    const canDetect = dist <= enemy.detect - stealthBonus && !playerInvis;
+    const rogueBonus = state.player.classId === 'rogue' ? Math.floor(enemy.detect / 2) : 0;
+    const canDetect = dist <= enemy.detect - stealthBonus - rogueBonus && !playerInvis;
 
     if (canDetect && hasLOS(enemy.x, enemy.y, state.player.x, state.player.y)) {
       enemy.alertness = 2;
@@ -2052,6 +2063,13 @@ function playerMove(dx, dy) {
   const enemy = enemyAt(nx, ny);
   if (enemy) {
     attackEntity(p, enemy);
+    // Berserker enrage: bonus attack on a neighbouring enemy after every action
+    if (p.enrageActive) {
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const bonus = enemyAt(p.x + ddx, p.y + ddy);
+        if (bonus && bonus !== enemy && bonus.hp > 0) { attackEntity(p, bonus); break; }
+      }
+    }
     endTurn();
     return;
   }
@@ -2158,6 +2176,14 @@ function playerMove(dx, dy) {
     updateUI();
     render();
     return; // Free move — don't end turn
+  }
+
+  // Berserker enrage: bonus attack on a neighbouring enemy after every move
+  if (p.enrageActive) {
+    for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      const bonus = enemyAt(p.x + ddx, p.y + ddy);
+      if (bonus && bonus.hp > 0) { attackEntity(p, bonus); break; }
+    }
   }
 
   endTurn();
@@ -2698,6 +2724,17 @@ function endTurn() {
     state.player.hp++;
   }
 
+  // Tick class ability cooldowns
+  if (state.player.enrageActive) {
+    state.player.engageTurnsLeft--;
+    if (state.player.engageTurnsLeft <= 0) {
+      state.player.enrageActive = false;
+      state.player.engageTurnsLeft = 0;
+      addMessage('The battle fury fades.', '');
+    }
+  }
+  if (state.player.spellCooldown > 0) state.player.spellCooldown--;
+
   // Process hazards
   for (let i = state.entities.length - 1; i >= 0; i--) {
     const e = state.entities[i];
@@ -3105,6 +3142,47 @@ function updateUI() {
 
   // Status effect indicators
   renderStatusFX();
+
+  // Special ability button (Berserker / Wizard only)
+  const spRow = $('special-row');
+  const spBtn = $('btn-special');
+  if (spRow && spBtn) {
+    const cls = p.classId;
+    if (cls === 'berserker') {
+      spRow.style.display = '';
+      if (p.enrageActive) {
+        spBtn.textContent = `🔥 FURY ${p.engageTurnsLeft}t`;
+        spBtn.style.borderColor = '#ff6020';
+        spBtn.style.color = '#ff6020';
+        spBtn.style.opacity = '1';
+      } else if (p.enrageFloorUsed) {
+        spBtn.textContent = '⚡ ENRAGE ✓';
+        spBtn.style.borderColor = 'var(--panel-border)';
+        spBtn.style.color = 'var(--text-dim)';
+        spBtn.style.opacity = '0.5';
+      } else {
+        spBtn.textContent = '⚡ ENRAGE';
+        spBtn.style.borderColor = 'var(--gold)';
+        spBtn.style.color = 'var(--gold)';
+        spBtn.style.opacity = '1';
+      }
+    } else if (cls === 'wizard') {
+      spRow.style.display = '';
+      if (p.spellCooldown > 0) {
+        spBtn.textContent = `✨ BLAST ${p.spellCooldown}t`;
+        spBtn.style.borderColor = 'var(--panel-border)';
+        spBtn.style.color = 'var(--text-dim)';
+        spBtn.style.opacity = '0.5';
+      } else {
+        spBtn.textContent = '✨ ARCANE BLAST';
+        spBtn.style.borderColor = 'var(--gold)';
+        spBtn.style.color = 'var(--gold)';
+        spBtn.style.opacity = '1';
+      }
+    } else {
+      spRow.style.display = 'none';
+    }
+  }
 }
 
 function renderInventory() {
@@ -3410,6 +3488,17 @@ function setupInput() {
   $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
 
+  // Special class ability button (Berserker / Wizard)
+  const spBtn = $('btn-special');
+  const handleSpecial = () => {
+    Audio.resume();
+    if (!state) return;
+    if (state.player.classId === 'berserker') activateEnrage();
+    else if (state.player.classId === 'wizard') castAoeSpell();
+  };
+  spBtn.addEventListener('click', handleSpecial);
+  spBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleSpecial(); }, { passive: false });
+
   // Prevent default touch behaviors on body
   document.body.addEventListener('touchmove', (e) => {
     if (e.target === document.body || e.target === $('app')) {
@@ -3582,7 +3671,7 @@ function showSettings() {
   $('char-name').textContent = state
     ? `${state.playerName} the ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer'}`
     : '—';
-  $('game-version').textContent = GAME_VERSION;
+  $('game-version').textContent = `${GAME_VERSION} · Last updated ${LAST_UPDATED}`;
 
   $('char-stats').innerHTML = [
     statRow('Level', p ? p.level : noGame),
@@ -4021,6 +4110,48 @@ function spawnMiniBoss() {
   miniBoss.isMiniBoss = true;
   state.entities.push(miniBoss);
   addMessage(`⚠ A ${template.name} guards this floor!`, 'damage');
+}
+
+// === CLASS SPECIAL ABILITIES ===
+
+function activateEnrage() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.enrageFloorUsed) {
+    addMessage('Enrage already used this floor.', '');
+    return;
+  }
+  if (state.player.enrageActive) return;
+  Audio.resume();
+  haptic(50);
+  state.player.enrageActive = true;
+  state.player.engageTurnsLeft = 5;
+  state.player.enrageFloorUsed = true;
+  addMessage('⚡ Battle fury! Bonus attacks for 5 turns!', 'good');
+  updateUI();
+}
+
+function castAoeSpell() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.spellCooldown > 0) {
+    addMessage(`Arcane blast recharging (${state.player.spellCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  const radius = 3;
+  const targets = state.entities.filter(e => {
+    if (e.type !== 'enemy' || e.hp <= 0) return false;
+    const dx = e.x - state.player.x, dy = e.y - state.player.y;
+    return Math.sqrt(dx * dx + dy * dy) <= radius;
+  });
+  if (targets.length === 0) {
+    addMessage('✨ Arcane blast — no enemies in range!', '');
+  } else {
+    addMessage(`✨ Arcane blast — ${targets.length} target${targets.length > 1 ? 's' : ''}!`, 'good');
+    for (const t of targets) { if (t.hp > 0) attackEntity(state.player, t); }
+  }
+  state.player.spellCooldown = 12;
+  endTurn();
 }
 
 // === BOOT ===
