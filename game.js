@@ -21,8 +21,62 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
+const GAME_VERSION = 'Add class special abilities'; // updated each push
+const LAST_UPDATED = '2026-03-22';
+
+// === CLASS DEFINITIONS ===
+const CLASS_DEFS = [
+  {
+    id: 'adventurer',
+    name: 'Adventurer',
+    icon: '🧝',
+    flavor: 'A steady hand and keen instincts. Heals slowly over time.',
+    hp: 15, attack: 2, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '♻ Rapid Regeneration',
+    startItems: 'Leather Armor · Healing Potion',
+    statBadges: [{ label: '15 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Regen', cls: 'pos' }]
+  },
+  {
+    id: 'berserker',
+    name: 'Berserker',
+    icon: '🪖',
+    flavor: 'Hits hard but burns through food. Rage sharpens at the brink.',
+    hp: 22, attack: 5, defense: 0,
+    hungerRate: 2, dodgeBonus: 0, critChance: 0.10,
+    passive: '⚡ Rage: +3 ATK below 40% HP',
+    startItems: 'Short Sword · 2× Strength Potions',
+    statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+5 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: '2× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
+  },
+  {
+    id: 'rogue',
+    name: 'Rogue',
+    icon: '🥷',
+    flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
+    hp: 10, attack: 3, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
+    passive: '👁 15% Dodge · 20% Crit',
+    startItems: '6 Throwing Daggers · Invis Potion',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '👁 Stealth', cls: 'pos' }]
+  },
+  {
+    id: 'wizard',
+    name: 'Wizard',
+    icon: '🧙',
+    flavor: 'Frail but fearsome. Magic doubles in your learned hands.',
+    hp: 11, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '✨ Arcane Affinity: scrolls ×2',
+    startItems: 'Arcane Staff · 3 identified scrolls',
+    statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: '✨ AoE Blast', cls: 'pos' }]
+  }
+];
 
 // Potion/scroll name randomization for the run
 let potionNames = [];
@@ -112,24 +166,78 @@ function showTitle() {
     particles.appendChild(p);
   }
 
+  // Reset sections so title is visible, class section is hidden
+  $('title-section').style.display = 'flex';
+  $('class-section').style.display = 'none';
   $('title-screen').classList.add('active');
 }
 
 function startGame() {
-  $('title-screen').classList.remove('active');
   Audio.init();
+  Audio.setEnabled(settings.sound);
   Audio.resume();
   Audio.titleMusic();
-  newRun();
+  // Swap to class selection within the same overlay — no separate overlay needed
+  $('title-section').style.display = 'none';
+  $('class-section').style.display = 'flex';
+  showClassSelect();
+}
+
+function showClassSelect() {
+  const cardsEl = $('class-cards');
+  const beginBtn = $('btn-begin');
+  if (!cardsEl || !beginBtn) return;
+  let selectedClass = null;
+
+  cardsEl.innerHTML = '';
+  beginBtn.disabled = true;
+
+  for (const cls of CLASS_DEFS) {
+    const card = document.createElement('div');
+    card.className = 'class-card';
+    card.innerHTML = `
+      <div class="class-icon">${cls.icon}</div>
+      <div class="class-name">${cls.name}</div>
+      <div class="class-flavor">${cls.flavor}</div>
+      <div class="class-badge-row">
+        ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+      </div>
+      <div class="class-badge-row" style="margin-top:3px;">
+        ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+      </div>
+      <div class="class-start-items">${cls.startItems}</div>
+    `;
+    const selectFn = () => {
+      selectedClass = cls.id;
+      cardsEl.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      beginBtn.disabled = false;
+    };
+    card.addEventListener('click', selectFn);
+    card.addEventListener('touchend', (e) => { e.preventDefault(); selectFn(); }, { passive: false });
+    cardsEl.appendChild(card);
+  }
+
+  beginBtn.onclick = () => {
+    if (!selectedClass) return;
+    $('title-screen').classList.remove('active');
+    newRun(selectedClass);
+  };
+  beginBtn.ontouchend = (e) => {
+    e.preventDefault();
+    if (!selectedClass) return;
+    $('title-screen').classList.remove('active');
+    newRun(selectedClass);
+  };
 }
 
 // === NEW RUN ===
-function newRun() {
+function newRun(classId = 'adventurer') {
   randomizePotionScrollNames();
   state = {
     floor: 1,
     turnCount: 0,
-    player: createPlayer(),
+    player: createPlayer(classId),
     entities: [],
     map: null,
     visible: null,
@@ -147,33 +255,89 @@ function newRun() {
     idleTurns: 0,        // turns spent near same spot (for wandering monster mechanic)
     lastIdleX: -1,
     lastIdleY: -1,
-    minimapOpen: false
+    minimapOpen: false,
+    throwMode: false,
+    throwItem: null,
+    floorData: Array.from({length: 11}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
+    peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
+    doorBashes: {}
   };
-  // Welcome messages with player name
-  addMessage(`${state.playerName} descends into the Unnamed Depths.`, 'gold');
+  applyClassStartingItems(classId);
+  const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
+  // Welcome messages with player name and class
+  addMessage(`${state.playerName} the ${className} descends into the Unnamed Depths.`, 'gold');
   addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
   updateUI();
   render();
 }
 
-function createPlayer() {
+function createPlayer(classId = 'adventurer') {
+  const cls = CLASS_DEFS.find(c => c.id === classId) || CLASS_DEFS[0];
   return {
     x: 0, y: 0,
+    classId,
     glyph: settings.heroIcon || '🧝',
     name: 'You',
-    hp: 15, maxHp: 15,
-    attack: 2, defense: 0,
+    hp: cls.hp, maxHp: cls.hp,
+    attack: cls.attack, defense: cls.defense,
     level: 1, xp: 0, xpToNext: 15,
     hunger: 100,
     gold: 0,
     inventory: [],
     equipped: { weapon: null, armor: null, ring: null },
     statusEffects: [],
-    hasRegen: false,
+    hasRegen: classId === 'adventurer',
+    hasVampire: false,
+    ironSkin: false,
+    hasFury: false,
+    arcaneAffinity: classId === 'wizard',
+    dodgeBonus: cls.dodgeBonus,
+    critChance: cls.critChance,
+    hungerRate: cls.hungerRate,
     regenCounter: 0,
-    turnsSurvived: 0
+    turnsSurvived: 0,
+    // Class special abilities
+    enrageActive: false,
+    engageTurnsLeft: 0,
+    enrageFloorUsed: false,
+    spellCooldown: 0
   };
+}
+
+function applyClassStartingItems(classId) {
+  const p = state.player;
+  if (classId === 'adventurer') {
+    const armor = ARMORS.find(a => a.name === 'Leather Armor');
+    if (armor) p.equipped.armor = { ...armor };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) p.inventory.push({ ...healPotion, glyph: '🧪', itemType: 'potion' });
+  } else if (classId === 'berserker') {
+    const sword = WEAPONS.find(w => w.name === 'Short Sword');
+    if (sword) p.equipped.weapon = { ...sword };
+    const strPotion = potionNames.find(n => n.id === 'strength');
+    if (strPotion) {
+      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
+      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
+    }
+  } else if (classId === 'rogue') {
+    p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', attack: 3, ammo: 6 });
+    const invisPotion = potionNames.find(n => n.id === 'invisibility');
+    if (invisPotion) p.inventory.push({ ...invisPotion, glyph: '🧪', itemType: 'potion' });
+  } else if (classId === 'wizard') {
+    p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 1, tier: 1, special: 'arcane' };
+    const usedIds = new Set();
+    let tries = 0;
+    while (p.inventory.length < 3 && tries < 30) {
+      tries++;
+      const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
+      if (!usedIds.has(s.id)) {
+        usedIds.add(s.id);
+        scrollIdentified[s.id] = true;
+        p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
+      }
+    }
+  }
 }
 
 // === POTION / SCROLL NAME RANDOMIZATION ===
@@ -188,7 +352,8 @@ const POTION_COLORS = [
 
 const SCROLL_LABELS = [
   'Scroll labeled XYZZY', 'Scroll labeled LOREM', 'Scroll labeled FOOBAR',
-  'Scroll labeled ZELGO', 'Scroll labeled KRUNK', 'Scroll labeled NIMHE'
+  'Scroll labeled ZELGO', 'Scroll labeled KRUNK', 'Scroll labeled NIMHE',
+  'Scroll labeled QUUX'
 ];
 
 const POTION_EFFECTS = [
@@ -206,7 +371,8 @@ const SCROLL_EFFECTS = [
   { id: 'enchant', name: 'Scroll of Enchant', desc: '+1 to equipped weapon' },
   { id: 'confusion', name: 'Scroll of Confusion', desc: 'Confuse visible enemies' },
   { id: 'identify', name: 'Scroll of Identify', desc: 'Identify an item type' },
-  { id: 'summon', name: 'Scroll of Summoning', desc: 'Summon a golem ally' }
+  { id: 'summon', name: 'Scroll of Summoning', desc: 'Summon a golem ally' },
+  { id: 'remove_curse', name: 'Scroll of Remove Curse', desc: 'Uncurse all equipped items' }
 ];
 
 function randomizePotionScrollNames() {
@@ -245,12 +411,13 @@ const RINGS = [
 ];
 
 const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
+const THROWING_DAGGERS = { name: 'Throwing Daggers', glyph: '🎯', itemType: 'thrown', ammo: 5, damage: 3, value: 30 };
 
 // === ENEMY DEFINITIONS ===
 const ENEMY_TIERS = {
   1: [
     { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
-    { name: 'Skeleton', glyph: '💀', hp: 6, attack: 2, defense: 1, ai: 'patrol', xp: 5, special: null, detect: 6 },
+    { name: 'Skeleton', glyph: '💀', hp: 4, attack: 2, defense: 0, ai: 'patrol', xp: 4, special: null, detect: 6 },
     { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
     { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true }
   ],
@@ -273,6 +440,13 @@ const BOSS = {
   ai: 'boss', xp: 100, special: 'boss', detect: 50
 };
 
+// Mini-bosses guard milestone floors (3, 6, 9)
+const MINI_BOSSES = {
+  3: { name: 'Cave Troll', glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
+  6: { name: 'Lich',       glyph: '💀', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
+  9: { name: 'Balrog',     glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 }
+};
+
 // === DUNGEON GENERATION (BSP) ===
 function generateFloor() {
   const p = state.player;
@@ -280,12 +454,22 @@ function generateFloor() {
   state.visible = new Uint8Array(MAP_W * MAP_H);
   state.explored = new Uint8Array(MAP_W * MAP_H);
   state.entities = [];
+  // Reset per-floor Berserker enrage (recharges each floor)
+  p.enrageFloorUsed = false;
+  p.enrageActive = false;
+  p.engageTurnsLeft = 0;
   state.rooms = [];
 
   if (state.floor === 10) {
     generateBossFloor();
   } else {
     generateBSP();
+  }
+
+  // Announce biome when entering a new region
+  if ([1, 4, 7, 10].includes(state.floor)) {
+    const biome = getFloorBiome(state.floor);
+    addMessage(`Entering ${biome.name}...`, 'gold');
   }
 
   // Place stairs down (except floor 10)
@@ -311,6 +495,9 @@ function generateFloor() {
   if ([3, 6, 9].includes(state.floor)) {
     spawnMerchant();
   }
+
+  // Friendly NPC with lore on every floor
+  spawnNPCs();
 
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
@@ -485,16 +672,67 @@ function addDoors() {
   addOneWayDoors();
 }
 
+// BFS reachability check — used to ensure one-way doors don't create dead ends
+function bfsReachable(sx, sy, tx, ty) {
+  const visited = new Set();
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    if (x === tx && y === ty) return true;
+    const k = y * MAP_W + x;
+    if (visited.has(k)) continue;
+    visited.add(k);
+    for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      const nx = x + dx, ny = y + dy;
+      const t = getTile(nx, ny);
+      // Treat closed doors and corridors as passable for connectivity check
+      if (t === T.WALL || t === T.DOOR_SEALED) continue;
+      q.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= 10) return; // Not on first or boss floor
+  if (state.floor <= 1 || state.floor >= 10) return;
+
+  // Find stairs
+  let stx = -1, sty = -1;
+  outer: for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outer; }
+    }
+  }
+  if (stx < 0) return;
+
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
     for (let x = 1; x < MAP_W - 1; x++) {
       if (getTile(x, y) !== T.DOOR_CLOSED) continue;
-      candidates.push({ x, y });
+
+      // Identify the tile on each side of the door along its corridor axis.
+      // A one-way door is only valid if both sides still connect to each other
+      // via an alternative path — guaranteeing the player can always get back.
+      let sideA, sideB;
+      if (getTile(x - 1, y) !== T.WALL && getTile(x + 1, y) !== T.WALL) {
+        sideA = [x - 1, y]; sideB = [x + 1, y]; // horizontal corridor
+      } else if (getTile(x, y - 1) !== T.WALL && getTile(x, y + 1) !== T.WALL) {
+        sideA = [x, y - 1]; sideB = [x, y + 1]; // vertical corridor
+      } else {
+        continue; // can't determine axis — skip
+      }
+
+      setTile(x, y, T.WALL); // temporarily block
+      // Both sides must still reach each other (alternative path exists)
+      // AND stairs must still be reachable from the player start
+      const altPath  = bfsReachable(sideA[0], sideA[1], sideB[0], sideB[1]);
+      const stairsOk = altPath && bfsReachable(state.player.x, state.player.y, stx, sty);
+      setTile(x, y, T.DOOR_CLOSED); // restore
+
+      if (altPath && stairsOk) candidates.push({ x, y });
     }
   }
-  // Convert 1-2 random doors to one-way doors
+
   const count = Math.min(candidates.length, Math.random() < 0.5 ? 1 : 2);
   for (let i = 0; i < count; i++) {
     const idx = Math.floor(Math.random() * candidates.length);
@@ -640,6 +878,8 @@ function removeEntity(e) {
 // === SPAWNING ===
 function spawnEnemies() {
   if (state.floor === 10) return; // Boss already placed
+  // Spawn mini-boss on milestone floors
+  if (MINI_BOSSES[state.floor]) spawnMiniBoss();
   const floorConfig = getFloorConfig(state.floor);
   const count = floorConfig.minEnemies + Math.floor(Math.random() * (floorConfig.maxEnemies - floorConfig.minEnemies + 1));
   const tier = floorConfig.tier;
@@ -675,10 +915,10 @@ function spawnItems() {
     }
   }
 
-  // Food
+  // Food — always spawn in a room interior so the player can always reach it
   const foodCount = floorConfig.food;
   for (let i = 0; i < foodCount; i++) {
-    const pos = randomFloorTile();
+    const pos = randomRoomFloorTile();
     if (pos) state.entities.push(createItemEntity({ ...FOOD }, pos.x, pos.y));
   }
 
@@ -693,6 +933,44 @@ function spawnItems() {
   }
 }
 
+// === FRIENDLY NPCs ===
+const NPC_LORE = [
+  // Purpose / world
+  "A ghostly wanderer murmurs: \"The Glyph King once ruled these depths with forbidden runes. Destroy him before he rewrites reality.\"",
+  "A faint shade whispers: \"Ten floors stand between you and the Sanctum. Each deeper level is older, darker, more wrong.\"",
+  "A spectral scribe warns: \"The Glyph King feeds on the memories of adventurers who fell here. Do not add to his collection.\"",
+  "A spirit hisses: \"The glyphs on the walls are not decoration — they are locks. Only the King's death will break them.\"",
+  // Gameplay hints
+  "A lingering echo advises: \"Sealed doors can be bashed open. It will cost you, but you will survive — barely.\"",
+  "A wandering shade notes: \"One-way doors seal behind you. There is always a way out, but it will hurt.\"",
+  "A fading voice murmurs: \"Hunger is the silent killer here. Find rations before the torches run out.\"",
+  "An old shade cautions: \"Cursed items bind to the bearer. Seek a Scroll of Remove Curse before equipping unknown armor.\"",
+  "A translucent figure advises: \"Mimics disguise themselves as chests. Step close — their true nature reveals itself.\"",
+  "A spirit warns: \"Demons leave fire in their wake. Flames linger for several turns and burn deeply.\"",
+  "A shade recalls: \"Poison from spiders lasts many turns. Use a healing potion to cleanse it before it kills you.\"",
+  "A ghost mutters: \"Ghosts walk through walls. There is no wall thick enough to stop one that wants you dead.\"",
+  "A spectral guide says: \"Level up wisely. Extended Vision keeps enemies from ambushing you in dark corridors.\"",
+  "A faint voice observes: \"Gold is not just for merchants. Hoard enough and surviving becomes much more forgiving.\"",
+  // Atmosphere
+  "A lost soul sighs: \"I tried to run from the Glyph King. The depths simply do not end — until he does.\"",
+  "A pale wanderer says: \"The deeper biomes grow stranger. The Crypt remembers every death. The Citadel enjoys them.\"",
+  "A translucent pilgrim whispers: \"Many came before you. Fewer left. The ones who did left only footprints — and warnings.\"",
+  "A shade confides: \"The Sanctum on the tenth floor is beautiful. You will never want to see it again.\"",
+];
+
+function spawnNPCs() {
+  if (!state.rooms || state.rooms.length < 2) return;
+  // Pick a room that isn't the starting room
+  const candidateRooms = state.rooms.slice(1);
+  const room = candidateRooms[Math.floor(Math.random() * candidateRooms.length)];
+  // Place in room interior
+  const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+  const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+  if (getTile(x, y) !== T.FLOOR) return;
+  const lore = NPC_LORE[Math.floor(Math.random() * NPC_LORE.length)];
+  state.entities.push({ type: 'npc', x, y, glyph: '👻', name: 'Wandering Shade', lore, spoken: false });
+}
+
 function spawnMerchant() {
   const room = state.rooms[Math.floor(Math.random() * state.rooms.length)];
   const x = room.x + Math.floor(room.w / 2);
@@ -702,8 +980,21 @@ function spawnMerchant() {
     x, y,
     glyph: '🧙',
     name: 'Merchant',
-    shopItems: generateShopItems(state.floor)
+    shopItems: generateShopItems(state.floor),
+    refreshesLeft: 2
   });
+}
+
+// Apply a curse to a weapon/armor copy (15% chance on floor 3+)
+function maybeCurse(item, floor) {
+  if (floor < 3) return item;
+  if (['weapon', 'armor'].includes(item.itemType) && Math.random() < 0.15) {
+    item.cursed = true;
+    if (item.attack !== undefined) item.attack += 1;
+    if (item.defense !== undefined) item.defense += 1;
+    item.name = 'Cursed ' + item.name;
+  }
+  return item;
 }
 
 function generateShopItems(floor) {
@@ -744,10 +1035,27 @@ function randomFloorTile() {
   return null;
 }
 
+// Pick a tile from the interior of a room (guaranteed accessible, not a corridor dead-end)
+function randomRoomFloorTile() {
+  if (!state.rooms || state.rooms.length === 0) return randomFloorTile();
+  for (let attempts = 0; attempts < 100; attempts++) {
+    const room = state.rooms[Math.floor(Math.random() * state.rooms.length)];
+    // Use interior tiles (1 tile in from each edge) to avoid corridor junctions
+    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+    if (getTile(x, y) !== T.FLOOR) continue;
+    if (x === state.player.x && y === state.player.y) continue;
+    if (enemyAt(x, y)) continue;
+    if (itemsAt(x, y).length > 0) continue;
+    return { x, y };
+  }
+  return randomFloorTile();
+}
+
 function getFloorConfig(floor) {
   const configs = {
-    1:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
-    2:  { tier: 1, nextTier: null,  minEnemies: 4, maxEnemies: 5, minItems: 2, maxItems: 3, food: 1 },
+    1:  { tier: 1, nextTier: null,  minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 1 },
+    2:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
     3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
     4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
     5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
@@ -766,11 +1074,11 @@ function generateRandomItem(floor) {
   if (roll < 0.25) {
     // Weapon
     const pool = WEAPONS.filter(w => w.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return { ...pool[Math.floor(Math.random() * pool.length)] };
+    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
   } else if (roll < 0.4) {
     // Armor
     const pool = ARMORS.filter(a => a.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return { ...pool[Math.floor(Math.random() * pool.length)] };
+    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
   } else if (roll < 0.6) {
     // Potion
     const p = potionNames[Math.floor(Math.random() * potionNames.length)];
@@ -779,9 +1087,12 @@ function generateRandomItem(floor) {
     // Scroll
     const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
     return makeScroll(s);
-  } else if (roll < 0.9) {
+  } else if (roll < 0.88) {
     // Ring
     return { ...RINGS[Math.floor(Math.random() * RINGS.length)] };
+  } else if (roll < 0.94) {
+    // Throwing Daggers
+    return { ...THROWING_DAGGERS };
   } else {
     // Food
     return { ...FOOD };
@@ -809,7 +1120,7 @@ function generateMonsterDrop(floor, enemyXp) {
   } else {
     // Equipment appropriate to floor
     const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier)];
-    if (pool.length > 0) return { ...pool[Math.floor(Math.random() * pool.length)] };
+    if (pool.length > 0) return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, state.floor);
     return { ...FOOD };
   }
 }
@@ -857,7 +1168,7 @@ const OCTANT_TRANSFORMS = [
 
 function computeFOV() {
   const p = state.player;
-  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0);
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0);
   state.visible.fill(0);
 
   // Player's tile is always visible
@@ -977,9 +1288,17 @@ function greedyStep(sx, sy, gx, gy, phaseThrough) {
 function attackEntity(attacker, defender) {
   const atk = getEffectiveAttack(attacker);
   const def = getEffectiveDefense(defender);
-  const isCrit = Math.random() < 0.1;
+  const critChance = (attacker === state.player)
+    ? (state.player.critChance || 0.10)
+    : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
+  const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
+
+  // Iron Skin perk: reduce incoming damage to player by 1
+  if (defender === state.player && state.player.ironSkin) {
+    damage = Math.max(1, damage - 1);
+  }
 
   // Ghost miss chance
   if (defender.special === 'phase' && Math.random() < 0.5) {
@@ -988,10 +1307,31 @@ function attackEntity(attacker, defender) {
     return;
   }
 
+  // Dodge check
+  const dodgeChance = getDodgeChance(attacker, defender);
+  if (dodgeChance > 0 && Math.random() < dodgeChance) {
+    const targetIsPlayerDodge = defender === state.player;
+    addMessage(targetIsPlayerDodge ? 'You dodge the attack!' : `${defender.name} dodges!`, targetIsPlayerDodge ? 'good' : '');
+    Audio.miss();
+    return;
+  }
+
   defender.hp -= damage;
 
   const isPlayer = attacker === state.player;
   const targetIsPlayer = defender === state.player;
+
+  // Track damage for death recap
+  const floorIdx = Math.min(state.floor, 10);
+  if (isPlayer && !targetIsPlayer) state.floorData[floorIdx].damageDealt += damage;
+  else if (!isPlayer && targetIsPlayer) state.floorData[floorIdx].damageTaken += damage;
+
+  // Vampiric Strikes perk: heal 20% of damage dealt
+  if (isPlayer && !targetIsPlayer && state.player.hasVampire) {
+    const vHeal = Math.max(1, Math.floor(damage * 0.2));
+    state.player.hp = Math.min(state.player.maxHp, state.player.hp + vHeal);
+    if (vHeal > 1) addMessage(`Vampiric: +${vHeal} HP`, 'good');
+  }
 
   if (isCrit) {
     addMessage(`${isPlayer ? 'You' : attacker.name} critically hit${isPlayer ? '' : 's'} ${targetIsPlayer ? 'you' : defender.name} for ${damage}!`, 'damage');
@@ -1055,6 +1395,10 @@ function getEffectiveAttack(entity) {
     if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
     // Strength potion
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
+    // Battle Fury perk: +3 attack when below 30% HP
+    if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) atk += 3;
+    // Berserker class rage: +3 attack when below 40% HP
+    if (state.player.classId === 'berserker' && state.player.hp < state.player.maxHp * 0.4) atk += 3;
     return Math.max(1, atk);
   }
   return entity.attack;
@@ -1090,6 +1434,7 @@ function applyWeaponSpecial(weapon, target) {
 function killEnemy(enemy) {
   state.player.xp += enemy.xp;
   state.enemiesKilled++;
+  state.floorData[Math.min(state.floor, 10)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
 
@@ -1118,6 +1463,17 @@ function killEnemy(enemy) {
       addMessage(spawned > 1 ? 'The Slime splits in two!' : 'The Slime oozes apart!', 'damage');
     } else {
       addMessage('The Slime dissolves!', '');
+    }
+  }
+
+  // Mini-boss guaranteed tier-appropriate drop
+  if (enemy.isMiniBoss) {
+    const tier = Math.ceil(state.floor / 3);
+    const pool = [...WEAPONS.filter(w => w.tier >= tier), ...ARMORS.filter(a => a.tier >= tier)];
+    if (pool.length > 0) {
+      const drop = { ...pool[Math.floor(Math.random() * pool.length)] };
+      state.entities.push(createItemEntity(drop, enemy.x, enemy.y));
+      addMessage(`The ${enemy.name} drops ${drop.name}!`, 'gold');
     }
   }
 
@@ -1151,9 +1507,10 @@ function playerDeath(killerName, killerGlyph) {
 
   const tk = state.toughestKill;
   const kg = killerGlyph || '';
-  $('death-cause').textContent = `${state.playerName} was slain by ${kg ? kg + ' ' : ''}${killerName} on Floor ${state.floor}`;
+  const deathClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
+  $('death-cause').textContent = `${state.playerName} the ${deathClassName} was slain by ${kg ? kg + ' ' : ''}${killerName} on Floor ${state.floor}`;
   $('death-stats').innerHTML = `
-    Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
+    Level <span>${state.player.level}</span> ${deathClassName} | Score: <span>${state.score}</span><br>
     Slain by: <span>${kg ? kg + ' ' : ''}${killerName}</span><br>
     Toughest kill: <span>${tk ? `${tk.glyph} ${tk.name}` : 'none'}</span><br>
     Enemies slain: <span>${state.enemiesKilled}</span> | Items found: <span>${state.itemsFound}</span>
@@ -1163,15 +1520,52 @@ function playerDeath(killerName, killerGlyph) {
   // Populate full character stats for "View Stats" button
   const p = state.player;
   function sr(label, val) { return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`; }
+
+  const totalDealt = state.floorData.reduce((acc, f) => acc + f.damageDealt, 0);
+  const totalTaken = state.floorData.reduce((acc, f) => acc + f.damageTaken, 0);
+
   $('death-char-stats').innerHTML = [
     sr('Level', p.level),
     sr('XP', `${p.xp}/${p.xpToNext}`),
     sr('HP', `${p.hp}/${p.maxHp}`),
+    sr('Peak HP', state.peakHp),
     sr('Attack', p.attack + (p.equipped.weapon?.attack || 0)),
     sr('Defense', p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)),
+    sr('Dmg Dealt', totalDealt),
+    sr('Dmg Taken', totalTaken),
     sr('Turns', p.turnsSurvived),
     sr('Gold', p.gold),
   ].join('');
+
+  // Floor-by-floor history
+  const activeFloors = state.floorData
+    .map((f, i) => ({ floor: i, ...f }))
+    .filter(f => f.floor >= 1 && f.floor <= state.floor && (f.kills > 0 || f.damageDealt > 0 || f.damageTaken > 0));
+  let historyHtml = '';
+  if (activeFloors.length > 0) {
+    historyHtml = `<div class="stats-heading" style="margin-top:10px;">FLOOR HISTORY</div>
+      <div style="font-size:11px;font-family:monospace;">
+        <div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:3px 0;color:var(--gold);border-bottom:1px solid var(--panel-border);">
+          <span>Floor</span><span>Kills</span><span>Dealt</span><span>Taken</span>
+        </div>`;
+    for (const f of activeFloors) {
+      historyHtml += `<div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:2px 0;color:var(--text-dim);">
+        <span style="color:var(--accent)">F${f.floor}</span>
+        <span>${f.kills}</span>
+        <span style="color:var(--hp-high)">${f.damageDealt}</span>
+        <span style="color:var(--danger)">${f.damageTaken}</span>
+      </div>`;
+    }
+    historyHtml += '</div>';
+    historyHtml += `<div style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr 1.5fr;gap:2px;padding:3px 0;font-size:11px;border-top:1px solid var(--panel-border);font-weight:600;">
+      <span style="color:var(--text-dim)">Total</span>
+      <span style="color:var(--text)">${state.enemiesKilled}</span>
+      <span style="color:var(--hp-high)">${totalDealt}</span>
+      <span style="color:var(--danger)">${totalTaken}</span>
+    </div>`;
+  }
+  // Inject floor history after equip stats
+  $('death-floor-history').innerHTML = historyHtml;
   const w = p.equipped.weapon, a = p.equipped.armor, r = p.equipped.ring;
   $('death-equip-stats').innerHTML = [
     sr('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
@@ -1220,16 +1614,20 @@ function showLevelUp() {
   $('levelup-label').textContent = `Level ${state.player.level}!`;
 
   const allPerks = [
-    { name: '+3 Max HP', desc: 'Increase max HP by 3 and heal 3', apply: () => { state.player.maxHp += 3; state.player.hp = Math.min(state.player.maxHp, state.player.hp + 3); }},
-    { name: '+1 Attack', desc: 'Increase base attack by 1', apply: () => { state.player.attack += 1; }},
-    { name: '+1 Defense', desc: 'Increase base defense by 1', apply: () => { state.player.defense += 1; }},
-    { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns (double speed)', apply: () => { state.player.hasRegen = true; }, rare: true, unique: true },
-    { name: '+5 Max HP', desc: 'Increase max HP by 5 and full heal', apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true }
+    { name: 'Extended Vision', desc: 'See 1 tile further in all directions', apply: () => { state.player.fovBonus = (state.player.fovBonus || 0) + 1; computeFOV(); } },
+    { name: '+1 Attack',   desc: 'Increase base attack by 1',             apply: () => { state.player.attack += 1; } },
+    { name: '+1 Defense',  desc: 'Increase base defense by 1',            apply: () => { state.player.defense += 1; } },
+    { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns',      apply: () => { state.player.hasRegen = true; }, rare: true, unique: true, flag: 'hasRegen' },
+    { name: '+5 Max HP',   desc: 'Increase max HP by 5 and full heal',    apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true },
+    { name: 'Glass Cannon', desc: 'Double your attack — but halve max HP', apply: () => { state.player.attack *= 2; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp / 2)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
+    { name: 'Vampiric Strikes', desc: 'Heal 20% of all damage you deal',  apply: () => { state.player.hasVampire = true; }, rare: true, unique: true, flag: 'hasVampire' },
+    { name: 'Iron Skin',   desc: 'Reduce all incoming damage by 1',       apply: () => { state.player.ironSkin = true; }, rare: true, unique: true, flag: 'ironSkin' },
+    { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' }
   ];
 
   // Filter out already-owned unique perks
   const available = allPerks.filter(p => {
-    if (p.unique && p.name === 'Regeneration' && state.player.hasRegen) return false;
+    if (p.unique && p.flag && state.player[p.flag]) return false;
     return true;
   });
 
@@ -1359,6 +1757,14 @@ function processEnemies() {
       continue;
     }
 
+    // Troll regeneration: heals 2 HP every 4 turns
+    if (enemy.special === 'troll_regen' && enemy.hp > 0 && enemy.hp < enemy.maxHp && state.turnCount % 4 === 0) {
+      enemy.hp = Math.min(enemy.maxHp, enemy.hp + 2);
+      if (state.visible[enemy.y * MAP_W + enemy.x]) {
+        addMessage(`The ${enemy.name} regenerates!`, 'damage');
+      }
+    }
+
     // Confused — move randomly
     if (enemy.confused > 0) {
       enemy.confused--;
@@ -1372,7 +1778,8 @@ function processEnemies() {
     const dist = Math.abs(enemy.x - state.player.x) + Math.abs(enemy.y - state.player.y);
     const playerInvis = hasStatusEffect(state.player, 'invisibility');
     const stealthBonus = state.player.equipped.armor?.special === 'stealth' ? 2 : 0;
-    const canDetect = dist <= enemy.detect - stealthBonus && !playerInvis;
+    const rogueBonus = state.player.classId === 'rogue' ? Math.floor(enemy.detect / 2) : 0;
+    const canDetect = dist <= enemy.detect - stealthBonus - rogueBonus && !playerInvis;
 
     if (canDetect && hasLOS(enemy.x, enemy.y, state.player.x, state.player.y)) {
       enemy.alertness = 2;
@@ -1652,6 +2059,12 @@ function hasLOS(x1, y1, x2, y2) {
 function playerMove(dx, dy) {
   if (inputLocked || state.gameOver || state.victory) return;
 
+  // Throw mode — launch projectile in chosen direction
+  if (state.throwMode) {
+    throwProjectile(dx, dy);
+    return;
+  }
+
   const p = state.player;
   const nx = p.x + dx, ny = p.y + dy;
 
@@ -1666,6 +2079,13 @@ function playerMove(dx, dy) {
   const enemy = enemyAt(nx, ny);
   if (enemy) {
     attackEntity(p, enemy);
+    // Berserker enrage: bonus attack on a neighbouring enemy after every action
+    if (p.enrageActive) {
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const bonus = enemyAt(p.x + ddx, p.y + ddy);
+        if (bonus && bonus !== enemy && bonus.hp > 0) { attackEntity(p, bonus); break; }
+      }
+    }
     endTurn();
     return;
   }
@@ -1682,15 +2102,35 @@ function playerMove(dx, dy) {
   // Check for one-way door — opens, then seals behind you
   if (getTile(nx, ny) === T.DOOR_ONEWAY) {
     setTile(nx, ny, T.FLOOR);
-    // Seal the tile we came from (place a sealed wall behind)
     const ox = state.player.x, oy = state.player.y;
     state.player.x = nx;
     state.player.y = ny;
     setTile(ox, oy, T.DOOR_SEALED);
-    addMessage('The door slams shut behind you! There is no going back.', 'damage');
+    addMessage('The door slams shut behind you! Bash it 5 times to break through.', 'damage');
     Audio.door();
     haptic(50);
     autoPickup();
+    endTurn();
+    return;
+  }
+
+  // Bash sealed doors — costs 1 HP per hit, breaks after 5 hits
+  // HP is clamped to 1 so the player can never die bashing their only way out
+  if (getTile(nx, ny) === T.DOOR_SEALED) {
+    const key = ny * MAP_W + nx;
+    state.doorBashes[key] = (state.doorBashes[key] || 0) + 1;
+    const hitsLeft = 5 - state.doorBashes[key];
+    state.player.hp = Math.max(1, state.player.hp - 1);
+    if (hitsLeft <= 0) {
+      setTile(nx, ny, T.FLOOR);
+      delete state.doorBashes[key];
+      addMessage('You bash through the sealed door! (-1 HP)', 'good');
+      Audio.door();
+    } else {
+      addMessage(`You bash the sealed door... ${hitsLeft} more hit${hitsLeft === 1 ? '' : 's'} to break it (-1 HP)`, 'damage');
+      Audio.hit();
+    }
+    haptic(40);
     endTurn();
     return;
   }
@@ -1720,11 +2160,29 @@ function playerMove(dx, dy) {
     if (state.player.hp <= 0) { playerDeath('fire', '🔥'); return; }
   }
 
+  // Check for NPC (friendly shade — cannot be attacked, gives lore)
+  const npc = state.entities.find(e => e.type === 'npc' && e.x === nx && e.y === ny);
+  if (npc) {
+    if (!npc.spoken) {
+      npc.spoken = true;
+      addMessage(npc.lore, 'gold');
+    } else {
+      addMessage(`${npc.name} drifts silently, its message already given.`, '');
+    }
+    endTurn();
+    return;
+  }
+
   // Check for merchant
   const merchant = state.entities.find(e => e.type === 'merchant' && e.x === nx && e.y === ny);
   if (merchant) {
-    showMerchant(merchant);
-    return; // Don't end turn yet, merchant UI is open
+    if (merchant.visited) {
+      addMessage('The merchant shrugs. "Nothing more to offer this level."', '');
+      endTurn();
+    } else {
+      showMerchant(merchant);
+    }
+    return;
   }
 
   // Ring of haste: 30% chance for free extra move
@@ -1736,11 +2194,27 @@ function playerMove(dx, dy) {
     return; // Free move — don't end turn
   }
 
+  // Berserker enrage: bonus attack on a neighbouring enemy after every move
+  if (p.enrageActive) {
+    for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      const bonus = enemyAt(p.x + ddx, p.y + ddy);
+      if (bonus && bonus.hp > 0) { attackEntity(p, bonus); break; }
+    }
+  }
+
   endTurn();
 }
 
 function playerWait() {
   if (inputLocked || state.gameOver || state.victory) return;
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Throw cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
   addMessage('You wait...', '');
   endTurn();
 }
@@ -1767,6 +2241,8 @@ function autoPickup() {
       Audio.gold();
       removeEntity(item);
       state.score += item.item.goldAmount;
+    } else if (settings.autopickup) {
+      pickupItem(item);
     }
   }
 }
@@ -1780,7 +2256,7 @@ function pickupItem(itemEntity) {
     return;
   }
   if (state.player.inventory.length >= MAX_INVENTORY) {
-    addMessage('Inventory full!', 'damage');
+    addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     return;
   }
   state.player.inventory.push(itemEntity.item);
@@ -1796,6 +2272,14 @@ function pickupItem(itemEntity) {
 
 function playerDescend() {
   if (inputLocked || state.gameOver || state.victory) return;
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Throw cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
   const t = getTile(state.player.x, state.player.y);
   if (t !== T.STAIRS_DOWN) {
     addMessage('No stairs here.', '');
@@ -1895,6 +2379,18 @@ function useItem(item, index) {
       }
       break;
 
+    case 'thrown':
+      if (item.ammo <= 0) {
+        addMessage('Your throwing daggers are exhausted!', 'damage');
+        return;
+      }
+      state.throwMode = true;
+      state.throwItem = { item, index };
+      addMessage(`Choose a direction to throw (${item.ammo} left). Wait to cancel.`, 'good');
+      updateUI();
+      render();
+      return; // Don't end turn or call updateUI again
+
     case 'food':
       p.hunger = Math.min(100, p.hunger + 30);
       p.inventory.splice(index, 1);
@@ -1963,43 +2459,53 @@ function applyScrollEffect(scroll) {
       addMessage('The layout of this floor is revealed!', 'good');
       break;
     case 'fireball': {
+      const arcane = state.player.arcaneAffinity;
+      const fbDamage = arcane ? 16 : 8;
+      const fbRadius = arcane ? 4 : 3;
       let hits = 0;
       for (const e of [...state.entities]) {
         if (e.type !== 'enemy') continue;
         const d = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
-        if (d <= 3) {
-          e.hp -= 8;
+        if (d <= fbRadius) {
+          e.hp -= fbDamage;
           hits++;
           if (e.hp <= 0) {
             addMessage(`${e.name} is incinerated!`, 'good');
             removeEntity(e);
             state.player.xp += e.xp;
             state.enemiesKilled++;
+            state.floorData[Math.min(state.floor, 10)].kills++;
           }
         }
       }
-      addMessage(`A fireball erupts! ${hits} enemies hit!`, 'damage');
+      addMessage(`A fireball erupts! ${hits} enemies hit for ${fbDamage}!`, 'damage');
       screenShake();
       break;
     }
-    case 'enchant':
+    case 'enchant': {
+      const arcane = state.player.arcaneAffinity;
+      const enchBonus = arcane ? 2 : 1;
       if (state.player.equipped.weapon) {
-        state.player.equipped.weapon.attack += 1;
-        state.player.equipped.weapon.name += ' +';
-        addMessage(`Your ${state.player.equipped.weapon.name} glows brighter!`, 'good');
+        state.player.equipped.weapon.attack += enchBonus;
+        state.player.equipped.weapon.name += enchBonus === 2 ? ' ++' : ' +';
+        addMessage(`Your ${state.player.equipped.weapon.name} blazes with power!`, 'good');
       } else {
         addMessage('You have no weapon to enchant.', '');
       }
       break;
-    case 'confusion':
+    }
+    case 'confusion': {
+      const arcane = state.player.arcaneAffinity;
+      const confDur = arcane ? 20 : 10;
       for (const e of state.entities) {
         if (e.type !== 'enemy') continue;
         if (state.visible[e.y * MAP_W + e.x]) {
-          e.confused = 10;
+          e.confused = confDur;
         }
       }
-      addMessage('Visible enemies look dazed!', 'good');
+      addMessage(`Visible enemies look ${arcane ? 'completely lost' : 'dazed'}!`, 'good');
       break;
+    }
     case 'identify':
       // Identify all potions and scrolls in inventory
       for (const item of state.player.inventory) {
@@ -2016,28 +2522,47 @@ function applyScrollEffect(scroll) {
       }
       addMessage('Your items shimmer with clarity!', 'good');
       break;
-    case 'summon': {
-      // Spawn golem adjacent to player so it's visible and useful
-      let pos = null;
-      const dirs = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,-1],[1,-1],[-1,1]];
-      for (const [dx, dy] of dirs) {
-        const nx = state.player.x + dx, ny = state.player.y + dy;
-        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
-          pos = { x: nx, y: ny };
-          break;
+    case 'remove_curse': {
+      const p2 = state.player;
+      let removed = 0;
+      for (const slot of ['weapon', 'armor', 'ring']) {
+        if (p2.equipped[slot]?.cursed) {
+          p2.equipped[slot].cursed = false;
+          p2.equipped[slot].name = p2.equipped[slot].name.replace(/^Cursed /, '');
+          removed++;
         }
       }
-      if (!pos) pos = randomFloorTile(); // fallback
-      if (pos) {
-        const golem = createEnemy({ name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 }, pos.x, pos.y);
-        golem.isAlly = true;
-        golem.allyTurns = 25;
-        golem.alertness = 2;
-        state.entities.push(golem);
-        addMessage('A stone golem materializes to aid you!', 'good');
-      } else {
-        addMessage('The scroll fizzles... no room for a summon.', 'damage');
-      }
+      addMessage(removed > 0 ? `${removed} item${removed === 1 ? '' : 's'} uncursed!` : 'Nothing to uncurse.', removed > 0 ? 'good' : '');
+      break;
+    }
+    case 'summon': {
+      const arcane = state.player.arcaneAffinity;
+      // Spawn golem(s) adjacent to player
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,-1],[1,-1],[-1,1]];
+      const spawnGolem = (stats) => {
+        let pos = null;
+        for (const [dx, dy] of dirs) {
+          const nx = state.player.x + dx, ny = state.player.y + dy;
+          if (isWalkable(nx, ny) && !enemyAt(nx, ny)) { pos = { x: nx, y: ny }; break; }
+        }
+        if (!pos) pos = randomFloorTile();
+        if (pos) {
+          const golem = createEnemy(stats, pos.x, pos.y);
+          golem.isAlly = true;
+          golem.allyTurns = arcane ? 40 : 25;
+          golem.alertness = 2;
+          state.entities.push(golem);
+          return true;
+        }
+        return false;
+      };
+      const golemStats = arcane
+        ? { name: 'Iron Golem', glyph: '🗿', hp: 25, attack: 5, defense: 4, ai: 'chase', xp: 0, special: null, detect: 10 }
+        : { name: 'Golem', glyph: '🗿', hp: 15, attack: 3, defense: 2, ai: 'chase', xp: 0, special: null, detect: 10 };
+      const spawned = spawnGolem(golemStats);
+      if (arcane && spawned) spawnGolem({ ...golemStats }); // second golem for wizard
+      if (spawned) addMessage(arcane ? 'Two iron golems rise to serve you!' : 'A stone golem materializes to aid you!', 'good');
+      else addMessage('The scroll fizzles... no room for a summon.', 'damage');
       break;
     }
   }
@@ -2111,17 +2636,27 @@ function showShrineChoice() {
 
 // === MERCHANT ===
 function showMerchant(merchant) {
+  merchant.visited = true;
   inputLocked = true;
   Audio.merchant();
-  $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+  renderShopItems(merchant);
+  $('merchant-overlay').classList.add('active');
+}
 
+function renderShopItems(merchant) {
+  $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
   const container = $('shop-items');
   container.innerHTML = '';
 
   for (const shopItem of merchant.shopItems) {
     const div = document.createElement('div');
     div.className = 'shop-item';
-    div.innerHTML = `<span>${shopItem.item.glyph} ${shopItem.item.name}</span><span class="price">${shopItem.item.itemType === 'food' ? '🍖' : ''} ${shopItem.price}💰</span>`;
+    const it = shopItem.item;
+    let statTag = '';
+    if (it.itemType === 'weapon' && it.attack != null) statTag = ` <span style="color:var(--accent);font-size:11px;">[+${it.attack} ATK]</span>`;
+    else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
+    else if (it.cursed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
+    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${shopItem.price}💰</span>`;
     div.addEventListener('click', () => {
       if (state.player.gold >= shopItem.price) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food') {
@@ -2148,7 +2683,31 @@ function showMerchant(merchant) {
     container.appendChild(div);
   }
 
-  $('merchant-overlay').classList.add('active');
+  // Refresh stock button
+  const REFRESH_COST = 25;
+  const refreshDiv = document.createElement('div');
+  refreshDiv.className = 'shop-item';
+  if (merchant.refreshesLeft > 0) {
+    refreshDiv.innerHTML = `<span>🔄 Refresh Stock</span><span class="price" style="color:var(--accent)">${REFRESH_COST}💰 (${merchant.refreshesLeft} left)</span>`;
+    refreshDiv.addEventListener('click', () => {
+      if (state.player.gold >= REFRESH_COST) {
+        state.player.gold -= REFRESH_COST;
+        merchant.shopItems = generateShopItems(state.floor);
+        merchant.refreshesLeft--;
+        addMessage('The merchant reveals new wares!', 'good');
+        Audio.gold();
+        renderShopItems(merchant);
+        updateUI();
+      } else {
+        addMessage("Not enough gold to refresh.", 'damage');
+      }
+    });
+  } else {
+    refreshDiv.innerHTML = `<span style="color:var(--text-dim)">🔄 No more refreshes</span><span></span>`;
+    refreshDiv.style.opacity = '0.4';
+    refreshDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(refreshDiv);
 }
 
 // === TURN PROCESSING ===
@@ -2157,13 +2716,16 @@ function endTurn() {
 
   state.turnCount++;
   state.player.turnsSurvived++;
+  if (state.player.hp > state.peakHp) state.peakHp = state.player.hp;
 
-  // Hunger
+  // Hunger (Berserker drains 2x faster; Ring of Hunger halves drain)
   if (state.turnCount % HUNGER_TICK === 0) {
-    const hungerRate = hasRingEffect('hunger') ? 0.5 : 1;
-    if (Math.random() < hungerRate) {
-      state.player.hunger = Math.max(0, state.player.hunger - 1);
-    }
+    const ringBonus = hasRingEffect('hunger') ? 0.5 : 1;
+    const classRate = state.player.hungerRate || 1;
+    const drainBase = Math.floor(classRate * ringBonus);
+    const drainFrac = (classRate * ringBonus) % 1;
+    const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
+    state.player.hunger = Math.max(0, state.player.hunger - drain);
   }
 
   if (state.player.hunger <= 0 && state.turnCount % HUNGER_DAMAGE_TICK === 0) {
@@ -2179,6 +2741,17 @@ function endTurn() {
     state.player.regenCounter = 0;
     state.player.hp++;
   }
+
+  // Tick class ability cooldowns
+  if (state.player.enrageActive) {
+    state.player.engageTurnsLeft--;
+    if (state.player.engageTurnsLeft <= 0) {
+      state.player.enrageActive = false;
+      state.player.engageTurnsLeft = 0;
+      addMessage('The battle fury fades.', '');
+    }
+  }
+  if (state.player.spellCooldown > 0) state.player.spellCooldown--;
 
   // Process hazards
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -2350,8 +2923,9 @@ function render() {
   const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
   const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
 
-  // Clear
-  ctx.fillStyle = '#0a0a0f';
+  // Clear with biome background
+  const biome = getFloorBiome(state.floor);
+  ctx.fillStyle = biome.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const fontSize = Math.floor(ts * 0.7);
@@ -2378,9 +2952,9 @@ function render() {
       const dist = Math.sqrt((mx - p.x) ** 2 + (my - p.y) ** 2);
       let alpha;
       if (vis) {
-        alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.7 : 0.5;
+        alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.85 : 0.7;
       } else {
-        alpha = 0.55; // Explored but not visible — clearly readable, slightly dimmed
+        alpha = 0.65; // Explored but not visible — clearly readable, slightly dimmed
       }
 
       ctx.globalAlpha = alpha;
@@ -2397,15 +2971,15 @@ function render() {
       switch (tile) {
         case T.WALL:
           tileGlyph = '▓';
-          tileColor = vis ? '#3a3a4a' : '#1a1a24';
+          tileColor = vis ? biome.wallVis : biome.wallDim;
           break;
         case T.FLOOR:
           tileGlyph = '·';
-          tileColor = vis ? '#2a2a38' : '#151520';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
           break;
         case T.CORRIDOR:
           tileGlyph = '·';
-          tileColor = vis ? '#252530' : '#121218';
+          tileColor = vis ? biome.corrVis : biome.corrDim;
           break;
         case T.STAIRS_DOWN:
           tileGlyph = '▼';
@@ -2472,6 +3046,19 @@ function render() {
     ctx.fillText(e.glyph, sx, sy);
   }
 
+  // Draw friendly NPCs
+  for (const e of state.entities) {
+    if (e.type !== 'npc') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    ctx.globalAlpha = e.spoken ? 0.5 : 1.0;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+    ctx.globalAlpha = 1.0;
+  }
+
   // Draw enemies (only visible ones)
   for (const e of state.entities) {
     if (e.type !== 'enemy') continue;
@@ -2526,7 +3113,7 @@ function render() {
     canvas.width / 2, canvas.height / 2, canvas.width * 0.6
   );
   gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.25)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -2546,7 +3133,15 @@ function updateUI() {
   // HP bar
   const hpPct = Math.max(0, p.hp / p.maxHp * 100);
   $('hp-bar').style.width = hpPct + '%';
-  const hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
+  const effects = p.statusEffects || [];
+  let hpColor;
+  if (effects.some(e => e.type === 'poison')) {
+    hpColor = '#50c040'; // green-tinted when poisoned
+  } else if (effects.some(e => e.type === 'burning')) {
+    hpColor = '#ff6020'; // orange when burning
+  } else {
+    hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
+  }
   $('hp-bar').style.backgroundColor = hpColor;
 
   // Messages
@@ -2562,6 +3157,50 @@ function updateUI() {
 
   // Inventory
   renderInventory();
+
+  // Status effect indicators
+  renderStatusFX();
+
+  // Special ability button (Berserker / Wizard only)
+  const spRow = $('special-row');
+  const spBtn = $('btn-special');
+  if (spRow && spBtn) {
+    const cls = p.classId;
+    if (cls === 'berserker') {
+      spRow.style.display = '';
+      if (p.enrageActive) {
+        spBtn.textContent = `🔥 FURY ${p.engageTurnsLeft}t`;
+        spBtn.style.borderColor = '#ff6020';
+        spBtn.style.color = '#ff6020';
+        spBtn.style.opacity = '1';
+      } else if (p.enrageFloorUsed) {
+        spBtn.textContent = '⚡ ENRAGE ✓';
+        spBtn.style.borderColor = 'var(--panel-border)';
+        spBtn.style.color = 'var(--text-dim)';
+        spBtn.style.opacity = '0.5';
+      } else {
+        spBtn.textContent = '⚡ ENRAGE';
+        spBtn.style.borderColor = 'var(--gold)';
+        spBtn.style.color = 'var(--gold)';
+        spBtn.style.opacity = '1';
+      }
+    } else if (cls === 'wizard') {
+      spRow.style.display = '';
+      if (p.spellCooldown > 0) {
+        spBtn.textContent = `✨ BLAST ${p.spellCooldown}t`;
+        spBtn.style.borderColor = 'var(--panel-border)';
+        spBtn.style.color = 'var(--text-dim)';
+        spBtn.style.opacity = '0.5';
+      } else {
+        spBtn.textContent = '✨ ARCANE BLAST';
+        spBtn.style.borderColor = 'var(--gold)';
+        spBtn.style.color = 'var(--gold)';
+        spBtn.style.opacity = '1';
+      }
+    } else {
+      spRow.style.display = 'none';
+    }
+  }
 }
 
 function renderInventory() {
@@ -2590,6 +3229,7 @@ function renderInventory() {
   for (const eq of equipped) {
     const slot = document.createElement('div');
     slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
+    if (eq.item?.cursed) slot.style.boxShadow = '0 0 6px rgba(200,40,40,0.7), inset 0 0 6px rgba(200,40,40,0.2)';
     slot.textContent = eq.item ? eq.item.glyph : eq.label;
     if (eq.item) {
       makeTappable(slot, (e) => showEquippedMenu(eq, e));
@@ -2602,7 +3242,11 @@ function renderInventory() {
     const item = state.player.inventory[i];
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
-    slot.textContent = item.glyph;
+    if (item.itemType === 'thrown') {
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#60ffb0;font-weight:bold;">${item.ammo}</span>`;
+    } else {
+      slot.textContent = item.glyph;
+    }
     const idx = i;
     makeTappable(slot, (e) => showItemMenu(item, idx, e));
     bar.appendChild(slot);
@@ -2641,8 +3285,40 @@ function showItemMenu(item, index, event) {
     actions.push({ label: 'Equip', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (['potion', 'scroll', 'food'].includes(item.itemType)) {
     actions.push({ label: 'Use', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'thrown') {
+    actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
+  actions.push({ label: 'Destroy', fn: () => {
+    // Replace menu content with an inline confirmation
+    menu.innerHTML = '';
+    const warn = document.createElement('div');
+    warn.className = 'item-name';
+    warn.style.color = '#ff6040';
+    warn.textContent = `Destroy ${item.glyph} ${item.name}?`;
+    menu.appendChild(warn);
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:10px;color:var(--text-dim);margin-bottom:6px;';
+    note.textContent = 'This cannot be undone.';
+    menu.appendChild(note);
+    const yesBtn = document.createElement('button');
+    yesBtn.textContent = '🗑 Yes, Destroy';
+    yesBtn.style.color = '#ff6040';
+    const doDestroy = () => {
+      state.player.inventory.splice(index, 1);
+      addMessage(`You destroy the ${item.name}.`, 'damage');
+      updateUI();
+      closeItemMenu();
+    };
+    yesBtn.addEventListener('click', (e) => { e.stopPropagation(); doDestroy(); });
+    yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); doDestroy(); }, { passive: false });
+    menu.appendChild(yesBtn);
+    const noBtn = document.createElement('button');
+    noBtn.textContent = 'Cancel';
+    noBtn.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+    noBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+    menu.appendChild(noBtn);
+  }});
   actions.push({ label: 'Cancel', fn: () => closeItemMenu() });
 
   for (const act of actions) {
@@ -2682,10 +3358,17 @@ function showEquippedMenu(eq, event) {
   if (item.attack) desc += ` (+${item.attack} ATK)`;
   if (item.defense) desc += ` (+${item.defense} DEF)`;
   if (item.special) desc += ` [${item.special}]`;
+  if (item.cursed) desc += ' ⚠ CURSED';
   nameDiv.textContent = desc;
+  if (item.cursed) nameDiv.style.color = '#ff6040';
   menu.appendChild(nameDiv);
 
   const unequipFn = () => {
+    if (item.cursed) {
+      addMessage(`The ${item.name} is cursed! Read a Scroll of Remove Curse first.`, 'damage');
+      closeItemMenu();
+      return;
+    }
     if (state.player.inventory.length >= MAX_INVENTORY) {
       addMessage('Inventory full!', 'damage');
       closeItemMenu();
@@ -2811,6 +3494,8 @@ function setupInput() {
       case 'g': playerPickup(); break;
       case '>': playerDescend(); break;
       case 'm': toggleMinimap(); break;
+      case 'u': showQuickUse(); break;
+      case 'h': case '?': showHelp(); break;
     }
   });
 
@@ -2848,7 +3533,19 @@ function setupInput() {
   $('btn-pickup').addEventListener('click', () => { Audio.resume(); playerPickup(); });
   $('btn-stairs').addEventListener('click', () => { Audio.resume(); playerDescend(); });
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
+  $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
+
+  // Special class ability button (Berserker / Wizard)
+  const spBtn = $('btn-special');
+  const handleSpecial = () => {
+    Audio.resume();
+    if (!state) return;
+    if (state.player.classId === 'berserker') activateEnrage();
+    else if (state.player.classId === 'wizard') castAoeSpell();
+  };
+  spBtn.addEventListener('click', handleSpecial);
+  spBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleSpecial(); }, { passive: false });
 
   // Prevent default touch behaviors on body
   document.body.addEventListener('touchmove', (e) => {
@@ -2951,6 +3648,7 @@ function handleLongPress(clientX, clientY) {
 function setupUI() {
   // Title screen
   $('btn-start').addEventListener('click', startGame);
+  $('btn-start').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); }, { passive: false });
 
   // Death screen
   $('btn-death-stats').addEventListener('click', () => {
@@ -2970,14 +3668,14 @@ function setupUI() {
     $('death-overlay').classList.remove('active');
     $('death-full-stats').style.display = 'none';
     $('btn-death-stats').textContent = 'View Stats';
-    newRun();
+    showTitle();
   });
 
   // Victory screen
   $('btn-victory-restart').addEventListener('click', () => {
     saveHighScore();
     $('victory-overlay').classList.remove('active');
-    newRun();
+    showTitle();
   });
 
   // Minimap
@@ -2996,6 +3694,15 @@ function setupUI() {
     $('settings-overlay').classList.remove('active');
     inputLocked = false;
   });
+
+  // Help screen
+  $('btn-help-from-title').addEventListener('click', showHelp);
+  $('btn-help-from-settings').addEventListener('click', () => {
+    $('settings-overlay').classList.remove('active');
+    showHelp();
+  });
+  $('btn-close-help').addEventListener('click', closeHelp);
+  $('btn-close-help-bottom').addEventListener('click', closeHelp);
 }
 
 function showSettings() {
@@ -3009,7 +3716,10 @@ function showSettings() {
     return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
   }
 
-  $('char-name').textContent = state ? state.playerName : '—';
+  $('char-name').textContent = state
+    ? `${state.playerName} the ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer'}`
+    : '—';
+  $('game-version').textContent = `${GAME_VERSION} · Last updated ${LAST_UPDATED}`;
 
   $('char-stats').innerHTML = [
     statRow('Level', p ? p.level : noGame),
@@ -3038,6 +3748,30 @@ function showSettings() {
     statRow('💍 Ring', r ? r.name : 'None'),
   ].join('');
 
+  // Status effects panel
+  const efxSection = $('status-effects-section');
+  const efxList = $('status-effects-list');
+  const efxLabels = {
+    burning:      { icon: '🔥', text: 'Burning',     color: '#ff6020' },
+    poison:       { icon: '☠️', text: 'Poisoned',    color: '#50c040' },
+    webbed:       { icon: '🕸', text: 'Webbed',      color: '#c0b060' },
+    invisibility: { icon: '👁', text: 'Invisible',   color: '#6080ff' },
+    strength:     { icon: '💪', text: 'Strengthened',color: '#ff8040' },
+    frozen:       { icon: '❄️', text: 'Frozen',      color: '#40c0ff' },
+  };
+  const effects = p ? (p.statusEffects || []) : [];
+  if (effects.length > 0) {
+    efxSection.style.display = '';
+    efxList.innerHTML = effects.map(eff => {
+      const cfg = efxLabels[eff.type] || { icon: '⚡', text: eff.type, color: '#aaa' };
+      return `<span style="background:rgba(0,0,0,0.4);border:1px solid ${cfg.color};border-radius:6px;padding:3px 8px;font-size:12px;color:${cfg.color};">${cfg.icon} ${cfg.text} (${eff.turns}t)</span>`;
+    }).join('');
+  } else {
+    efxSection.style.display = p ? '' : 'none';
+    efxList.innerHTML = p ? '<span style="color:var(--text-dim);font-size:12px;">None</span>' : '';
+    if (p) efxSection.style.display = '';
+  }
+
   // Hero icon picker
   const picker = $('hero-picker');
   picker.innerHTML = '';
@@ -3064,6 +3798,7 @@ function showSettings() {
   $('toggle-sound').classList.toggle('on', settings.sound);
   $('toggle-haptics').classList.toggle('on', settings.haptics);
   $('toggle-dpad').classList.toggle('on', settings.dpad);
+  $('toggle-autopickup').classList.toggle('on', settings.autopickup);
 
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
@@ -3085,7 +3820,24 @@ function showSettings() {
     saveSettings();
   };
 
+  $('toggle-autopickup').onclick = () => {
+    settings.autopickup = !settings.autopickup;
+    $('toggle-autopickup').classList.toggle('on', settings.autopickup);
+    saveSettings();
+  };
+
   $('settings-overlay').classList.add('active');
+}
+
+// === HELP SCREEN ===
+function showHelp() {
+  inputLocked = true;
+  $('help-overlay').classList.add('active');
+}
+
+function closeHelp() {
+  $('help-overlay').classList.remove('active');
+  inputLocked = false;
 }
 
 // === MINIMAP ===
@@ -3104,13 +3856,15 @@ function toggleMinimap() {
 function renderMinimap() {
   const mc = $('minimap-canvas');
   const ctx = mc.getContext('2d');
-  const scale = 5; // pixels per tile — large enough to see clearly on mobile
+  const scale = 5; // pixels per tile
+  const LEGEND_H = 52; // pixels of legend strip at bottom
   mc.width = MAP_W * scale;
-  mc.height = MAP_H * scale;
+  mc.height = MAP_H * scale + LEGEND_H;
 
   ctx.fillStyle = '#0a0a0f';
   ctx.fillRect(0, 0, mc.width, mc.height);
 
+  // Draw map tiles
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const idx = y * MAP_W + x;
@@ -3125,13 +3879,13 @@ function renderMinimap() {
           break;
         case T.FLOOR:
         case T.CORRIDOR:
-          ctx.fillStyle = vis ? '#18181f' : '#0e0e14';
+          ctx.fillStyle = vis ? '#2a2a3a' : '#161620';
           break;
         case T.STAIRS_DOWN:
-          ctx.fillStyle = '#80ff80';
+          ctx.fillStyle = '#00e060';
           break;
         case T.STAIRS_UP:
-          ctx.fillStyle = '#ffff80';
+          ctx.fillStyle = '#60c0ff';
           break;
         case T.DOOR_CLOSED:
         case T.DOOR_OPEN:
@@ -3154,7 +3908,26 @@ function renderMinimap() {
     }
   }
 
-  // Draw visible enemies as red dots
+  // Draw stairs labels (▼ down, ▲ up) over the colored dots — 8px font
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 7px monospace';
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      const idx = y * MAP_W + x;
+      if (!state.explored[idx]) continue;
+      const tile = state.map[idx];
+      if (tile === T.STAIRS_DOWN) {
+        ctx.fillStyle = '#003818';
+        ctx.fillText('▼', x * scale + scale / 2, y * scale + scale / 2);
+      } else if (tile === T.STAIRS_UP) {
+        ctx.fillStyle = '#002840';
+        ctx.fillText('▲', x * scale + scale / 2, y * scale + scale / 2);
+      }
+    }
+  }
+
+  // Draw visible enemies
   for (const e of state.entities) {
     if (e.type !== 'enemy' || e.hp <= 0) continue;
     const idx = e.y * MAP_W + e.x;
@@ -3163,9 +3936,277 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
-  // Draw player as bright dot
-  ctx.fillStyle = '#f0c040';
-  ctx.fillRect(state.player.x * scale - 1, state.player.y * scale - 1, scale + 2, scale + 2);
+  // Draw NPCs as cyan dots
+  for (const e of state.entities) {
+    if (e.type !== 'npc') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    ctx.fillStyle = '#40e0ff';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
+  // Draw player as bright gold cross (more visible than a single dot)
+  const px = state.player.x * scale;
+  const py = state.player.y * scale;
+  ctx.fillStyle = '#ffe840';
+  ctx.fillRect(px - 1, py, scale + 2, scale);     // horizontal bar
+  ctx.fillRect(px, py - 1, scale, scale + 2);     // vertical bar
+
+  // Legend strip
+  const ly = MAP_H * scale + 4;
+  ctx.fillStyle = '#ffe840';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  // Title / floor info
+  const biome = getFloorBiome(state.floor);
+  ctx.fillStyle = '#c8a840';
+  ctx.fillText(`Floor ${state.floor} — ${biome.name}`, 4, ly);
+
+  // Player coords
+  ctx.fillStyle = '#ffe840';
+  ctx.fillText(`You: (${state.player.x}, ${state.player.y})`, 4, ly + 14);
+
+  // Stair legend
+  ctx.fillStyle = '#00e060';
+  ctx.fillRect(4, ly + 30, 8, 8);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(' ▼ Stairs down', 10, ly + 29);
+
+  ctx.fillStyle = '#60c0ff';
+  ctx.fillRect(MAP_W * scale / 2 + 4, ly + 30, 8, 8);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(' ▲ Stairs up', MAP_W * scale / 2 + 10, ly + 29);
+}
+
+// === QUICKCAST ===
+function showQuickUse() {
+  if (!state || state.gameOver || state.victory || inputLocked) return;
+
+  const consumables = state.player.inventory
+    .map((item, idx) => ({ item, idx }))
+    .filter(({ item }) => ['potion', 'scroll', 'food', 'thrown'].includes(item.itemType));
+
+  if (consumables.length === 0) {
+    addMessage('No consumables in inventory.', '');
+    return;
+  }
+
+  const menu = $('item-menu');
+  menu.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'item-name';
+  title.textContent = '🧪 Quick Use';
+  menu.appendChild(title);
+
+  for (const { item, idx } of consumables) {
+    const btn = document.createElement('button');
+    let label = `${item.glyph} ${item.name}`;
+    if (item.itemType === 'thrown') label += ` (${item.ammo})`;
+    btn.textContent = label;
+    const captureIdx = idx;
+    const fn = () => { closeItemMenu(); useItem(item, captureIdx); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
+    menu.appendChild(btn);
+  }
+
+  const cancel = document.createElement('button');
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+  menu.appendChild(cancel);
+
+  menu.style.left = '50%';
+  menu.style.transform = 'translateX(-50%)';
+  menu.style.bottom = '180px';
+  menu.style.top = 'auto';
+  menu.classList.add('active');
+
+  setTimeout(() => {
+    const closer = (e) => { if (!$('item-menu').contains(e.target)) closeItemMenu(); };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
+}
+
+// === FLOOR BIOMES ===
+function getFloorBiome(floor) {
+  if (floor <= 3) return {
+    name: 'The Sewers',
+    wallVis: '#4a7a4a', wallDim: '#1e321e',
+    floorVis: '#2e4e2e', floorDim: '#16221a',
+    corrVis:  '#264020', corrDim:  '#121a10',
+    bg: '#080f08'
+  };
+  if (floor <= 6) return {
+    name: 'The Crypt',
+    wallVis: '#5a5a72', wallDim: '#282838',
+    floorVis: '#40405a', floorDim: '#1e1e2c',
+    corrVis:  '#38384e', corrDim:  '#181820',
+    bg: '#0c0c14'
+  };
+  if (floor <= 9) return {
+    name: 'The Citadel',
+    wallVis: '#6a3a3a', wallDim: '#301818',
+    floorVis: '#4a2424', floorDim: '#201010',
+    corrVis:  '#3e1e1e', corrDim:  '#180c0c',
+    bg: '#100606'
+  };
+  return {
+    name: 'The Sanctum',
+    wallVis: '#5a2a6a', wallDim: '#280f32',
+    floorVis: '#3e1858', floorDim: '#1c0a28',
+    corrVis:  '#321444', corrDim:  '#160820',
+    bg: '#0c0210'
+  };
+}
+
+// === DODGE CHANCE ===
+function getDodgeChance(attacker, defender) {
+  if (defender === state.player) {
+    let dodge = 0.05; // base 5% for all
+    if (state.player.equipped.armor?.special === 'stealth') dodge += 0.15;
+    dodge += (state.player.dodgeBonus || 0); // class-based bonus (Rogue: +15%)
+    return dodge;
+  }
+  // Evasive enemies can dodge player attacks
+  if (['Bat', 'Spider', 'Rat'].includes(defender.name)) return 0.10;
+  return 0;
+}
+
+// === STATUS EFFECT INDICATORS ===
+function renderStatusFX() {
+  const bar = $('fx-bar');
+  if (!state || !bar) return;
+  const effects = state.player.statusEffects || [];
+  if (effects.length === 0 && !state.throwMode) { bar.innerHTML = ''; return; }
+
+  const labels = {
+    burning:      { icon: '🔥', text: 'Burn',   cls: 'fx-burning' },
+    frozen:       { icon: '❄️', text: 'Frozen', cls: 'fx-frozen' },
+    poison:       { icon: '☠️', text: 'Poison', cls: 'fx-poison' },
+    webbed:       { icon: '🕸', text: 'Webbed', cls: 'fx-webbed' },
+    invisibility: { icon: '👁', text: 'Invis',  cls: 'fx-invisibility' },
+    strength:     { icon: '💪', text: 'Str+',   cls: 'fx-strength' }
+  };
+
+  let html = '';
+  if (state.throwMode) {
+    html += '<div class="fx-pill fx-throw-mode">🎯 Aim&hellip;</div>';
+  }
+  for (const eff of effects) {
+    const cfg = labels[eff.type];
+    if (!cfg) continue;
+    html += `<div class="fx-pill ${cfg.cls}">${cfg.icon} ${cfg.text} ${eff.turns}</div>`;
+  }
+  bar.innerHTML = html;
+}
+
+// === RANGED COMBAT — THROWING DAGGERS ===
+function throwProjectile(dx, dy) {
+  state.throwMode = false;
+  const throwData = state.throwItem;
+  state.throwItem = null;
+  if (!throwData) { endTurn(); return; }
+
+  const { item } = throwData;
+  let x = state.player.x + dx;
+  let y = state.player.y + dy;
+  let hit = false;
+
+  for (let i = 0; i < 8; i++) {
+    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
+    const target = enemyAt(x, y);
+    if (target && target.hp > 0) {
+      const def = getEffectiveDefense(target);
+      const dmg = Math.max(1, item.damage - def + Math.floor(Math.random() * 3) - 1);
+      target.hp -= dmg;
+      addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
+      Audio.hit();
+      haptic(20);
+      hit = true;
+      if (target.hp <= 0) killEnemy(target);
+      break;
+    }
+    if (!isWalkable(x, y)) break;
+    x += dx;
+    y += dy;
+  }
+
+  if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
+
+  item.ammo--;
+  if (item.ammo <= 0) {
+    const idx = state.player.inventory.indexOf(item);
+    if (idx >= 0) state.player.inventory.splice(idx, 1);
+    addMessage('Your last throwing dagger is gone!', '');
+  } else {
+    addMessage(`${item.ammo} throwing dagger${item.ammo === 1 ? '' : 's'} remaining.`, '');
+  }
+
+  updateUI();
+  render();
+  endTurn();
+}
+
+// === MINI-BOSS SPAWNING ===
+function spawnMiniBoss() {
+  const template = MINI_BOSSES[state.floor];
+  if (!template) return;
+
+  const room = getFarthestRoom(state.player.x, state.player.y);
+  const x = room.x + Math.floor(room.w / 2);
+  const y = room.y + Math.floor(room.h / 2);
+
+  const miniBoss = createEnemy(template, x, y);
+  miniBoss.isMiniBoss = true;
+  state.entities.push(miniBoss);
+  addMessage(`⚠ A ${template.name} guards this floor!`, 'damage');
+}
+
+// === CLASS SPECIAL ABILITIES ===
+
+function activateEnrage() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.enrageFloorUsed) {
+    addMessage('Enrage already used this floor.', '');
+    return;
+  }
+  if (state.player.enrageActive) return;
+  Audio.resume();
+  haptic(50);
+  state.player.enrageActive = true;
+  state.player.engageTurnsLeft = 5;
+  state.player.enrageFloorUsed = true;
+  addMessage('⚡ Battle fury! Bonus attacks for 5 turns!', 'good');
+  updateUI();
+}
+
+function castAoeSpell() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.spellCooldown > 0) {
+    addMessage(`Arcane blast recharging (${state.player.spellCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  const radius = 3;
+  const targets = state.entities.filter(e => {
+    if (e.type !== 'enemy' || e.hp <= 0) return false;
+    const dx = e.x - state.player.x, dy = e.y - state.player.y;
+    return Math.sqrt(dx * dx + dy * dy) <= radius;
+  });
+  if (targets.length === 0) {
+    addMessage('✨ Arcane blast — no enemies in range!', '');
+  } else {
+    addMessage(`✨ Arcane blast — ${targets.length} target${targets.length > 1 ? 's' : ''}!`, 'good');
+    for (const t of targets) { if (t.hp > 0) attackEntity(state.player, t); }
+  }
+  state.player.spellCooldown = 12;
+  endTurn();
 }
 
 // === BOOT ===
