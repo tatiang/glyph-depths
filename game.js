@@ -5206,11 +5206,35 @@ function showSettings() {
   const w = p?.equipped.weapon;
   const a = p?.equipped.armor;
   const r = p?.equipped.ring;
+  const rng = p?.equipped.ranged;
   $('equip-stats').innerHTML = [
     statRow('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
+    statRow('🏹 Ranged', rng ? `${rng.name} (${rng.damage} dmg, ${rng.range} rng)` : 'None'),
     statRow('🛡️ Armor', a ? `${a.name} (+${a.defense})` : 'None'),
     statRow('💍 Ring', r ? r.name : 'None'),
   ].join('');
+
+  // Glyph Runes panel
+  const runeSection = $('rune-section');
+  if (runeSection) {
+    const runes = p ? (p.runes || []) : [];
+    if (p) {
+      runeSection.style.display = '';
+      const runeList = $('rune-list');
+      if (runes.length > 0) {
+        runeList.innerHTML = runes.map(r =>
+          `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">`
+          + `<span style="font-size:16px;">${r.symbol}</span>`
+          + `<span style="font-size:12px;"><strong style="color:var(--gold);">${r.name}</strong> — <span style="color:var(--text-dim);">${r.desc}</span></span>`
+          + `</div>`
+        ).join('');
+      } else {
+        runeList.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">No runes collected yet. Look for glowing ✦ symbols on each floor.</span>';
+      }
+    } else {
+      runeSection.style.display = 'none';
+    }
+  }
 
   // Status effects panel
   const efxSection = $('status-effects-section');
