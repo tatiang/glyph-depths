@@ -23,8 +23,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'Badge achievement system'; // updated each push
-const LAST_UPDATED = '2026-03-22 15:00';
+const GAME_VERSION = 'Ranged weapon system'; // updated each push
+const LAST_UPDATED = '2026-03-22 17:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -555,7 +555,10 @@ function createPlayer(classId = 'adventurer') {
     hunger: 100,
     gold: 0,
     inventory: [],
-    equipped: { weapon: null, armor: null, ring: null },
+    equipped: { weapon: null, armor: null, ring: null, ranged: null },
+    arrows: 0,
+    infiniteArrows: classId === 'ranger',
+    loadedSpecialArrow: null, // reference to special arrow item in inventory
     statusEffects: [],
     hasRegen: classId === 'adventurer',
     hasVampire: false,
@@ -614,9 +617,11 @@ function applyClassStartingItems(classId) {
       }
     }
   } else if (classId === 'ranger') {
-    p.equipped.weapon = { name: 'Hunting Bow', glyph: '🏹', itemType: 'weapon', attack: 2, tier: 1, special: null };
+    p.equipped.ranged = { ...RANGED_WEAPONS.find(r => r.name === 'Short Bow') };
+    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
     p.inventory.push({ ...FOOD });
+    // Rangers have infinite basic arrows — no arrow count needed
   } else if (classId === 'cleric') {
     p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
     const healPotion = potionNames.find(n => n.id === 'healing');
@@ -702,6 +707,25 @@ const RINGS = [
 
 const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
 const THROWING_DAGGERS = { name: 'Throwing Daggers', glyph: '🎯', itemType: 'thrown', ammo: 5, damage: 3, value: 30 };
+
+// Ranged weapons (bows/crossbows) — equipped in separate ranged slot
+const RANGED_WEAPONS = [
+  { name: 'Short Bow', glyph: '🏹', itemType: 'ranged', damage: 3, range: 6, tier: 1, special: null, value: 20 },
+  { name: 'Hunting Bow', glyph: '🏹', itemType: 'ranged', damage: 4, range: 8, tier: 2, special: null, value: 40 },
+  { name: 'Longbow', glyph: '🏹', itemType: 'ranged', damage: 6, range: 10, tier: 3, special: null, value: 70 },
+  { name: 'Crossbow', glyph: '⚙️', itemType: 'ranged', damage: 7, range: 8, tier: 3, special: 'pierce', value: 85 },
+  { name: 'Elven Bow', glyph: '🏹', itemType: 'ranged', damage: 5, range: 12, tier: 3, special: 'sight', value: 80 }
+];
+
+// Special arrows — limited ammo items found as loot
+const SPECIAL_ARROWS = [
+  { name: 'Fire Arrows', glyph: '🔥', itemType: 'special_arrow', arrowType: 'fire', ammo: 3, damage: 0, value: 25, desc: 'Burns target for 3 turns' },
+  { name: 'Frost Arrows', glyph: '❄️', itemType: 'special_arrow', arrowType: 'frost', ammo: 3, damage: 0, value: 25, desc: 'Freezes target for 2 turns' },
+  { name: 'Blast Arrows', glyph: '💥', itemType: 'special_arrow', arrowType: 'blast', ammo: 2, damage: 0, value: 35, desc: 'AoE: hits adjacent enemies' },
+  { name: 'Piercing Arrows', glyph: '🗡️', itemType: 'special_arrow', arrowType: 'pierce', ammo: 3, damage: 3, value: 30, desc: '+3 dmg, ignores 2 DEF' }
+];
+
+const ARROW_BUNDLE = { name: 'Arrows', glyph: '➶', itemType: 'arrows', count: 4, value: 8 };
 
 // === ENEMY DEFINITIONS ===
 const ENEMY_TIERS = {
@@ -1236,6 +1260,16 @@ function spawnItems() {
     if (pos) state.entities.push(createItemEntity({ ...FOOD }, pos.x, pos.y));
   }
 
+  // Arrow bundles (2-4 per floor)
+  const arrowCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < arrowCount; i++) {
+    const pos = randomFloorTile();
+    if (pos) {
+      const count = 2 + Math.floor(Math.random() * 4); // 2-5 arrows
+      state.entities.push(createItemEntity({ name: `${count} Arrows`, glyph: '➶', itemType: 'arrows', count, value: 0 }, pos.x, pos.y));
+    }
+  }
+
   // Gold piles
   const goldCount = 2 + Math.floor(Math.random() * 3);
   for (let i = 0; i < goldCount; i++) {
@@ -1334,7 +1368,7 @@ function renderSageServices(sage) {
   const HEAL_COST = 20;
 
   // Uncurse equipped items
-  const hasCursedEquip = ['weapon', 'armor', 'ring'].some(slot => p.equipped[slot]?.cursed);
+  const hasCursedEquip = ['weapon', 'armor', 'ring', 'ranged'].some(slot => p.equipped[slot]?.cursed);
   const uncurseDiv = document.createElement('div');
   uncurseDiv.className = 'shop-item';
   if (hasCursedEquip) {
@@ -1450,15 +1484,26 @@ function maybeCurse(item, floor) {
 
 function generateShopItems(floor) {
   const items = [];
+  const tier = Math.ceil(floor / 3);
   // Always have a healing potion
   const healPotion = potionNames.find(p => p.id === 'healing');
   items.push({ item: makePotion(healPotion), price: 15 });
-  // Random weapon or armor
-  const weaponPool = WEAPONS.filter(w => w.tier <= Math.ceil(floor / 3));
-  if (weaponPool.length > 0) {
-    const w = weaponPool[Math.floor(Math.random() * weaponPool.length)];
-    items.push({ item: { ...w }, price: w.value });
+  // Random weapon or armor (50%) or ranged weapon (50%)
+  if (Math.random() < 0.5) {
+    const weaponPool = WEAPONS.filter(w => w.tier <= tier);
+    if (weaponPool.length > 0) {
+      const w = weaponPool[Math.floor(Math.random() * weaponPool.length)];
+      items.push({ item: { ...w }, price: w.value });
+    }
+  } else {
+    const rangedPool = RANGED_WEAPONS.filter(r => r.tier <= tier);
+    if (rangedPool.length > 0) {
+      const r = rangedPool[Math.floor(Math.random() * rangedPool.length)];
+      items.push({ item: { ...r }, price: r.value });
+    }
   }
+  // Arrow bundle
+  items.push({ item: { name: '5 Arrows', glyph: '➶', itemType: 'arrows', count: 5, value: 0 }, price: 8 });
   // Food
   items.push({ item: { ...FOOD }, price: 8 });
   return items;
@@ -1538,12 +1583,20 @@ function generateRandomItem(floor) {
     // Scroll
     const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
     return makeScroll(s);
-  } else if (roll < 0.88) {
+  } else if (roll < 0.85) {
     // Ring
     return { ...RINGS[Math.floor(Math.random() * RINGS.length)] };
-  } else if (roll < 0.94) {
+  } else if (roll < 0.89) {
     // Throwing Daggers
     return { ...THROWING_DAGGERS };
+  } else if (roll < 0.93) {
+    // Ranged weapon
+    const rPool = RANGED_WEAPONS.filter(r => r.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
+    if (rPool.length > 0) return { ...rPool[Math.floor(Math.random() * rPool.length)] };
+    return { ...FOOD };
+  } else if (roll < 0.96) {
+    // Special arrows
+    return { ...SPECIAL_ARROWS[Math.floor(Math.random() * SPECIAL_ARROWS.length)] };
   } else {
     // Food
     return { ...FOOD };
@@ -1570,7 +1623,7 @@ function generateMonsterDrop(floor, enemyXp) {
     return makeScroll(s);
   } else {
     // Equipment appropriate to floor
-    const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier)];
+    const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier), ...RANGED_WEAPONS.filter(r => r.tier <= tier)];
     if (pool.length > 0) return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, state.floor);
     return { ...FOOD };
   }
@@ -1619,7 +1672,8 @@ const OCTANT_TRANSFORMS = [
 
 function computeFOV() {
   const p = state.player;
-  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0);
+  const rangedSightBonus = (state.player.equipped.ranged?.special === 'sight') ? 1 : 0;
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus;
   state.visible.fill(0);
 
   // Player's tile is always visible
@@ -2750,6 +2804,11 @@ function autoPickup() {
       Audio.gold();
       removeEntity(item);
       state.score += item.item.goldAmount;
+    } else if (item.item.itemType === 'arrows') {
+      state.player.arrows += item.item.count;
+      addMessage(`You pick up ${item.item.count} arrows! (${state.player.arrows} total)`, 'good');
+      Audio.pickup();
+      removeEntity(item);
     } else if (settings.autopickup) {
       pickupItem(item);
     }
@@ -2761,6 +2820,13 @@ function pickupItem(itemEntity) {
     state.player.gold += itemEntity.item.goldAmount;
     addMessage(`You pick up ${itemEntity.item.goldAmount} gold!`, 'gold');
     Audio.gold();
+    removeEntity(itemEntity);
+    return;
+  }
+  if (itemEntity.item.itemType === 'arrows') {
+    state.player.arrows += itemEntity.item.count;
+    addMessage(`You pick up ${itemEntity.item.count} arrows! (${state.player.arrows} total)`, 'good');
+    Audio.pickup();
     removeEntity(itemEntity);
     return;
   }
@@ -2922,6 +2988,39 @@ function useItem(item, index) {
           }
         }
       }
+      break;
+
+    case 'ranged':
+      // Equip ranged weapon
+      if (p.equipped.ranged) p.inventory.push(p.equipped.ranged);
+      p.equipped.ranged = item;
+      p.inventory.splice(index, 1);
+      addMessage(`You equip the ${item.name}.`, 'good');
+      if (item.cursed && p.curseImmune) {
+        item.cursed = false;
+        addMessage('Your holy aura purifies the curse!', 'good');
+      } else if (item.cursed && !item.curseRevealed) {
+        item.curseRevealed = true;
+        item.name = 'Cursed ' + item.name;
+        addMessage('A dark aura binds the weapon to you! It\'s cursed!', 'damage');
+        haptic(60);
+      }
+      if (item.special === 'sight') addMessage('Your vision sharpens through the bowstring.', 'good');
+      Audio.useItem();
+      break;
+
+    case 'special_arrow':
+      // Load special arrow for next ranged shot
+      if (!p.equipped.ranged) {
+        addMessage('You need a ranged weapon equipped to use special arrows.', 'damage');
+        return;
+      }
+      if (item.ammo <= 0) {
+        addMessage('No special arrows remaining!', 'damage');
+        return;
+      }
+      p.loadedSpecialArrow = item;
+      addMessage(`🔥 ${item.name} loaded! Fire your bow to use.`, 'good');
       break;
 
     case 'thrown':
@@ -3226,12 +3325,13 @@ function renderShopItems(merchant) {
     const it = shopItem.item;
     let statTag = '';
     if (it.itemType === 'weapon' && it.attack != null) statTag = ` <span style="color:var(--accent);font-size:11px;">[+${it.attack} ATK]</span>`;
+    else if (it.itemType === 'ranged') statTag = ` <span style="color:#4a9;font-size:11px;">[${it.damage} DMG, ${it.range} rng]</span>`;
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
     div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${shopItem.price}💰</span>`;
     div.addEventListener('click', () => {
       if (state.player.gold >= shopItem.price) {
-        if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food') {
+        if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food' && shopItem.item.itemType !== 'arrows') {
           addMessage('Inventory full!', 'damage');
           return;
         }
@@ -3239,6 +3339,9 @@ function renderShopItems(merchant) {
         if (shopItem.item.itemType === 'food') {
           state.player.hunger = Math.min(100, state.player.hunger + 30);
           addMessage('You eat a ration. (+30 hunger)', 'good');
+        } else if (shopItem.item.itemType === 'arrows') {
+          state.player.arrows += shopItem.item.count;
+          addMessage(`You buy ${shopItem.item.count} arrows! (${state.player.arrows} total)`, 'good');
         } else {
           state.player.inventory.push({ ...shopItem.item });
           addMessage(`You buy ${shopItem.item.name}.`, 'good');
@@ -3821,6 +3924,21 @@ function updateUI() {
   $('level-label').textContent = `Lv.${p.level}`;
   $('gold-label').textContent = `💰 ${p.gold}`;
   $('hunger-label').textContent = `🍖 ${p.hunger}`;
+  // Arrow counter — show if player has a ranged weapon or any arrows
+  const arrowEl = $('arrow-label');
+  if (arrowEl) {
+    if (p.equipped.ranged || p.arrows > 0) {
+      arrowEl.style.display = '';
+      arrowEl.textContent = p.infiniteArrows ? '➶ ∞' : `➶ ${p.arrows}`;
+    } else {
+      arrowEl.style.display = 'none';
+    }
+  }
+  // Fire button — show when ranged weapon equipped
+  const fireBtn = $('btn-fire');
+  if (fireBtn) {
+    fireBtn.style.display = p.equipped.ranged ? '' : 'none';
+  }
   $('hp-text').textContent = `${p.hp}/${p.maxHp}`;
 
   // HP bar
@@ -3925,6 +4043,7 @@ function renderInventory() {
   // Show equipped items first with gold border
   const equipped = [
     { label: '⚔️', slot: 'weapon', item: state.player.equipped.weapon },
+    { label: '🏹', slot: 'ranged', item: state.player.equipped.ranged },
     { label: '🛡️', slot: 'armor', item: state.player.equipped.armor },
     { label: '💍', slot: 'ring', item: state.player.equipped.ring }
   ];
@@ -3945,6 +4064,7 @@ function renderInventory() {
     const slot = document.createElement('div');
     slot.className = 'inv-slot' + (eq.item ? ' equipped' : ' empty');
     if (eq.item?.cursed && eq.item?.curseRevealed) slot.style.boxShadow = '0 0 6px rgba(200,40,40,0.7), inset 0 0 6px rgba(200,40,40,0.2)';
+    else if (eq.slot === 'ranged' && eq.item) slot.style.borderColor = '#4a9';
     slot.textContent = eq.item ? eq.item.glyph : eq.label;
     if (eq.item) {
       makeTappable(slot, (e) => showEquippedMenu(eq, e));
@@ -3957,8 +4077,12 @@ function renderInventory() {
     const item = state.player.inventory[i];
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
-    if (item.itemType === 'thrown') {
-      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#60ffb0;font-weight:bold;">${item.ammo}</span>`;
+    if (item.itemType === 'thrown' || item.itemType === 'special_arrow') {
+      const countLabel = item.ammo != null ? item.ammo : '';
+      const isLoaded = item.itemType === 'special_arrow' && state.player.loadedSpecialArrow === item;
+      const countColor = isLoaded ? '#ff8020' : '#60ffb0';
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:${countColor};font-weight:bold;">${countLabel}</span>`;
+      if (isLoaded) slot.style.boxShadow = '0 0 6px rgba(255,128,32,0.5)';
     } else {
       slot.textContent = item.glyph;
     }
@@ -3987,6 +4111,8 @@ function showItemMenu(item, index, event) {
   nameDiv.textContent = `${item.glyph} ${item.name}`;
   if (item.desc && item.desc !== '???') {
     nameDiv.textContent += ` — ${item.desc}`;
+  } else if (item.itemType === 'ranged') {
+    nameDiv.textContent += ` (${item.damage} DMG, ${item.range} range)`;
   } else if (item.attack) {
     nameDiv.textContent += ` (+${item.attack} ATK)`;
   } else if (item.defense) {
@@ -3996,12 +4122,19 @@ function showItemMenu(item, index, event) {
   menu.appendChild(nameDiv);
 
   const actions = [];
-  if (['weapon', 'armor', 'ring'].includes(item.itemType)) {
+  if (['weapon', 'armor', 'ring', 'ranged'].includes(item.itemType)) {
     actions.push({ label: 'Equip', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (['potion', 'scroll', 'food'].includes(item.itemType)) {
     actions.push({ label: 'Use', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'thrown') {
     actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'special_arrow') {
+    const isLoaded = state.player.loadedSpecialArrow === item;
+    actions.push({ label: isLoaded ? '✓ Loaded' : `Load (${item.ammo} left)`, fn: () => {
+      if (isLoaded) { state.player.loadedSpecialArrow = null; addMessage('Special arrow unloaded.', ''); }
+      else { useItem(item, index); }
+      closeItemMenu();
+    }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
@@ -4070,7 +4203,8 @@ function showEquippedMenu(eq, event) {
   const nameDiv = document.createElement('div');
   nameDiv.className = 'item-name';
   let desc = `${item.glyph} ${item.name}`;
-  if (item.attack) desc += ` (+${item.attack} ATK)`;
+  if (item.itemType === 'ranged') desc += ` (${item.damage} DMG, ${item.range} range)`;
+  else if (item.attack) desc += ` (+${item.attack} ATK)`;
   if (item.defense) desc += ` (+${item.defense} DEF)`;
   if (item.special) desc += ` [${item.special}]`;
   if (item.cursed && item.curseRevealed) desc += ' ⚠ CURSED';
@@ -4092,6 +4226,7 @@ function showEquippedMenu(eq, event) {
     state.player.inventory.push(item);
     if (eq.slot === 'weapon') state.player.equipped.weapon = null;
     else if (eq.slot === 'armor') state.player.equipped.armor = null;
+    else if (eq.slot === 'ranged') state.player.equipped.ranged = null;
     else state.player.equipped.ring = null;
     addMessage(`You unequip the ${item.name}.`, '');
     updateUI();
@@ -4212,6 +4347,7 @@ function setupInput() {
       case 'u': showQuickUse(); break;
       case 'e': showQuickEquip(); break;
       case 't': showQuickThrow(); break;
+      case 'f': fireRangedWeapon(); break;
       case 'h': case '?': showHelp(); break;
     }
   });
@@ -4252,6 +4388,12 @@ function setupInput() {
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
   $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
+
+  // Fire ranged weapon button
+  const fireBtn = $('btn-fire');
+  const handleFire = () => { Audio.resume(); fireRangedWeapon(); };
+  fireBtn.addEventListener('click', handleFire);
+  fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleFire(); }, { passive: false });
 
   // Special class ability button (Berserker / Wizard)
   const spBtn = $('btn-special');
@@ -4834,7 +4976,7 @@ function showQuickEquip() {
 
   const equippable = state.player.inventory
     .map((item, idx) => ({ item, idx }))
-    .filter(({ item }) => ['weapon', 'armor', 'ring'].includes(item.itemType));
+    .filter(({ item }) => ['weapon', 'armor', 'ring', 'ranged'].includes(item.itemType));
 
   if (equippable.length === 0) {
     addMessage('No equippable items in inventory.', '');
@@ -4852,7 +4994,8 @@ function showQuickEquip() {
   for (const { item, idx } of equippable) {
     const btn = document.createElement('button');
     let label = `${item.glyph} ${item.name}`;
-    if (item.attack) label += ` (+${item.attack} ATK)`;
+    if (item.itemType === 'ranged') label += ` (${item.damage} DMG, ${item.range} rng)`;
+    else if (item.attack) label += ` (+${item.attack} ATK)`;
     else if (item.defense) label += ` (+${item.defense} DEF)`;
     else if (item.special) label += ` (${item.special})`;
     btn.textContent = label;
@@ -4967,6 +5110,53 @@ function renderStatusFX() {
   bar.innerHTML = html;
 }
 
+// === RANGED COMBAT — BOW FIRING ===
+function fireRangedWeapon() {
+  if (inputLocked || !state || state.gameOver || state.victory) return;
+  if (state.throwMode) return; // already in aim mode
+
+  const p = state.player;
+  const bow = p.equipped.ranged;
+  if (!bow) {
+    addMessage('No ranged weapon equipped.', '');
+    return;
+  }
+
+  // Check ammo (Rangers have infinite basic arrows)
+  if (!p.infiniteArrows && p.arrows <= 0 && !p.loadedSpecialArrow) {
+    addMessage('No arrows! Find or buy more.', 'damage');
+    return;
+  }
+
+  // Calculate damage with Ranger level scaling
+  let baseDmg = bow.damage;
+  if (p.infiniteArrows) {
+    baseDmg += Math.floor(p.level / 3); // Rangers scale with level
+  }
+
+  // Enter aim mode using throwMode system
+  state.throwMode = true;
+  const arrowLabel = p.loadedSpecialArrow ? p.loadedSpecialArrow.name : 'Arrow';
+  state.throwItem = {
+    item: {
+      name: arrowLabel,
+      damage: baseDmg,
+      ammo: Infinity, // don't consume via throwProjectile — we handle ammo ourselves
+      itemType: 'ranged_shot',
+      range: bow.range,
+      bowSpecial: bow.special,
+      loadedArrow: p.loadedSpecialArrow
+    },
+    index: -1
+  };
+
+  const ammoStr = p.infiniteArrows ? '∞' : `${p.arrows}`;
+  const specialStr = p.loadedSpecialArrow ? ` [${p.loadedSpecialArrow.name}]` : '';
+  addMessage(`🏹 ${bow.name}${specialStr} — choose direction! (${ammoStr} arrows)`, 'good');
+  updateUI();
+  render();
+}
+
 // === RANGED COMBAT — THROWING DAGGERS ===
 function throwProjectile(dx, dy) {
   state.throwMode = false;
@@ -4976,27 +5166,68 @@ function throwProjectile(dx, dy) {
 
   const { item } = throwData;
   const isAimedShot = item.itemType === 'aimed_shot';
-  const maxRange = isAimedShot ? 50 : 8;
-  let x = state.player.x + dx;
-  let y = state.player.y + dy;
+  const isRangedShot = item.itemType === 'ranged_shot';
+  const maxRange = isAimedShot ? 50 : (isRangedShot ? (item.range || 8) : 8);
+  const p = state.player;
+
+  let x = p.x + dx;
+  let y = p.y + dy;
   let hit = false;
+  let hitTarget = null;
   let landX = x, landY = y;
+
+  // Crossbow pierce special: ignore some DEF
+  const pierceDef = (isRangedShot && item.bowSpecial === 'pierce') ? 1 : 0;
+  // Piercing arrow: ignore 2 DEF + bonus damage
+  const loadedArrow = isRangedShot ? item.loadedArrow : null;
+  const piercingArrowDef = (loadedArrow?.arrowType === 'pierce') ? 2 : 0;
+  const bonusDmg = (loadedArrow?.damage || 0);
 
   for (let i = 0; i < maxRange; i++) {
     if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
     const target = enemyAt(x, y);
     if (target && target.hp > 0) {
       landX = x; landY = y;
-      const def = getEffectiveDefense(target);
-      const baseDmg = item.damage || item.attack || 1;
+      const def = Math.max(0, getEffectiveDefense(target) - pierceDef - piercingArrowDef);
+      const baseDmg = (item.damage || item.attack || 1) + bonusDmg;
       const dmg = Math.max(1, baseDmg - def + Math.floor(Math.random() * 3) - 1);
       target.hp -= dmg;
-      addMessage(isAimedShot
-        ? `🏹 Aimed Shot hits ${target.name} for ${dmg}!`
-        : `Your dagger strikes ${target.name} for ${dmg}!`, 'good');
+
+      if (isAimedShot) {
+        addMessage(`🏹 Aimed Shot hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isRangedShot) {
+        addMessage(`🏹 Arrow hits ${target.name} for ${dmg}!`, 'good');
+      } else {
+        addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
+      }
+
       Audio.hit();
-      haptic(isAimedShot ? 40 : 20);
+      haptic((isAimedShot || isRangedShot) ? 40 : 20);
       hit = true;
+      hitTarget = target;
+
+      // Apply special arrow effects
+      if (isRangedShot && loadedArrow) {
+        if (loadedArrow.arrowType === 'fire' && target.hp > 0) {
+          addStatusEffect(target, 'burning', 3);
+          addMessage(`🔥 ${target.name} catches fire!`, 'good');
+        } else if (loadedArrow.arrowType === 'frost' && target.hp > 0) {
+          addStatusEffect(target, 'frozen', 2);
+          addMessage(`❄️ ${target.name} is frozen!`, 'good');
+        }
+      }
+      // Aimed shot with special arrow loaded also applies effects
+      if (isAimedShot && p.loadedSpecialArrow) {
+        const sa = p.loadedSpecialArrow;
+        if (sa.arrowType === 'fire' && target.hp > 0) {
+          addStatusEffect(target, 'burning', 3);
+          addMessage(`🔥 ${target.name} catches fire!`, 'good');
+        } else if (sa.arrowType === 'frost' && target.hp > 0) {
+          addStatusEffect(target, 'frozen', 2);
+          addMessage(`❄️ ${target.name} is frozen!`, 'good');
+        }
+      }
+
       if (target.hp <= 0) {
         killEnemy(target);
         if (state.runStats) {
@@ -5012,13 +5243,69 @@ function throwProjectile(dx, dy) {
     y += dy;
   }
 
+  // Blast arrow AoE: damage all enemies adjacent to impact point
+  if (isRangedShot && loadedArrow?.arrowType === 'blast' && hit && hitTarget) {
+    const aoeDmg = Math.max(1, Math.floor((item.damage || 1) * 0.5));
+    let aoeCount = 0;
+    for (let ax = landX - 1; ax <= landX + 1; ax++) {
+      for (let ay = landY - 1; ay <= landY + 1; ay++) {
+        if (ax === landX && ay === landY) continue;
+        const adj = enemyAt(ax, ay);
+        if (adj && adj.hp > 0) {
+          adj.hp -= aoeDmg;
+          aoeCount++;
+          if (adj.hp <= 0) killEnemy(adj);
+        }
+      }
+    }
+    if (aoeCount > 0) {
+      addMessage(`💥 Blast hits ${aoeCount} adjacent foe${aoeCount > 1 ? 's' : ''}!`, 'good');
+      animateAoeBlast(landX, landY, 1.5, '#ff8020');
+    }
+  }
+
   // Animation
-  animateProjectile(state.player.x, state.player.y, landX, landY, isAimedShot ? '🏹' : '🗡️');
+  const projGlyph = (isAimedShot || isRangedShot) ? '🏹' : '🗡️';
+  animateProjectile(p.x, p.y, landX, landY, projGlyph);
 
   if (isAimedShot) {
     if (!hit) addMessage('Your arrow flies into the darkness.', '');
-    state.player.aimedShotCooldown = 8;
+    p.aimedShotCooldown = 8;
+    // Aimed shot consumes special arrow if loaded
+    if (p.loadedSpecialArrow && hit) {
+      p.loadedSpecialArrow.ammo--;
+      if (p.loadedSpecialArrow.ammo <= 0) {
+        const saIdx = p.inventory.indexOf(p.loadedSpecialArrow);
+        if (saIdx >= 0) p.inventory.splice(saIdx, 1);
+        addMessage(`Last ${p.loadedSpecialArrow.name} used!`, '');
+      }
+      p.loadedSpecialArrow = null;
+    }
+  } else if (isRangedShot) {
+    if (!hit) addMessage('Your arrow flies into the darkness.', '');
+
+    // Consume ammo: Rangers use no basic arrows; non-Rangers use 1
+    if (!p.infiniteArrows) {
+      p.arrows--;
+      if (p.arrows <= 0) {
+        addMessage('That was your last arrow!', 'damage');
+      } else {
+        addMessage(`${p.arrows} arrow${p.arrows === 1 ? '' : 's'} remaining.`, '');
+      }
+    }
+
+    // Consume special arrow if loaded
+    if (loadedArrow) {
+      loadedArrow.ammo--;
+      if (loadedArrow.ammo <= 0) {
+        const saIdx = p.inventory.indexOf(loadedArrow);
+        if (saIdx >= 0) p.inventory.splice(saIdx, 1);
+        addMessage(`Last ${loadedArrow.name} used!`, '');
+      }
+      p.loadedSpecialArrow = null;
+    }
   } else {
+    // Throwing daggers
     if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
 
     // Identify thrown weapon after first use
@@ -5030,8 +5317,8 @@ function throwProjectile(dx, dy) {
 
     item.ammo--;
     if (item.ammo <= 0) {
-      const idx = state.player.inventory.indexOf(item);
-      if (idx >= 0) state.player.inventory.splice(idx, 1);
+      const idx = p.inventory.indexOf(item);
+      if (idx >= 0) p.inventory.splice(idx, 1);
       addMessage('Your last throwing dagger is gone!', '');
     } else {
       addMessage(`${item.ammo} throwing dagger${item.ammo === 1 ? '' : 's'} remaining.`, '');
@@ -5111,8 +5398,16 @@ function activateAimedShot() {
   }
   Audio.resume();
   // Enter throw-like targeting mode but with infinite range and 2x damage
+  // If a bow is equipped, use bow damage × 2 + level scaling; otherwise ATK × 2
+  const bow = state.player.equipped.ranged;
+  let aimDmg;
+  if (bow) {
+    aimDmg = (bow.damage + Math.floor(state.player.level / 3)) * 2;
+  } else {
+    aimDmg = state.player.attack * 2;
+  }
   state.throwMode = true;
-  state.throwItem = { item: { name: 'Aimed Shot', damage: state.player.attack * 2, ammo: Infinity, itemType: 'aimed_shot' }, index: -1 };
+  state.throwItem = { item: { name: 'Aimed Shot', damage: aimDmg, ammo: Infinity, itemType: 'aimed_shot' }, index: -1 };
   addMessage('🏹 Aimed Shot — choose a direction!', 'good');
   updateUI();
   render();
