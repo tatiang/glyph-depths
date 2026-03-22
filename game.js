@@ -23,8 +23,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'Ranged weapon system'; // updated each push
-const LAST_UPDATED = '2026-03-22 17:00';
+const GAME_VERSION = 'UI polish + danger border'; // updated each push
+const LAST_UPDATED = '2026-03-22 18:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -3542,6 +3542,7 @@ function animateProjectile(fromX, fromY, toX, toY, glyph, onDone) {
     sy: (fromY - camY) * ts + ts / 2,
     ex: (toX - camX) * ts + ts / 2,
     ey: (toY - camY) * ts + ts / 2,
+    targetMapX: toX, targetMapY: toY, // map coords for enemy redraw
     t: 0, dur: 150, onDone
   });
   requestAnimationFrame(tickAnimations);
@@ -3601,6 +3602,14 @@ function tickAnimations(now) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(a.glyph, x, y);
+      // Redraw enemy on top of projectile so arrow appears to go behind/past monster
+      if (a.targetMapX != null && state) {
+        const enemy = state.entities.find(e => e.type === 'enemy' && e.x === a.targetMapX && e.y === a.targetMapY && e.hp > 0);
+        if (enemy) {
+          ctx.font = `${Math.floor(tileSize * 0.7)}px serif`;
+          ctx.fillText(enemy.glyph, a.ex, a.ey);
+        }
+      }
     } else if (a.type === 'aoe') {
       const r = a.maxR * progress;
       ctx.globalAlpha = 0.4 * (1 - progress);
@@ -3902,6 +3911,49 @@ function render() {
   }
   ctx.fillText(p.glyph, playerSX, playerSY);
   ctx.globalAlpha = 1.0;
+
+  // Danger border — red glow when low HP or low food
+  const hpPct = p.hp / p.maxHp;
+  const dangerHP = hpPct <= 0.25;
+  const dangerHunger = p.hunger <= 15;
+  if (dangerHP || dangerHunger) {
+    const intensity = dangerHP ? Math.max(0.3, 1 - hpPct * 4) : 0.3; // stronger as HP drops
+    const pulseAlpha = intensity * (0.7 + 0.3 * Math.sin(Date.now() / 300)); // subtle pulse
+    const borderW = 3;
+    ctx.save();
+    ctx.globalAlpha = pulseAlpha;
+    ctx.strokeStyle = dangerHP ? '#ff2020' : '#ff6020'; // red for HP, orange for hunger-only
+    ctx.lineWidth = borderW * 2; // doubled because half is clipped by canvas edge
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    // Inner glow gradient on edges
+    const glowSize = 12;
+    ctx.globalAlpha = pulseAlpha * 0.4;
+    // Top edge
+    const gt = ctx.createLinearGradient(0, 0, 0, glowSize);
+    gt.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gt.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gt;
+    ctx.fillRect(0, 0, canvas.width, glowSize);
+    // Bottom edge
+    const gb = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - glowSize);
+    gb.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gb.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gb;
+    ctx.fillRect(0, canvas.height - glowSize, canvas.width, glowSize);
+    // Left edge
+    const gl = ctx.createLinearGradient(0, 0, glowSize, 0);
+    gl.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gl.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(0, 0, glowSize, canvas.height);
+    // Right edge
+    const gr = ctx.createLinearGradient(canvas.width, 0, canvas.width - glowSize, 0);
+    gr.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(canvas.width - glowSize, 0, glowSize, canvas.height);
+    ctx.restore();
+  }
 
   // Vignette effect
   const gradient = ctx.createRadialGradient(
@@ -4334,6 +4386,28 @@ function setupInput() {
   // Keyboard support (for testing on desktop)
   document.addEventListener('keydown', (e) => {
     Audio.resume();
+
+    // ESC: close any open overlay, menu, or cancel throw mode
+    if (e.key === 'Escape') {
+      // Item menu
+      if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
+      // Settings
+      if ($('settings-overlay').classList.contains('active')) { $('settings-overlay').classList.remove('active'); inputLocked = false; return; }
+      // Help
+      if ($('help-overlay').classList.contains('active')) { closeHelp(); return; }
+      // Minimap
+      if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); return; }
+      // Badge overlay
+      if ($('badge-overlay').classList.contains('active')) { $('badge-overlay').classList.remove('active'); return; }
+      // Merchant
+      if ($('merchant-overlay').classList.contains('active')) { $('merchant-overlay').classList.remove('active'); inputLocked = false; endTurn(); return; }
+      // Sage
+      if ($('sage-overlay').classList.contains('active')) { $('sage-overlay').classList.remove('active'); inputLocked = false; endTurn(); return; }
+      // Throw/aim mode
+      if (state && state.throwMode) { state.throwMode = false; state.throwItem = null; addMessage('Cancelled.', ''); updateUI(); render(); return; }
+      return;
+    }
+
     switch (e.key) {
       case 'ArrowUp': case 'w': playerMove(0, -1); break;
       case 'ArrowDown': playerMove(0, 1); break;
@@ -4348,6 +4422,7 @@ function setupInput() {
       case 'e': showQuickEquip(); break;
       case 't': showQuickThrow(); break;
       case 'f': fireRangedWeapon(); break;
+      case 'b': if (state && !state.gameOver) showBadgeOverlay(); break;
       case 'h': case '?': showHelp(); break;
     }
   });
@@ -4586,6 +4661,15 @@ function setupUI() {
     $('settings-overlay').classList.remove('active');
     showHelp();
   });
+  $('btn-badges-from-settings').addEventListener('click', () => {
+    $('settings-overlay').classList.remove('active');
+    showBadgeOverlay();
+  });
+  $('btn-badges-from-settings').addEventListener('touchend', (e) => {
+    e.preventDefault();
+    $('settings-overlay').classList.remove('active');
+    showBadgeOverlay();
+  }, { passive: false });
   $('btn-close-help').addEventListener('click', closeHelp);
   $('btn-close-help-bottom').addEventListener('click', closeHelp);
 }
