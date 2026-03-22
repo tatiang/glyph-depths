@@ -1001,9 +1001,10 @@
       <div class="subtitle">What lies below has no name until you give it one.</div>
       <button class="big-btn" id="btn-start">Descend</button>
       <button class="big-btn" id="btn-load-from-title" style="display:none;margin-top:8px;background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Continue Saved Game</button>
-      <div style="display:flex;gap:10px;margin-top:12px;">
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
         <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">📖 How to Play</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
+        <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
       </div>
       <div id="title-badge-count" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
     </div>
@@ -1091,6 +1092,14 @@
         <div class="stats-heading">GLYPH RUNES ✦</div>
         <div id="rune-list" style="margin-top:6px;"></div>
       </div>
+      <div id="synergy-section" style="display:none;margin-top:12px;">
+        <div class="stats-heading">PERK SYNERGIES ⚡</div>
+        <div id="synergy-list" style="margin-top:6px;"></div>
+      </div>
+      <div id="mastery-section" style="display:none;margin-top:12px;">
+        <div class="stats-heading">MASTERY ⭐</div>
+        <div id="mastery-list" style="margin-top:6px;"></div>
+      </div>
       <div id="status-effects-section" style="display:none;margin-top:12px;">
         <div class="stats-heading">STATUS EFFECTS</div>
         <div id="status-effects-list" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -1115,8 +1124,153 @@
       <button class="big-btn" id="btn-close-settings">Close</button>
       <button class="big-btn" id="btn-badges-from-settings" style="background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
       <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">📖 How to Play</button>
+      <button class="big-btn" id="btn-manual-from-settings" style="background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
     </div>
     <div id="game-version" style="margin-top:12px;font-size:10px;color:var(--text-dim);text-align:center;opacity:0.6;font-family:monospace;"></div>
+  </div>
+
+  <div class="overlay" id="manual-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
+    <div style="max-width:340px;width:100%;padding:0 12px;">
+      <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
+
+      <div class="help-section">
+        <div class="help-heading">The World</div>
+        <p class="help-note">Beneath the forgotten city of Erathis lies the Unnamed Depths — a shifting labyrinth of ten floors ruled by the Glyph King. Long ago, the King discovered primordial runes that could rewrite reality itself. He carved them into the walls of his domain, bending stone and shadow to his will. The depths grew, consuming the city above. Now only monsters and ghosts remain. Brave souls descend seeking glory, treasure, or the power of the glyphs themselves. None have returned — until, perhaps, you.</p>
+        <p class="help-note" style="margin-top:6px;">Each floor grows darker and more dangerous. Merchants appear on floors 3, 6, and 9. Sages offer services on floors 2, 5, and 8. The Glyph King awaits on floor 10.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Character Classes</div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧝 Adventurer</div>
+          <p class="help-note">The balanced choice. Natural regeneration heals 1 HP every 15 turns. 10% crit chance. Starts with Leather Vest and Healing Potion.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Survivor's Instinct — auto-eat food when starving.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🪖 Berserker</div>
+          <p class="help-note">High HP (22) and ATK (+4) but 2× hunger drain. Rage gives +3 ATK below 40% HP. Enrage ability: +5 ATK for 5 turns, once per floor. Starts with Short Sword and 2 Strength Potions.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Undying Fury — survive a lethal hit with 1 HP, once per floor.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🥷 Rogue</div>
+          <p class="help-note">Low HP (10) but deadly precision: 15% dodge, 20% crit. Stealth reduces enemy detection. Starts with 6 Throwing Daggers and Invisibility Potion.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Shadow Step — become invisible for 2 turns after killing an enemy.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧙 Wizard</div>
+          <p class="help-note">Fragile (11 HP, 1 ATK) but scroll effects are doubled. Arcane Blast AoE ability. Starts with Arcane Staff and 3 identified scrolls.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Mana Shield — 25% chance to completely negate incoming damage.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🏹 Ranger</div>
+          <p class="help-note">Survivalist with +2 FOV, 5% dodge, 15% crit. Forager (bonus food/arrows). Aimed Shot: 2× bow damage on 8-turn cooldown. Infinite basic arrows. Starts with Short Bow, Dagger, Throwing Daggers, and a Ration.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Quick Draw — Aimed Shot cooldown reduced from 8 to 5 turns.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">⛪ Cleric</div>
+          <p class="help-note">Holy warrior (18 HP, +2 ATK, +1 DEF). +3 ATK vs undead. Curse immune. Divine Heal: full HP restore once per run. Starts with Mace, Healing Potion, Scroll of Identify.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Sanctified Ground — heal 1 HP each time you wait (Space).</p>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Level-Up Perks</div>
+        <p class="help-note" style="margin-bottom:6px;">Gain XP from killing enemies. At each level, choose 1 of 3 random perks. Rare perks appear less often.</p>
+        <div class="help-row"><span class="hl">Extended Vision</span><span>+1 FOV radius (stackable)</span></div>
+        <div class="help-row"><span class="hl">+1 Attack</span><span>Increase base attack</span></div>
+        <div class="help-row"><span class="hl">+1 Defense</span><span>Increase base defense</span></div>
+        <div class="help-row"><span class="hl">Rapid Regen ⭐</span><span>Heal 1 HP every 15 turns (unique)</span></div>
+        <div class="help-row"><span class="hl">+5 Max HP ⭐</span><span>+5 max HP and full heal</span></div>
+        <div class="help-row"><span class="hl">Glass Cannon ⭐</span><span>Double ATK but halve max HP</span></div>
+        <div class="help-row"><span class="hl">Vampiric Strikes ⭐</span><span>Heal 20% of damage dealt (unique)</span></div>
+        <div class="help-row"><span class="hl">Iron Skin ⭐</span><span>Reduce all incoming damage by 1 (unique)</span></div>
+        <div class="help-row"><span class="hl">Battle Fury ⭐</span><span>+3 ATK below 30% HP (unique)</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Glyph Runes ✦</div>
+        <p class="help-note" style="margin-bottom:6px;">One rune spawns per floor as a glowing purple symbol. Walk over to collect. Effects are permanent for the run.</p>
+        <div class="help-row"><span class="hl">🔶 Flame</span><span>15% burn chance on hit</span></div>
+        <div class="help-row"><span class="hl">🔷 Frost</span><span>15% freeze chance on hit</span></div>
+        <div class="help-row"><span class="hl">🟢 Thorns</span><span>Reflect 1 damage when hit</span></div>
+        <div class="help-row"><span class="hl">❤️ Vitality</span><span>+3 max HP</span></div>
+        <div class="help-row"><span class="hl">⚡ Swiftness</span><span>+8% dodge</span></div>
+        <div class="help-row"><span class="hl">👁️ Sight</span><span>+1 FOV</span></div>
+        <div class="help-row"><span class="hl">💎 Greed</span><span>+50% gold from enemies</span></div>
+        <div class="help-row"><span class="hl">🍞 Sustenance</span><span>25% slower hunger</span></div>
+        <div class="help-row"><span class="hl">💢 Wrath</span><span>+1 base ATK</span></div>
+        <div class="help-row"><span class="hl">🛡️ Warding</span><span>+1 base DEF</span></div>
+        <div class="help-row"><span class="hl">🩸 Vampirism</span><span>Heal 1 HP per kill</span></div>
+        <div class="help-row"><span class="hl">🍀 Fortune</span><span>+5% crit chance</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Perk Synergies ⚡</div>
+        <p class="help-note" style="margin-bottom:6px;">Combine specific perks with runes to unlock powerful hidden synergies. Active synergies show in the Stats screen.</p>
+        <div class="help-row"><span class="hl">🔥 Soulfire</span><span>Vampiric Strikes + Flame → burn heals you</span></div>
+        <div class="help-row"><span class="hl">🏰 Fortress</span><span>Iron Skin + Thorns → reflect 3 dmg</span></div>
+        <div class="help-row"><span class="hl">💢 Berserker's Rage</span><span>Battle Fury + Wrath → +5 ATK fury</span></div>
+        <div class="help-row"><span class="hl">🌿 Lifebloom</span><span>Rapid Regen + Vitality → heal 2/tick</span></div>
+        <div class="help-row"><span class="hl">🎯 Deadly Precision</span><span>Glass Cannon + Fortune → +15% crit</span></div>
+        <div class="help-row"><span class="hl">🩸 Blood Lord</span><span>Vampiric Strikes + Vampirism → 35% life steal</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Mastery System ⭐</div>
+        <p class="help-note" style="margin-bottom:6px;">Permanent cross-run bonuses earned by completing achievements. These persist forever and apply to all future runs.</p>
+        <div class="help-row"><span class="hl">Adventurer Mastery</span><span>Win as Adventurer → +1 DEF start</span></div>
+        <div class="help-row"><span class="hl">Berserker Mastery</span><span>Win as Berserker → +3 max HP start</span></div>
+        <div class="help-row"><span class="hl">Rogue Mastery</span><span>Win as Rogue → +5% crit start</span></div>
+        <div class="help-row"><span class="hl">Wizard Mastery</span><span>Win as Wizard → +2 ATK start</span></div>
+        <div class="help-row"><span class="hl">Ranger Mastery</span><span>Win as Ranger → start with Hunting Bow</span></div>
+        <div class="help-row"><span class="hl">Cleric Mastery</span><span>Win as Cleric → +3 max HP start</span></div>
+        <div class="help-row"><span class="hl">Veteran</span><span>Win any run → +1 max HP all classes</span></div>
+        <div class="help-row"><span class="hl">Seasoned Slayer</span><span>Kill 100+ enemies total → +1 ATK all</span></div>
+        <div class="help-row"><span class="hl">Rune Adept</span><span>Collect 15+ runes total → floor 1 rune revealed</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Ranged Combat</div>
+        <p class="help-note">Equip a bow in the ranged slot. Press <kbd>F</kbd> or tap 🏹 Fire, then choose a direction. Rangers have infinite basic arrows; other classes must manage arrow supply. Special arrows (🔥 Fire, ❄️ Frost, 💥 Blast, 🗡️ Pierce) can be loaded for bonus effects.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Equipment Slots</div>
+        <div class="help-row"><span class="hl">⚔️ Weapon</span><span>Melee weapon — adds ATK to melee hits</span></div>
+        <div class="help-row"><span class="hl">🏹 Ranged</span><span>Bow/crossbow — fire arrows at range</span></div>
+        <div class="help-row"><span class="hl">🛡️ Armor</span><span>Adds DEF, may have special effects</span></div>
+        <div class="help-row"><span class="hl">💍 Ring</span><span>Passive bonuses (sight, haste, protection, hunger)</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Enemies</div>
+        <p class="help-note"><strong>Tier 1 (F1–3):</strong> Rats, Bats, Skeletons, Slimes, Spiders<br>
+        <strong>Tier 2 (F4–6):</strong> Goblins, Wraiths, Trolls, Lizardfolk, Fire Elementals<br>
+        <strong>Tier 3 (F7–9):</strong> Demons, Liches, Minotaurs, Shadow Stalkers, Mimics<br>
+        <strong>Floor 10:</strong> The Glyph King — boss fight</p>
+        <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths</strong> drain max HP. <strong>Slimes</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls.</p>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Tips</div>
+        <p class="help-note">• Food is scarce — manage hunger carefully.<br>
+        • One-way doors can create shortcuts but never trap you permanently.<br>
+        • Sealed doors can be bashed open at a steep HP cost.<br>
+        • The ghost of your previous run haunts the floor where you died.<br>
+        • Identify potions carefully — some are harmful.<br>
+        • Rune synergies can turn a weak build into an unstoppable one.</p>
+      </div>
+
+      <div style="text-align:center;margin-top:8px;">
+        <button class="big-btn" id="btn-close-manual">Close</button>
+      </div>
+    </div>
   </div>
 
   <div class="overlay" id="save-overlay" style="justify-content:center;padding:24px;">

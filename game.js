@@ -24,7 +24,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'UI polish + danger border'; // updated each push
-const LAST_UPDATED = '2026-03-22 20:00';
+const LAST_UPDATED = '2026-03-22 21:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -158,6 +158,163 @@ function renderBadgesEarned(containerId) {
     const b = BADGE_DEFS.find(d => d.id === id);
     return b ? `<span class="badge-earned">${b.icon} ${b.name}</span>` : '';
   }).join('');
+}
+
+// === PRESTIGE / MASTERY SYSTEM ===
+// Persistent cross-run progression stored in localStorage
+let masteryState = {};
+const MASTERY_PREFIX = 'glyphDepths_mastery';
+
+const MASTERY_DEFS = [
+  { id: 'adv_mastery',  trigger: 'win_adventurer', name: 'Adventurer Mastery',  desc: 'All Adventurers start with +1 DEF',       classReq: 'adventurer', bonus: { defense: 1 } },
+  { id: 'ber_mastery',  trigger: 'win_berserker',  name: 'Berserker Mastery',   desc: 'All Berserkers start with +3 max HP',     classReq: 'berserker',  bonus: { maxHp: 3 } },
+  { id: 'rog_mastery',  trigger: 'win_rogue',      name: 'Rogue Mastery',       desc: 'All Rogues start with +5% crit chance',   classReq: 'rogue',      bonus: { critChance: 0.05 } },
+  { id: 'wiz_mastery',  trigger: 'win_wizard',     name: 'Wizard Mastery',      desc: 'All Wizards start with +2 ATK',           classReq: 'wizard',     bonus: { attack: 2 } },
+  { id: 'ran_mastery',  trigger: 'win_ranger',     name: 'Ranger Mastery',      desc: 'Rangers start with Hunting Bow',          classReq: 'ranger',     bonus: { upgradeBow: true } },
+  { id: 'cle_mastery',  trigger: 'win_cleric',     name: 'Cleric Mastery',      desc: 'All Clerics start with +3 max HP',        classReq: 'cleric',     bonus: { maxHp: 3 } },
+  { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
+  { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
+  { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
+];
+
+function loadMastery() {
+  try {
+    masteryState = JSON.parse(localStorage.getItem(MASTERY_PREFIX) || '{}');
+  } catch { masteryState = {}; }
+}
+
+function saveMastery() {
+  try { localStorage.setItem(MASTERY_PREFIX, JSON.stringify(masteryState)); } catch {}
+}
+
+function checkMasteryUnlocks() {
+  let newUnlocks = [];
+  for (const m of MASTERY_DEFS) {
+    if (masteryState[m.id]) continue; // already unlocked
+    // Check if the trigger badge is unlocked
+    if (m.trigger === 'rune_collector') {
+      // Special: collect 15+ runes across all runs
+      if ((masteryState._runesCollected || 0) >= 15) {
+        masteryState[m.id] = true;
+        newUnlocks.push(m);
+      }
+    } else if (hasBadge(m.trigger)) {
+      masteryState[m.id] = true;
+      newUnlocks.push(m);
+    }
+  }
+  if (newUnlocks.length > 0) {
+    saveMastery();
+    for (const m of newUnlocks) {
+      showMasteryToast(m);
+    }
+  }
+}
+
+function trackRuneCollection(count) {
+  masteryState._runesCollected = (masteryState._runesCollected || 0) + count;
+  saveMastery();
+}
+
+function showMasteryToast(mastery) {
+  const toast = $('badge-toast');
+  if (!toast) return;
+  toast.innerHTML = `<span class="badge-toast-icon">⭐</span> <span class="badge-toast-text">Mastery Unlocked: ${mastery.name}</span>`;
+  toast.classList.add('active');
+  setTimeout(() => toast.classList.remove('active'), 3500);
+}
+
+function getMasteryBonuses(classId) {
+  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, upgradeBow: false, revealRune: false };
+  for (const m of MASTERY_DEFS) {
+    if (!masteryState[m.id]) continue;
+    if (m.classReq && m.classReq !== classId) continue;
+    if (m.bonus.maxHp) bonuses.maxHp += m.bonus.maxHp;
+    if (m.bonus.attack) bonuses.attack += m.bonus.attack;
+    if (m.bonus.defense) bonuses.defense += m.bonus.defense;
+    if (m.bonus.critChance) bonuses.critChance += m.bonus.critChance;
+    if (m.bonus.upgradeBow) bonuses.upgradeBow = true;
+    if (m.bonus.revealRune) bonuses.revealRune = true;
+  }
+  return bonuses;
+}
+
+function getActiveMasteries(classId) {
+  return MASTERY_DEFS.filter(m => {
+    if (!masteryState[m.id]) return false;
+    if (m.classReq && m.classReq !== classId) return false;
+    return true;
+  });
+}
+
+// === PERK SYNERGIES ===
+const PERK_SYNERGIES = [
+  {
+    id: 'soulfire',
+    name: 'Soulfire',
+    icon: '🔥',
+    desc: 'Burn damage also heals you for 1 HP',
+    requires: { perk: 'hasVampire', rune: 'flame' }
+  },
+  {
+    id: 'fortress',
+    name: 'Fortress',
+    icon: '🏰',
+    desc: 'Reflect 3 damage instead of 1 when hit',
+    requires: { perk: 'ironSkin', rune: 'thorns' }
+  },
+  {
+    id: 'berserkers_rage',
+    name: "Berserker's Rage",
+    icon: '💢',
+    desc: 'Low-HP fury bonus increased to +5 ATK',
+    requires: { perk: 'hasFury', rune: 'wrath' }
+  },
+  {
+    id: 'lifebloom',
+    name: 'Lifebloom',
+    icon: '🌿',
+    desc: 'Regeneration heals 2 HP per tick instead of 1',
+    requires: { perk: 'hasRegen', rune: 'vitality' }
+  },
+  {
+    id: 'deadly_precision',
+    name: 'Deadly Precision',
+    icon: '🎯',
+    desc: '+15% crit chance (stacks with Fortune rune)',
+    requires: { perk: 'glassCannon', rune: 'fortune' }
+  },
+  {
+    id: 'blood_lord',
+    name: 'Blood Lord',
+    icon: '🩸',
+    desc: 'Vampiric healing increased to 35% of damage',
+    requires: { perk: 'hasVampire', rune: 'vampirism' }
+  },
+];
+
+function hasSynergy(id) {
+  const syn = PERK_SYNERGIES.find(s => s.id === id);
+  if (!syn) return false;
+  const p = state.player;
+  const perkMet = syn.requires.perk === 'glassCannon' ? p.glassCannon : !!p[syn.requires.perk];
+  const runeMet = hasRune(syn.requires.rune);
+  return perkMet && runeMet;
+}
+
+function getActiveSynergies() {
+  return PERK_SYNERGIES.filter(s => hasSynergy(s.id));
+}
+
+function checkNewSynergies() {
+  for (const syn of PERK_SYNERGIES) {
+    if (hasSynergy(syn.id) && !state.player._activeSynergies?.includes(syn.id)) {
+      if (!state.player._activeSynergies) state.player._activeSynergies = [];
+      state.player._activeSynergies.push(syn.id);
+      addMessage(`⚡ SYNERGY: ${syn.name} — ${syn.desc}`, 'gold');
+      haptic(50);
+    }
+  }
 }
 
 // Check badges at specific trigger points
@@ -339,6 +496,7 @@ function boot() {
   ctxC = canvas.getContext('2d');
   loadSettings();
   loadBadges();
+  loadMastery();
   setupCanvas();
   setupInput();
   setupUI();
@@ -539,9 +697,14 @@ function newRun(classId = 'adventurer') {
   state.playerName = charName.first;
   state.playerEpithet = charName.epithet;
   applyClassStartingItems(classId);
+  applyMasteryBonuses(classId);
   const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
   // Welcome messages with player name and class
   addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into the Unnamed Depths.`, 'gold');
+  const activeMasteries = getActiveMasteries(classId);
+  if (activeMasteries.length > 0) {
+    addMessage(`Mastery bonuses: ${activeMasteries.map(m => m.name).join(', ')}`, 'gold');
+  }
   addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
   updateUI();
@@ -571,6 +734,15 @@ function createPlayer(classId = 'adventurer') {
     hasVampire: false,
     ironSkin: false,
     hasFury: false,
+    glassCannon: false,
+    // Class-specific perk flags
+    shadowStep: false,    // Rogue: invisibility on kill
+    manaShield: false,    // Wizard: 25% negate incoming damage
+    undyingFury: false,   // Berserker: survive lethal once per floor
+    undyingFuryUsed: false,
+    quickDraw: false,     // Ranger: -3 aimed shot cooldown
+    sanctifiedGround: false, // Cleric: heal when standing still
+    survivorInstinct: false, // Adventurer: auto-eat food at 0 hunger
     arcaneAffinity: classId === 'wizard',
     dodgeBonus: cls.dodgeBonus,
     critChance: cls.critChance,
@@ -589,6 +761,15 @@ function createPlayer(classId = 'adventurer') {
     divineHealUsed: false,
     curseImmune: classId === 'cleric'
   };
+}
+
+function applyMasteryBonuses(classId) {
+  const p = state.player;
+  const m = getMasteryBonuses(classId);
+  if (m.maxHp > 0)      { p.maxHp += m.maxHp; p.hp += m.maxHp; }
+  if (m.attack > 0)     { p.attack += m.attack; }
+  if (m.defense > 0)    { p.defense += m.defense; }
+  if (m.critChance > 0) { p.critChance += m.critChance; }
 }
 
 function applyClassStartingItems(classId) {
@@ -624,7 +805,8 @@ function applyClassStartingItems(classId) {
       }
     }
   } else if (classId === 'ranger') {
-    p.equipped.ranged = { ...RANGED_WEAPONS.find(r => r.name === 'Short Bow') };
+    const bowName = getMasteryBonuses(classId).upgradeBow ? 'Hunting Bow' : 'Short Bow';
+    p.equipped.ranged = { ...RANGED_WEAPONS.find(r => r.name === bowName) };
     p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
     p.inventory.push({ ...FOOD });
@@ -795,8 +977,9 @@ function generateFloor() {
   state.visible = new Uint8Array(MAP_W * MAP_H);
   state.explored = new Uint8Array(MAP_W * MAP_H);
   state.entities = [];
-  // Reset per-floor Berserker enrage (recharges each floor)
+  // Reset per-floor abilities
   p.enrageFloorUsed = false;
+  p.undyingFuryUsed = false;
   p.enrageActive = false;
   p.engageTurnsLeft = 0;
   state.rooms = [];
@@ -1582,6 +1765,7 @@ function collectGlyphRune(runeEntity) {
 
   addMessage(`${rune.symbol} ${rune.name} — ${rune.desc}`, 'gold');
   haptic(50);
+  checkNewSynergies();
   // Animation: expanding glyph circle
   animateAoeBlast(p.x, p.y, 2, '#f0c040');
 }
@@ -1599,6 +1783,11 @@ function spawnGlyphRune() {
   const pos = randomRoomFloorTile();
   if (pos) {
     state.entities.push({ type: 'rune', x: pos.x, y: pos.y, glyph: '✦', rune });
+    // Rune Adept mastery: reveal first floor's rune on the map
+    if (state.floor === 1 && getMasteryBonuses(state.player.classId).revealRune) {
+      state.explored[pos.y * MAP_W + pos.x] = 1;
+      addMessage('⭐ Rune Adept: a rune\'s location is revealed!', 'gold');
+    }
   }
 }
 
@@ -1888,7 +2077,7 @@ function attackEntity(attacker, defender) {
   let critChance = (attacker === state.player)
     ? (state.player.critChance || 0.10)
     : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
-  if (attacker === state.player && hasRune('fortune')) critChance += 0.05;
+  if (attacker === state.player && hasRune('fortune')) critChance += hasSynergy('deadly_precision') ? 0.15 : 0.05;
   const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
@@ -1901,6 +2090,13 @@ function attackEntity(attacker, defender) {
     if (defender === state.player && isUndead(attacker)) {
       damage = Math.max(1, damage - 1);
     }
+  }
+
+  // Mana Shield (Wizard perk): 25% chance to negate damage
+  if (defender === state.player && state.player.manaShield && Math.random() < 0.25) {
+    addMessage('✨ Mana Shield absorbs the attack!', 'good');
+    Audio.miss();
+    return;
   }
 
   // Iron Skin perk: reduce incoming damage to player by 1
@@ -1937,9 +2133,10 @@ function attackEntity(attacker, defender) {
   if (isPlayer && !targetIsPlayer) state.floorData[floorIdx].damageDealt += damage;
   else if (!isPlayer && targetIsPlayer) state.floorData[floorIdx].damageTaken += damage;
 
-  // Vampiric Strikes perk: heal 20% of damage dealt
+  // Vampiric Strikes perk: heal 20% of damage dealt (Blood Lord synergy: 35%)
   if (isPlayer && !targetIsPlayer && state.player.hasVampire) {
-    const vHeal = Math.max(1, Math.floor(damage * 0.2));
+    const vRate = hasSynergy('blood_lord') ? 0.35 : 0.2;
+    const vHeal = Math.max(1, Math.floor(damage * vRate));
     state.player.hp = Math.min(state.player.maxHp, state.player.hp + vHeal);
     if (vHeal > 1) addMessage(`Vampiric: +${vHeal} HP`, 'good');
   }
@@ -1986,10 +2183,11 @@ function attackEntity(attacker, defender) {
     }
   }
 
-  // Glyph Rune: thorns reflect when player is hit
+  // Glyph Rune: thorns reflect when player is hit (Fortress synergy: 3 dmg)
   if (targetIsPlayer && hasRune('thorns')) {
-    attacker.hp -= 1;
-    addMessage(`🟢 Thorns glyph reflects 1 damage!`, '');
+    const thornsDmg = hasSynergy('fortress') ? 3 : 1;
+    attacker.hp -= thornsDmg;
+    addMessage(hasSynergy('fortress') ? `🏰 Fortress reflects ${thornsDmg} damage!` : `🟢 Thorns glyph reflects 1 damage!`, '');
     if (attacker.hp <= 0) killEnemy(attacker);
   }
 
@@ -2014,7 +2212,16 @@ function attackEntity(attacker, defender) {
   // Check death
   if (defender.hp <= 0) {
     if (targetIsPlayer) {
-      playerDeath(attacker.name, attacker.glyph);
+      // Undying Fury (Berserker perk): survive lethal once per floor
+      if (state.player.undyingFury && !state.player.undyingFuryUsed) {
+        state.player.hp = 1;
+        state.player.undyingFuryUsed = true;
+        addMessage('💢 UNDYING FURY! You refuse to fall!', 'good');
+        animateEntityFlash(state.player.x, state.player.y, '#ff4040');
+        haptic(80);
+      } else {
+        playerDeath(attacker.name, attacker.glyph);
+      }
     } else {
       killEnemy(defender);
       // Vampiric weapon
@@ -2026,6 +2233,11 @@ function attackEntity(attacker, defender) {
       if (isPlayer && hasRune('vampirism')) {
         state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1);
         addMessage('🩸 Vampirism glyph heals you!', 'good');
+      }
+      // Shadow Step (Rogue perk): invisibility for 2 turns on kill
+      if (isPlayer && state.player.shadowStep) {
+        addStatusEffect(state.player, 'invisibility', 2);
+        addMessage('💨 Shadow Step! You vanish into darkness.', 'good');
       }
     }
   }
@@ -2039,8 +2251,10 @@ function getEffectiveAttack(entity) {
     if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
     // Strength potion
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
-    // Battle Fury perk: +3 attack when below 30% HP
-    if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) atk += 3;
+    // Battle Fury perk: +3 attack when below 30% HP (Berserker's Rage synergy: +5)
+    if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) {
+      atk += hasSynergy('berserkers_rage') ? 5 : 3;
+    }
     // Berserker class rage: +3 attack when below 40% HP
     if (state.player.classId === 'berserker' && state.player.hp < state.player.maxHp * 0.4) atk += 3;
     return Math.max(1, atk);
@@ -2224,6 +2438,8 @@ function playerDeath(killerName, killerGlyph) {
   $('death-full-stats').style.display = 'none';
 
   checkBadgesOnDeath();
+  trackRuneCollection(state.player.runes ? state.player.runes.length : 0);
+  checkMasteryUnlocks();
   renderBadgesEarned('death-badges');
 
   setTimeout(() => {
@@ -2248,6 +2464,8 @@ function showVictory() {
   `;
 
   checkBadgesOnVictory();
+  trackRuneCollection(state.player.runes ? state.player.runes.length : 0);
+  checkMasteryUnlocks();
   renderBadgesEarned('victory-badge-list');
 
   setTimeout(() => {
@@ -2273,17 +2491,26 @@ function showLevelUp() {
     { name: '+1 Defense',  desc: 'Increase base defense by 1',            apply: () => { state.player.defense += 1; } },
     { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns',      apply: () => { state.player.hasRegen = true; }, rare: true, unique: true, flag: 'hasRegen' },
     { name: '+5 Max HP',   desc: 'Increase max HP by 5 and full heal',    apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true },
-    { name: 'Glass Cannon', desc: 'Double your attack — but halve max HP', apply: () => { state.player.attack *= 2; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp / 2)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
+    { name: 'Glass Cannon', desc: 'Double your attack — but halve max HP', apply: () => { state.player.attack *= 2; state.player.glassCannon = true; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp / 2)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
     { name: 'Vampiric Strikes', desc: 'Heal 20% of all damage you deal',  apply: () => { state.player.hasVampire = true; }, rare: true, unique: true, flag: 'hasVampire' },
     { name: 'Iron Skin',   desc: 'Reduce all incoming damage by 1',       apply: () => { state.player.ironSkin = true; }, rare: true, unique: true, flag: 'ironSkin' },
-    { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' }
+    { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' },
+    // Class-exclusive perks
+    { name: "Survivor's Instinct", desc: 'Auto-eat food from inventory when starving', apply: () => { state.player.survivorInstinct = true; }, rare: false, unique: true, flag: 'survivorInstinct', classOnly: 'adventurer' },
+    { name: 'Undying Fury', desc: 'Survive a lethal hit with 1 HP (once per floor)', apply: () => { state.player.undyingFury = true; }, rare: true, unique: true, flag: 'undyingFury', classOnly: 'berserker' },
+    { name: 'Shadow Step', desc: 'Become invisible for 2 turns after a kill', apply: () => { state.player.shadowStep = true; }, rare: true, unique: true, flag: 'shadowStep', classOnly: 'rogue' },
+    { name: 'Mana Shield', desc: '25% chance to negate incoming damage', apply: () => { state.player.manaShield = true; }, rare: true, unique: true, flag: 'manaShield', classOnly: 'wizard' },
+    { name: 'Quick Draw', desc: 'Aimed Shot cooldown reduced by 3 turns', apply: () => { state.player.quickDraw = true; }, rare: false, unique: true, flag: 'quickDraw', classOnly: 'ranger' },
+    { name: 'Sanctified Ground', desc: 'Heal 1 HP when you wait (Space)', apply: () => { state.player.sanctifiedGround = true; }, rare: false, unique: true, flag: 'sanctifiedGround', classOnly: 'cleric' },
   ];
 
-  // Filter out already-owned unique perks
+  // Filter out already-owned unique perks and class-restricted perks
   const available = allPerks.filter(p => {
     if (p.unique && p.flag && state.player[p.flag]) return false;
     // Berserker already has Rage — Battle Fury would stack to +6 ATK
     if (state.player.classId === 'berserker' && p.name === 'Battle Fury') return false;
+    // Class-exclusive perks only appear for their class
+    if (p.classOnly && p.classOnly !== state.player.classId) return false;
     return true;
   });
 
@@ -2307,9 +2534,11 @@ function showLevelUp() {
   for (const perk of perks) {
     const btn = document.createElement('button');
     btn.className = 'perk-btn';
-    btn.innerHTML = `<div class="perk-name">${perk.name}</div><div class="perk-desc">${perk.desc}</div>`;
+    const classTag = perk.classOnly ? `<div style="font-size:10px;color:#c0a0ff;margin-bottom:2px;">★ CLASS PERK</div>` : '';
+    btn.innerHTML = `${classTag}<div class="perk-name">${perk.name}</div><div class="perk-desc">${perk.desc}</div>`;
     btn.addEventListener('click', () => {
       perk.apply();
+      checkNewSynergies();
       $('levelup-overlay').classList.remove('active');
       inputLocked = false;
       updateUI();
@@ -2353,6 +2582,11 @@ function processEntityEffects(entity) {
       case 'burning':
         entity.hp -= 2;
         if (isPlayer) addMessage('You burn! (-2 HP)', 'damage');
+        // Soulfire synergy: player heals from enemy burn damage
+        if (!isPlayer && hasSynergy('soulfire')) {
+          state.player.hp = Math.min(state.player.maxHp, state.player.hp + 1);
+          addMessage('🔥 Soulfire heals you!', 'good');
+        }
         break;
       case 'poison':
         entity.hp -= 3;
@@ -2910,6 +3144,11 @@ function playerWait() {
     return;
   }
   addMessage('You wait...', '');
+  // Sanctified Ground (Cleric perk): heal 1 HP when waiting
+  if (state.player.sanctifiedGround && state.player.hp < state.player.maxHp) {
+    state.player.hp++;
+    addMessage('✝️ Sanctified Ground heals you. (+1 HP)', 'good');
+  }
   endTurn();
 }
 
@@ -3536,6 +3775,16 @@ function endTurn() {
     state.player.hunger = Math.max(0, state.player.hunger - drain);
   }
 
+  // Survivor's Instinct (Adventurer perk): auto-eat food when starving
+  if (state.player.hunger <= 0 && state.player.survivorInstinct) {
+    const foodIdx = state.player.inventory.findIndex(i => i.itemType === 'food');
+    if (foodIdx >= 0) {
+      state.player.inventory.splice(foodIdx, 1);
+      state.player.hunger = Math.min(100, state.player.hunger + 40);
+      addMessage("🍖 Survivor's Instinct: you eat a ration automatically!", 'good');
+    }
+  }
+
   if (state.player.hunger <= 0 && state.turnCount % HUNGER_DAMAGE_TICK === 0) {
     state.player.hp--;
     addMessage('You are starving! (-1 HP)', 'damage');
@@ -3547,7 +3796,8 @@ function endTurn() {
   const regenRate = state.player.hasRegen ? 15 : 30;
   if (state.player.regenCounter >= regenRate && state.player.hp < state.player.maxHp) {
     state.player.regenCounter = 0;
-    state.player.hp++;
+    const regenAmount = hasSynergy('lifebloom') ? 2 : 1;
+    state.player.hp = Math.min(state.player.maxHp, state.player.hp + regenAmount);
   }
 
   // Tick class ability cooldowns
@@ -4839,8 +5089,9 @@ function setupInput() {
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
       if ($('settings-overlay').classList.contains('active')) { $('settings-overlay').classList.remove('active'); inputLocked = false; return; }
-      // Help
+      // Help / Manual
       if ($('help-overlay').classList.contains('active')) { closeHelp(); return; }
+      if ($('manual-overlay').classList.contains('active')) { closeManual(); return; }
       // Minimap
       if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); return; }
       // Badge overlay
@@ -5136,6 +5387,26 @@ function setupUI() {
   $('btn-close-help').addEventListener('click', closeHelp);
   $('btn-close-help-bottom').addEventListener('click', closeHelp);
 
+  // Manual overlay
+  const manualFromSettings = $('btn-manual-from-settings');
+  if (manualFromSettings) {
+    const manFn = () => { $('settings-overlay').classList.remove('active'); showManual(); };
+    manualFromSettings.addEventListener('click', manFn);
+    manualFromSettings.addEventListener('touchend', (e) => { e.preventDefault(); manFn(); }, { passive: false });
+  }
+  const manualFromTitle = $('btn-manual-from-title');
+  if (manualFromTitle) {
+    const manFn = () => { showManual(); };
+    manualFromTitle.addEventListener('click', manFn);
+    manualFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); manFn(); }, { passive: false });
+  }
+  const closeManualBtn = $('btn-close-manual');
+  if (closeManualBtn) {
+    const closeFn = () => closeManual();
+    closeManualBtn.addEventListener('click', closeFn);
+    closeManualBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
+  }
+
   // Save/Load buttons in settings
   const saveGameBtn = $('btn-save-game');
   if (saveGameBtn) {
@@ -5232,6 +5503,19 @@ function showSettings() {
           abilities.push({ icon: '💛', name: 'Divine Heal', desc: `Full HP heal (1/run)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
       }
+      // Add unlocked class-specific perks
+      const classPerkFlags = [
+        { flag: 'survivorInstinct', icon: '🍖', name: "Survivor's Instinct", desc: 'Auto-eat food when starving' },
+        { flag: 'undyingFury', icon: '💢', name: 'Undying Fury', desc: `Survive lethal hit 1/floor${p.undyingFuryUsed ? ' — USED' : ' — Ready'}` },
+        { flag: 'shadowStep', icon: '💨', name: 'Shadow Step', desc: 'Invisible for 2 turns after a kill' },
+        { flag: 'manaShield', icon: '✨', name: 'Mana Shield', desc: '25% chance to negate damage' },
+        { flag: 'quickDraw', icon: '🎯', name: 'Quick Draw', desc: 'Aimed Shot cooldown 5 instead of 8' },
+        { flag: 'sanctifiedGround', icon: '✝️', name: 'Sanctified Ground', desc: 'Heal 1 HP when waiting' },
+      ];
+      for (const cp of classPerkFlags) {
+        if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
+      }
+
       const classAbilList = $('class-ability-list');
       classAbilList.innerHTML = abilities.map(a =>
         `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
@@ -5241,6 +5525,45 @@ function showSettings() {
       ).join('');
     } else {
       classSection.style.display = 'none';
+    }
+  }
+
+  // Active Perk Synergies panel
+  const synSection = $('synergy-section');
+  if (synSection) {
+    if (p) {
+      const activeSyn = getActiveSynergies();
+      if (activeSyn.length > 0) {
+        synSection.style.display = '';
+        $('synergy-list').innerHTML = activeSyn.map(s =>
+          `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
+          + `<span style="font-size:15px;flex-shrink:0;">${s.icon}</span>`
+          + `<span style="font-size:12px;"><strong style="color:#c0a0ff;">${s.name}</strong> — <span style="color:var(--text-dim);">${s.desc}</span></span>`
+          + `</div>`
+        ).join('');
+      } else {
+        synSection.style.display = 'none';
+      }
+    } else {
+      synSection.style.display = 'none';
+    }
+  }
+
+  // Mastery bonuses panel
+  const masterySection = $('mastery-section');
+  if (masterySection) {
+    const allMasteries = MASTERY_DEFS.filter(m => masteryState[m.id]);
+    if (allMasteries.length > 0) {
+      masterySection.style.display = '';
+      $('mastery-list').innerHTML = allMasteries.map(m =>
+        `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
+        + `<span style="font-size:15px;flex-shrink:0;">⭐</span>`
+        + `<span style="font-size:12px;"><strong style="color:var(--gold);">${m.name}</strong> — <span style="color:var(--text-dim);">${m.desc}</span></span>`
+        + `</div>`
+      ).join('');
+    } else {
+      masterySection.style.display = '';
+      $('mastery-list').innerHTML = '<span style="color:var(--text-dim);font-size:12px;">No masteries unlocked yet. Win runs to earn permanent bonuses.</span>';
     }
   }
 
@@ -5375,6 +5698,16 @@ function showHelp() {
 
 function closeHelp() {
   $('help-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function showManual() {
+  inputLocked = true;
+  $('manual-overlay').classList.add('active');
+}
+
+function closeManual() {
+  $('manual-overlay').classList.remove('active');
   inputLocked = false;
 }
 
@@ -5933,7 +6266,7 @@ function throwProjectile(dx, dy) {
 
   if (isAimedShot) {
     if (!hit) addMessage('Your arrow flies into the darkness.', '');
-    p.aimedShotCooldown = 8;
+    p.aimedShotCooldown = p.quickDraw ? 5 : 8;
     // Aimed shot consumes special arrow if loaded
     if (p.loadedSpecialArrow && hit) {
       p.loadedSpecialArrow.ammo--;
