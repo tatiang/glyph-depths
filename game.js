@@ -24,7 +24,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'UI polish + danger border'; // updated each push
-const LAST_UPDATED = '2026-03-22 19:00';
+const LAST_UPDATED = '2026-03-22 20:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -423,6 +423,12 @@ function showTitle() {
   if (badgeCountEl) {
     const count = getBadgeCount();
     badgeCountEl.textContent = count > 0 ? `🏆 ${count}/${BADGE_DEFS.length}` : '';
+  }
+
+  // Show/hide continue button based on saved games
+  const loadBtn = $('btn-load-from-title');
+  if (loadBtn) {
+    loadBtn.style.display = hasSavedGames() ? '' : 'none';
   }
 }
 
@@ -3809,6 +3815,276 @@ function saveHighScore() {
   } catch {}
 }
 
+// === SAVE / LOAD SYSTEM ===
+const SAVE_SLOTS = 3;
+const SAVE_PREFIX = 'glyphDepths_save_';
+
+function saveGameToSlot(slot) {
+  if (!state || state.gameOver || state.victory) {
+    addMessage('Nothing to save.', 'damage');
+    return false;
+  }
+  try {
+    const saveData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      state: serializeState(),
+      potionNames: potionNames,
+      scrollNames: scrollNames,
+      potionIdentified: potionIdentified,
+      scrollIdentified: scrollIdentified,
+      badgesEarnedThisRun: badgesEarnedThisRun
+    };
+    localStorage.setItem(SAVE_PREFIX + slot, JSON.stringify(saveData));
+    return true;
+  } catch (e) {
+    addMessage('Save failed — storage full?', 'damage');
+    return false;
+  }
+}
+
+function serializeState() {
+  // Deep clone state, converting Uint8Arrays to regular arrays for JSON
+  const s = {};
+  for (const key of Object.keys(state)) {
+    const val = state[key];
+    if (val instanceof Uint8Array) {
+      s[key] = { _uint8: true, data: Array.from(val) };
+    } else if (key === 'ghost') {
+      s[key] = val; // ghost is already a simple object
+    } else {
+      s[key] = JSON.parse(JSON.stringify(val)); // deep clone
+    }
+  }
+  return s;
+}
+
+function loadGameFromSlot(slot) {
+  try {
+    const raw = localStorage.getItem(SAVE_PREFIX + slot);
+    if (!raw) return false;
+    const saveData = JSON.parse(raw);
+    if (!saveData || !saveData.state) return false;
+
+    // Restore global potion/scroll names and identification
+    potionNames = saveData.potionNames || [];
+    scrollNames = saveData.scrollNames || [];
+    potionIdentified = saveData.potionIdentified || {};
+    scrollIdentified = saveData.scrollIdentified || {};
+    badgesEarnedThisRun = saveData.badgesEarnedThisRun || [];
+
+    // Restore state, converting Uint8Array markers back
+    const s = saveData.state;
+    for (const key of Object.keys(s)) {
+      if (s[key] && s[key]._uint8) {
+        s[key] = new Uint8Array(s[key].data);
+      }
+    }
+    state = s;
+
+    // Reset transient state
+    inputLocked = false;
+    state.throwMode = false;
+    state.throwItem = null;
+    state.minimapOpen = false;
+
+    // Close all overlays
+    document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
+    $('minimap-overlay').classList.remove('active');
+
+    // Ensure audio is initialized (in case loading from title)
+    Audio.init();
+    Audio.setEnabled(settings.sound);
+
+    // Recompute FOV and render
+    computeFOV();
+    render();
+    updateUI();
+    addMessage('Game loaded.', 'good');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function deleteSaveSlot(slot) {
+  localStorage.removeItem(SAVE_PREFIX + slot);
+}
+
+function getSaveSlotInfo(slot) {
+  try {
+    const raw = localStorage.getItem(SAVE_PREFIX + slot);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !data.state) return null;
+    const p = data.state.player;
+    const cls = CLASS_DEFS.find(c => c.id === p.classId);
+    return {
+      slot: slot,
+      className: cls ? cls.name : 'Unknown',
+      classIcon: cls ? cls.icon : '?',
+      playerName: data.state.playerName || 'Unknown',
+      playerEpithet: data.state.playerEpithet || '',
+      floor: data.state.floor,
+      level: p.level,
+      hp: p.hp,
+      maxHp: p.maxHp,
+      timestamp: data.timestamp
+    };
+  } catch { return null; }
+}
+
+function showSaveOverlay() {
+  const overlay = $('save-overlay');
+  const slotsEl = $('save-slots');
+  slotsEl.innerHTML = '';
+
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    const info = getSaveSlotInfo(i);
+    const slotDiv = document.createElement('div');
+    slotDiv.className = 'save-slot';
+    if (info) {
+      const age = timeSince(info.timestamp);
+      slotDiv.innerHTML =
+        `<div class="save-slot-header">`
+        + `<span class="save-slot-name">${info.classIcon} ${info.playerName} ${info.playerEpithet}</span>`
+        + `<span class="save-slot-meta">${info.className}</span>`
+        + `</div>`
+        + `<div class="save-slot-details">`
+        + `Floor ${info.floor} · Lv.${info.level} · ${info.hp}/${info.maxHp} HP`
+        + `<span class="save-slot-time">${age}</span>`
+        + `</div>`;
+      const btnRow = document.createElement('div');
+      btnRow.className = 'save-slot-actions';
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-action-btn save-overwrite';
+      saveBtn.textContent = '💾 Overwrite';
+      const slot = i;
+      const saveFn = () => {
+        if (saveGameToSlot(slot)) {
+          addMessage(`Game saved to slot ${slot}.`, 'good');
+          closeSaveOverlay();
+        }
+      };
+      saveBtn.addEventListener('click', saveFn);
+      saveBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
+      btnRow.appendChild(saveBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'save-action-btn save-delete';
+      delBtn.textContent = '🗑️ Delete';
+      const delFn = () => { deleteSaveSlot(slot); showSaveOverlay(); };
+      delBtn.addEventListener('click', delFn);
+      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
+      btnRow.appendChild(delBtn);
+
+      slotDiv.appendChild(btnRow);
+    } else {
+      slotDiv.innerHTML = `<div class="save-slot-empty">— Empty Slot ${i} —</div>`;
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-action-btn save-new';
+      saveBtn.textContent = '💾 Save Here';
+      const slot = i;
+      const saveFn = () => {
+        if (saveGameToSlot(slot)) {
+          addMessage(`Game saved to slot ${slot}.`, 'good');
+          closeSaveOverlay();
+        }
+      };
+      saveBtn.addEventListener('click', saveFn);
+      saveBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
+      slotDiv.appendChild(saveBtn);
+    }
+    slotsEl.appendChild(slotDiv);
+  }
+
+  inputLocked = true;
+  overlay.classList.add('active');
+}
+
+function showLoadOverlay(fromTitle) {
+  const overlay = $('load-overlay');
+  const slotsEl = $('load-slots');
+  slotsEl.innerHTML = '';
+  let hasSaves = false;
+
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    const info = getSaveSlotInfo(i);
+    const slotDiv = document.createElement('div');
+    slotDiv.className = 'save-slot';
+    if (info) {
+      hasSaves = true;
+      const age = timeSince(info.timestamp);
+      slotDiv.innerHTML =
+        `<div class="save-slot-header">`
+        + `<span class="save-slot-name">${info.classIcon} ${info.playerName} ${info.playerEpithet}</span>`
+        + `<span class="save-slot-meta">${info.className}</span>`
+        + `</div>`
+        + `<div class="save-slot-details">`
+        + `Floor ${info.floor} · Lv.${info.level} · ${info.hp}/${info.maxHp} HP`
+        + `<span class="save-slot-time">${age}</span>`
+        + `</div>`;
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'save-action-btn save-new';
+      loadBtn.textContent = '▶️ Load';
+      const slot = i;
+      const loadFn = () => {
+        if (loadGameFromSlot(slot)) {
+          closeLoadOverlay();
+          if (fromTitle) {
+            $('title-screen').classList.remove('active');
+          }
+        } else {
+          addMessage('Failed to load save.', 'damage');
+        }
+      };
+      loadBtn.addEventListener('click', loadFn);
+      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+      slotDiv.appendChild(loadBtn);
+    } else {
+      slotDiv.innerHTML = `<div class="save-slot-empty">— Empty Slot ${i} —</div>`;
+    }
+    slotsEl.appendChild(slotDiv);
+  }
+
+  if (!hasSaves) {
+    slotsEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No saved games found.</div>';
+  }
+
+  inputLocked = true;
+  overlay.classList.add('active');
+}
+
+function closeSaveOverlay() {
+  $('save-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function closeLoadOverlay() {
+  $('load-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function timeSince(isoStr) {
+  try {
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  } catch { return ''; }
+}
+
+function hasSavedGames() {
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    if (localStorage.getItem(SAVE_PREFIX + i)) return true;
+  }
+  return false;
+}
+
 // === SETTINGS ===
 function loadSettings() {
   try {
@@ -4556,6 +4832,9 @@ function setupInput() {
 
     // ESC: close any open overlay, menu, or cancel throw mode
     if (e.key === 'Escape') {
+      // Save/Load overlays
+      if ($('save-overlay').classList.contains('active')) { closeSaveOverlay(); return; }
+      if ($('load-overlay').classList.contains('active')) { closeLoadOverlay(); return; }
       // Item menu
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
@@ -4856,6 +5135,38 @@ function setupUI() {
   }, { passive: false });
   $('btn-close-help').addEventListener('click', closeHelp);
   $('btn-close-help-bottom').addEventListener('click', closeHelp);
+
+  // Save/Load buttons in settings
+  const saveGameBtn = $('btn-save-game');
+  if (saveGameBtn) {
+    const saveFn = () => { $('settings-overlay').classList.remove('active'); showSaveOverlay(); };
+    saveGameBtn.addEventListener('click', saveFn);
+    saveGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
+  }
+  const loadGameBtn = $('btn-load-game');
+  if (loadGameBtn) {
+    const loadFn = () => { $('settings-overlay').classList.remove('active'); showLoadOverlay(false); };
+    loadGameBtn.addEventListener('click', loadFn);
+    loadGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+  }
+  const closeSaveBtn = $('btn-close-save');
+  if (closeSaveBtn) {
+    closeSaveBtn.addEventListener('click', closeSaveOverlay);
+    closeSaveBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeSaveOverlay(); }, { passive: false });
+  }
+  const closeLoadBtn = $('btn-close-load');
+  if (closeLoadBtn) {
+    closeLoadBtn.addEventListener('click', closeLoadOverlay);
+    closeLoadBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLoadOverlay(); }, { passive: false });
+  }
+
+  // Load from title screen
+  const loadFromTitle = $('btn-load-from-title');
+  if (loadFromTitle) {
+    const loadTitleFn = () => { Audio.resume(); showLoadOverlay(true); };
+    loadFromTitle.addEventListener('click', loadTitleFn);
+    loadFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); loadTitleFn(); }, { passive: false });
+  }
 }
 
 function showSettings() {
