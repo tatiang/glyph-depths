@@ -21,7 +21,7 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, heroIcon: '🧝' };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'Add class special abilities'; // updated each push
 const LAST_UPDATED = '2026-03-22';
@@ -2225,6 +2225,8 @@ function autoPickup() {
       Audio.gold();
       removeEntity(item);
       state.score += item.item.goldAmount;
+    } else if (settings.autopickup) {
+      pickupItem(item);
     }
   }
 }
@@ -3780,6 +3782,7 @@ function showSettings() {
   $('toggle-sound').classList.toggle('on', settings.sound);
   $('toggle-haptics').classList.toggle('on', settings.haptics);
   $('toggle-dpad').classList.toggle('on', settings.dpad);
+  $('toggle-autopickup').classList.toggle('on', settings.autopickup);
 
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
@@ -3798,6 +3801,12 @@ function showSettings() {
     settings.dpad = !settings.dpad;
     $('toggle-dpad').classList.toggle('on', settings.dpad);
     $('dpad').style.display = settings.dpad ? 'grid' : 'none';
+    saveSettings();
+  };
+
+  $('toggle-autopickup').onclick = () => {
+    settings.autopickup = !settings.autopickup;
+    $('toggle-autopickup').classList.toggle('on', settings.autopickup);
     saveSettings();
   };
 
