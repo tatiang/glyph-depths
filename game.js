@@ -705,15 +705,31 @@ function addOneWayDoors() {
   }
   if (stx < 0) return;
 
-  // Only use doors where removing them still leaves stairs reachable from the player
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
     for (let x = 1; x < MAP_W - 1; x++) {
       if (getTile(x, y) !== T.DOOR_CLOSED) continue;
+
+      // Identify the tile on each side of the door along its corridor axis.
+      // A one-way door is only valid if both sides still connect to each other
+      // via an alternative path — guaranteeing the player can always get back.
+      let sideA, sideB;
+      if (getTile(x - 1, y) !== T.WALL && getTile(x + 1, y) !== T.WALL) {
+        sideA = [x - 1, y]; sideB = [x + 1, y]; // horizontal corridor
+      } else if (getTile(x, y - 1) !== T.WALL && getTile(x, y + 1) !== T.WALL) {
+        sideA = [x, y - 1]; sideB = [x, y + 1]; // vertical corridor
+      } else {
+        continue; // can't determine axis — skip
+      }
+
       setTile(x, y, T.WALL); // temporarily block
-      const safe = bfsReachable(state.player.x, state.player.y, stx, sty);
+      // Both sides must still reach each other (alternative path exists)
+      // AND stairs must still be reachable from the player start
+      const altPath  = bfsReachable(sideA[0], sideA[1], sideB[0], sideB[1]);
+      const stairsOk = altPath && bfsReachable(state.player.x, state.player.y, stx, sty);
       setTile(x, y, T.DOOR_CLOSED); // restore
-      if (safe) candidates.push({ x, y }); // non-critical path — safe to make one-way
+
+      if (altPath && stairsOk) candidates.push({ x, y });
     }
   }
 
