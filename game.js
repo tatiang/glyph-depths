@@ -486,6 +486,9 @@ function generateFloor() {
     spawnMerchant();
   }
 
+  // Friendly NPC with lore on every floor
+  spawnNPCs();
+
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
     spawnSpecialTiles();
@@ -886,10 +889,10 @@ function spawnItems() {
     }
   }
 
-  // Food
+  // Food — always spawn in a room interior so the player can always reach it
   const foodCount = floorConfig.food;
   for (let i = 0; i < foodCount; i++) {
-    const pos = randomFloorTile();
+    const pos = randomRoomFloorTile();
     if (pos) state.entities.push(createItemEntity({ ...FOOD }, pos.x, pos.y));
   }
 
@@ -902,6 +905,44 @@ function spawnItems() {
       state.entities.push(createItemEntity({ name: `${amount} Gold`, glyph: '💰', itemType: 'gold', goldAmount: amount, value: 0 }, pos.x, pos.y));
     }
   }
+}
+
+// === FRIENDLY NPCs ===
+const NPC_LORE = [
+  // Purpose / world
+  "A ghostly wanderer murmurs: \"The Glyph King once ruled these depths with forbidden runes. Destroy him before he rewrites reality.\"",
+  "A faint shade whispers: \"Ten floors stand between you and the Sanctum. Each deeper level is older, darker, more wrong.\"",
+  "A spectral scribe warns: \"The Glyph King feeds on the memories of adventurers who fell here. Do not add to his collection.\"",
+  "A spirit hisses: \"The glyphs on the walls are not decoration — they are locks. Only the King's death will break them.\"",
+  // Gameplay hints
+  "A lingering echo advises: \"Sealed doors can be bashed open. It will cost you, but you will survive — barely.\"",
+  "A wandering shade notes: \"One-way doors seal behind you. There is always a way out, but it will hurt.\"",
+  "A fading voice murmurs: \"Hunger is the silent killer here. Find rations before the torches run out.\"",
+  "An old shade cautions: \"Cursed items bind to the bearer. Seek a Scroll of Remove Curse before equipping unknown armor.\"",
+  "A translucent figure advises: \"Mimics disguise themselves as chests. Step close — their true nature reveals itself.\"",
+  "A spirit warns: \"Demons leave fire in their wake. Flames linger for several turns and burn deeply.\"",
+  "A shade recalls: \"Poison from spiders lasts many turns. Use a healing potion to cleanse it before it kills you.\"",
+  "A ghost mutters: \"Ghosts walk through walls. There is no wall thick enough to stop one that wants you dead.\"",
+  "A spectral guide says: \"Level up wisely. Extended Vision keeps enemies from ambushing you in dark corridors.\"",
+  "A faint voice observes: \"Gold is not just for merchants. Hoard enough and surviving becomes much more forgiving.\"",
+  // Atmosphere
+  "A lost soul sighs: \"I tried to run from the Glyph King. The depths simply do not end — until he does.\"",
+  "A pale wanderer says: \"The deeper biomes grow stranger. The Crypt remembers every death. The Citadel enjoys them.\"",
+  "A translucent pilgrim whispers: \"Many came before you. Fewer left. The ones who did left only footprints — and warnings.\"",
+  "A shade confides: \"The Sanctum on the tenth floor is beautiful. You will never want to see it again.\"",
+];
+
+function spawnNPCs() {
+  if (!state.rooms || state.rooms.length < 2) return;
+  // Pick a room that isn't the starting room
+  const candidateRooms = state.rooms.slice(1);
+  const room = candidateRooms[Math.floor(Math.random() * candidateRooms.length)];
+  // Place in room interior
+  const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+  const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+  if (getTile(x, y) !== T.FLOOR) return;
+  const lore = NPC_LORE[Math.floor(Math.random() * NPC_LORE.length)];
+  state.entities.push({ type: 'npc', x, y, glyph: '👻', name: 'Wandering Shade', lore, spoken: false });
 }
 
 function spawnMerchant() {
@@ -966,6 +1007,23 @@ function randomFloorTile() {
     }
   }
   return null;
+}
+
+// Pick a tile from the interior of a room (guaranteed accessible, not a corridor dead-end)
+function randomRoomFloorTile() {
+  if (!state.rooms || state.rooms.length === 0) return randomFloorTile();
+  for (let attempts = 0; attempts < 100; attempts++) {
+    const room = state.rooms[Math.floor(Math.random() * state.rooms.length)];
+    // Use interior tiles (1 tile in from each edge) to avoid corridor junctions
+    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+    if (getTile(x, y) !== T.FLOOR) continue;
+    if (x === state.player.x && y === state.player.y) continue;
+    if (enemyAt(x, y)) continue;
+    if (itemsAt(x, y).length > 0) continue;
+    return { x, y };
+  }
+  return randomFloorTile();
 }
 
 function getFloorConfig(floor) {
@@ -2023,11 +2081,12 @@ function playerMove(dx, dy) {
   }
 
   // Bash sealed doors — costs 1 HP per hit, breaks after 5 hits
+  // HP is clamped to 1 so the player can never die bashing their only way out
   if (getTile(nx, ny) === T.DOOR_SEALED) {
     const key = ny * MAP_W + nx;
     state.doorBashes[key] = (state.doorBashes[key] || 0) + 1;
     const hitsLeft = 5 - state.doorBashes[key];
-    state.player.hp = Math.max(0, state.player.hp - 1);
+    state.player.hp = Math.max(1, state.player.hp - 1);
     if (hitsLeft <= 0) {
       setTile(nx, ny, T.FLOOR);
       delete state.doorBashes[key];
@@ -2037,7 +2096,6 @@ function playerMove(dx, dy) {
       addMessage(`You bash the sealed door... ${hitsLeft} more hit${hitsLeft === 1 ? '' : 's'} to break it (-1 HP)`, 'damage');
       Audio.hit();
     }
-    if (state.player.hp <= 0) { playerDeath('a sealed door', '🚪'); return; }
     haptic(40);
     endTurn();
     return;
@@ -2068,11 +2126,29 @@ function playerMove(dx, dy) {
     if (state.player.hp <= 0) { playerDeath('fire', '🔥'); return; }
   }
 
+  // Check for NPC (friendly shade — cannot be attacked, gives lore)
+  const npc = state.entities.find(e => e.type === 'npc' && e.x === nx && e.y === ny);
+  if (npc) {
+    if (!npc.spoken) {
+      npc.spoken = true;
+      addMessage(npc.lore, 'gold');
+    } else {
+      addMessage(`${npc.name} drifts silently, its message already given.`, '');
+    }
+    endTurn();
+    return;
+  }
+
   // Check for merchant
   const merchant = state.entities.find(e => e.type === 'merchant' && e.x === nx && e.y === ny);
   if (merchant) {
-    showMerchant(merchant);
-    return; // Don't end turn yet, merchant UI is open
+    if (merchant.visited) {
+      addMessage('The merchant shrugs. "Nothing more to offer this level."', '');
+      endTurn();
+    } else {
+      showMerchant(merchant);
+    }
+    return;
   }
 
   // Ring of haste: 30% chance for free extra move
@@ -2136,7 +2212,7 @@ function pickupItem(itemEntity) {
     return;
   }
   if (state.player.inventory.length >= MAX_INVENTORY) {
-    addMessage('Inventory full!', 'damage');
+    addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     return;
   }
   state.player.inventory.push(itemEntity.item);
@@ -2516,6 +2592,7 @@ function showShrineChoice() {
 
 // === MERCHANT ===
 function showMerchant(merchant) {
+  merchant.visited = true;
   inputLocked = true;
   Audio.merchant();
   renderShopItems(merchant);
@@ -2530,7 +2607,12 @@ function renderShopItems(merchant) {
   for (const shopItem of merchant.shopItems) {
     const div = document.createElement('div');
     div.className = 'shop-item';
-    div.innerHTML = `<span>${shopItem.item.glyph} ${shopItem.item.name}</span><span class="price">${shopItem.price}💰</span>`;
+    const it = shopItem.item;
+    let statTag = '';
+    if (it.itemType === 'weapon' && it.attack != null) statTag = ` <span style="color:var(--accent);font-size:11px;">[+${it.attack} ATK]</span>`;
+    else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
+    else if (it.cursed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
+    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${shopItem.price}💰</span>`;
     div.addEventListener('click', () => {
       if (state.player.gold >= shopItem.price) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food') {
@@ -2815,9 +2897,9 @@ function render() {
       const dist = Math.sqrt((mx - p.x) ** 2 + (my - p.y) ** 2);
       let alpha;
       if (vis) {
-        alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.7 : 0.5;
+        alpha = dist <= 3 ? 1.0 : dist <= 6 ? 0.85 : 0.7;
       } else {
-        alpha = 0.55; // Explored but not visible — clearly readable, slightly dimmed
+        alpha = 0.65; // Explored but not visible — clearly readable, slightly dimmed
       }
 
       ctx.globalAlpha = alpha;
@@ -2909,6 +2991,19 @@ function render() {
     ctx.fillText(e.glyph, sx, sy);
   }
 
+  // Draw friendly NPCs
+  for (const e of state.entities) {
+    if (e.type !== 'npc') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    ctx.globalAlpha = e.spoken ? 0.5 : 1.0;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+    ctx.globalAlpha = 1.0;
+  }
+
   // Draw enemies (only visible ones)
   for (const e of state.entities) {
     if (e.type !== 'enemy') continue;
@@ -2963,7 +3058,7 @@ function render() {
     canvas.width / 2, canvas.height / 2, canvas.width * 0.6
   );
   gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.25)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -2983,7 +3078,15 @@ function updateUI() {
   // HP bar
   const hpPct = Math.max(0, p.hp / p.maxHp * 100);
   $('hp-bar').style.width = hpPct + '%';
-  const hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
+  const effects = p.statusEffects || [];
+  let hpColor;
+  if (effects.some(e => e.type === 'poison')) {
+    hpColor = '#50c040'; // green-tinted when poisoned
+  } else if (effects.some(e => e.type === 'burning')) {
+    hpColor = '#ff6020'; // orange when burning
+  } else {
+    hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
+  }
   $('hp-bar').style.backgroundColor = hpColor;
 
   // Messages
@@ -3507,6 +3610,30 @@ function showSettings() {
     statRow('💍 Ring', r ? r.name : 'None'),
   ].join('');
 
+  // Status effects panel
+  const efxSection = $('status-effects-section');
+  const efxList = $('status-effects-list');
+  const efxLabels = {
+    burning:      { icon: '🔥', text: 'Burning',     color: '#ff6020' },
+    poison:       { icon: '☠️', text: 'Poisoned',    color: '#50c040' },
+    webbed:       { icon: '🕸', text: 'Webbed',      color: '#c0b060' },
+    invisibility: { icon: '👁', text: 'Invisible',   color: '#6080ff' },
+    strength:     { icon: '💪', text: 'Strengthened',color: '#ff8040' },
+    frozen:       { icon: '❄️', text: 'Frozen',      color: '#40c0ff' },
+  };
+  const effects = p ? (p.statusEffects || []) : [];
+  if (effects.length > 0) {
+    efxSection.style.display = '';
+    efxList.innerHTML = effects.map(eff => {
+      const cfg = efxLabels[eff.type] || { icon: '⚡', text: eff.type, color: '#aaa' };
+      return `<span style="background:rgba(0,0,0,0.4);border:1px solid ${cfg.color};border-radius:6px;padding:3px 8px;font-size:12px;color:${cfg.color};">${cfg.icon} ${cfg.text} (${eff.turns}t)</span>`;
+    }).join('');
+  } else {
+    efxSection.style.display = p ? '' : 'none';
+    efxList.innerHTML = p ? '<span style="color:var(--text-dim);font-size:12px;">None</span>' : '';
+    if (p) efxSection.style.display = '';
+  }
+
   // Hero icon picker
   const picker = $('hero-picker');
   picker.innerHTML = '';
@@ -3584,13 +3711,15 @@ function toggleMinimap() {
 function renderMinimap() {
   const mc = $('minimap-canvas');
   const ctx = mc.getContext('2d');
-  const scale = 5; // pixels per tile — large enough to see clearly on mobile
+  const scale = 5; // pixels per tile
+  const LEGEND_H = 52; // pixels of legend strip at bottom
   mc.width = MAP_W * scale;
-  mc.height = MAP_H * scale;
+  mc.height = MAP_H * scale + LEGEND_H;
 
   ctx.fillStyle = '#0a0a0f';
   ctx.fillRect(0, 0, mc.width, mc.height);
 
+  // Draw map tiles
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const idx = y * MAP_W + x;
@@ -3605,13 +3734,13 @@ function renderMinimap() {
           break;
         case T.FLOOR:
         case T.CORRIDOR:
-          ctx.fillStyle = vis ? '#18181f' : '#0e0e14';
+          ctx.fillStyle = vis ? '#2a2a3a' : '#161620';
           break;
         case T.STAIRS_DOWN:
-          ctx.fillStyle = '#80ff80';
+          ctx.fillStyle = '#00e060';
           break;
         case T.STAIRS_UP:
-          ctx.fillStyle = '#ffff80';
+          ctx.fillStyle = '#60c0ff';
           break;
         case T.DOOR_CLOSED:
         case T.DOOR_OPEN:
@@ -3634,7 +3763,26 @@ function renderMinimap() {
     }
   }
 
-  // Draw visible enemies as red dots
+  // Draw stairs labels (▼ down, ▲ up) over the colored dots — 8px font
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 7px monospace';
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      const idx = y * MAP_W + x;
+      if (!state.explored[idx]) continue;
+      const tile = state.map[idx];
+      if (tile === T.STAIRS_DOWN) {
+        ctx.fillStyle = '#003818';
+        ctx.fillText('▼', x * scale + scale / 2, y * scale + scale / 2);
+      } else if (tile === T.STAIRS_UP) {
+        ctx.fillStyle = '#002840';
+        ctx.fillText('▲', x * scale + scale / 2, y * scale + scale / 2);
+      }
+    }
+  }
+
+  // Draw visible enemies
   for (const e of state.entities) {
     if (e.type !== 'enemy' || e.hp <= 0) continue;
     const idx = e.y * MAP_W + e.x;
@@ -3643,9 +3791,48 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
-  // Draw player as bright dot
-  ctx.fillStyle = '#f0c040';
-  ctx.fillRect(state.player.x * scale - 1, state.player.y * scale - 1, scale + 2, scale + 2);
+  // Draw NPCs as cyan dots
+  for (const e of state.entities) {
+    if (e.type !== 'npc') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    ctx.fillStyle = '#40e0ff';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
+  // Draw player as bright gold cross (more visible than a single dot)
+  const px = state.player.x * scale;
+  const py = state.player.y * scale;
+  ctx.fillStyle = '#ffe840';
+  ctx.fillRect(px - 1, py, scale + 2, scale);     // horizontal bar
+  ctx.fillRect(px, py - 1, scale, scale + 2);     // vertical bar
+
+  // Legend strip
+  const ly = MAP_H * scale + 4;
+  ctx.fillStyle = '#ffe840';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  // Title / floor info
+  const biome = getFloorBiome(state.floor);
+  ctx.fillStyle = '#c8a840';
+  ctx.fillText(`Floor ${state.floor} — ${biome.name}`, 4, ly);
+
+  // Player coords
+  ctx.fillStyle = '#ffe840';
+  ctx.fillText(`You: (${state.player.x}, ${state.player.y})`, 4, ly + 14);
+
+  // Stair legend
+  ctx.fillStyle = '#00e060';
+  ctx.fillRect(4, ly + 30, 8, 8);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(' ▼ Stairs down', 10, ly + 29);
+
+  ctx.fillStyle = '#60c0ff';
+  ctx.fillRect(MAP_W * scale / 2 + 4, ly + 30, 8, 8);
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(' ▲ Stairs up', MAP_W * scale / 2 + 10, ly + 29);
 }
 
 // === QUICKCAST ===
@@ -3704,31 +3891,31 @@ function showQuickUse() {
 function getFloorBiome(floor) {
   if (floor <= 3) return {
     name: 'The Sewers',
-    wallVis: '#2a4a2a', wallDim: '#111a11',
-    floorVis: '#1a2e1a', floorDim: '#0c150c',
-    corrVis:  '#162414', corrDim:  '#0a100a',
-    bg: '#060d06'
+    wallVis: '#4a7a4a', wallDim: '#1e321e',
+    floorVis: '#2e4e2e', floorDim: '#16221a',
+    corrVis:  '#264020', corrDim:  '#121a10',
+    bg: '#080f08'
   };
   if (floor <= 6) return {
     name: 'The Crypt',
-    wallVis: '#3a3a4a', wallDim: '#1a1a24',
-    floorVis: '#2a2a38', floorDim: '#151520',
-    corrVis:  '#252530', corrDim:  '#121218',
-    bg: '#0a0a0f'
+    wallVis: '#5a5a72', wallDim: '#282838',
+    floorVis: '#40405a', floorDim: '#1e1e2c',
+    corrVis:  '#38384e', corrDim:  '#181820',
+    bg: '#0c0c14'
   };
   if (floor <= 9) return {
     name: 'The Citadel',
-    wallVis: '#4a2a2a', wallDim: '#221212',
-    floorVis: '#2e1818', floorDim: '#150c0c',
-    corrVis:  '#281414', corrDim:  '#110808',
-    bg: '#0d0606'
+    wallVis: '#6a3a3a', wallDim: '#301818',
+    floorVis: '#4a2424', floorDim: '#201010',
+    corrVis:  '#3e1e1e', corrDim:  '#180c0c',
+    bg: '#100606'
   };
   return {
     name: 'The Sanctum',
-    wallVis: '#3a1a4a', wallDim: '#1a0a22',
-    floorVis: '#28103a', floorDim: '#12071a',
-    corrVis:  '#200d2e', corrDim:  '#0e0614',
-    bg: '#090208'
+    wallVis: '#5a2a6a', wallDim: '#280f32',
+    floorVis: '#3e1858', floorDim: '#1c0a28',
+    corrVis:  '#321444', corrDim:  '#160820',
+    bg: '#0c0210'
   };
 }
 
