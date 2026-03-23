@@ -694,6 +694,7 @@ function showTitle() {
   $('title-section').style.display = 'flex';
   $('class-section').style.display = 'none';
   $('title-screen').classList.add('active');
+  $('title-screen').classList.remove('class-mode');
 
   // Update badge count on title screen
   const badgeCountEl = $('title-badge-count');
@@ -717,17 +718,21 @@ function startGame() {
   // Swap to class selection within the same overlay — no separate overlay needed
   $('title-section').style.display = 'none';
   $('class-section').style.display = 'flex';
+  $('title-screen').classList.add('class-mode');
   showClassSelect();
 }
 
 function showClassSelect() {
   const cardsEl = $('class-cards');
+  const scrollEl = $('class-cards-scroll');
   const beginBtn = $('btn-begin');
+  const labelEl = $('selected-class-label');
   if (!cardsEl || !beginBtn) return;
   let selectedClass = null;
 
   cardsEl.innerHTML = '';
   beginBtn.disabled = true;
+  if (labelEl) labelEl.textContent = '';
 
   for (const cls of CLASS_DEFS) {
     const card = document.createElement('div');
@@ -749,36 +754,42 @@ function showClassSelect() {
       cardsEl.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       beginBtn.disabled = false;
+      if (labelEl) labelEl.textContent = `${cls.icon}  ${cls.name}`;
     };
+
+    // Mouse click — always safe, no scroll ambiguity
     card.addEventListener('click', selectFn);
-    // Touch: only select on tap (not swipe). Track start position and reject if moved >10px.
-    let touchStartX = 0, touchStartY = 0;
+
+    // Touch: only fire on a genuine tap.
+    // Strategy: record scroll container's scrollTop and finger position at touchstart.
+    // At touchend, reject if the container scrolled OR finger moved > 8px.
+    let tapStartX = 0, tapStartY = 0, tapScrollTop = 0;
     card.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      tapStartX = e.touches[0].clientX;
+      tapStartY = e.touches[0].clientY;
+      tapScrollTop = scrollEl ? scrollEl.scrollTop : 0;
     }, { passive: true });
     card.addEventListener('touchend', (e) => {
-      const dx = e.changedTouches[0].clientX - touchStartX;
-      const dy = e.changedTouches[0].clientY - touchStartY;
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      const dx = Math.abs(e.changedTouches[0].clientX - tapStartX);
+      const dy = Math.abs(e.changedTouches[0].clientY - tapStartY);
+      const scrolled = scrollEl ? Math.abs(scrollEl.scrollTop - tapScrollTop) > 2 : false;
+      if (!scrolled && dx < 8 && dy < 8) {
         e.preventDefault();
         selectFn();
       }
     }, { passive: false });
+
     cardsEl.appendChild(card);
   }
 
-  beginBtn.onclick = () => {
+  const startRun = () => {
     if (!selectedClass) return;
     $('title-screen').classList.remove('active');
+    $('title-screen').classList.remove('class-mode');
     newRun(selectedClass);
   };
-  beginBtn.ontouchend = (e) => {
-    e.preventDefault();
-    if (!selectedClass) return;
-    $('title-screen').classList.remove('active');
-    newRun(selectedClass);
-  };
+  beginBtn.onclick = startRun;
+  beginBtn.ontouchend = (e) => { e.preventDefault(); startRun(); };
 }
 
 // === NEW RUN ===

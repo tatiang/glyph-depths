@@ -653,6 +653,24 @@
     #title-screen {
       gap: 0;
     }
+    #title-screen.class-mode {
+      overflow-y: hidden;
+    }
+    #class-section {
+      flex: 1;
+      min-height: 0;
+      align-items: center;
+    }
+    #class-cards-scroll {
+      width: 100%;
+      max-width: 440px;
+    }
+    #class-footer {
+      width: 100%;
+      max-width: 440px;
+      border-top: 1px solid var(--panel-border);
+      background: rgba(5,5,8,0.85);
+    }
     #title-section .title-graphic {
       font-size: 28px;
       line-height: 1.15;
@@ -1077,11 +1095,16 @@
       <div id="title-badge-count" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
     </div>
     <!-- Step 2: Class selection (shown after clicking Descend) -->
-    <div id="class-section" style="display:none;flex-direction:column;align-items:center;width:100%;">
-      <div style="color:var(--gold);font-weight:800;font-size:19px;letter-spacing:0.12em;margin-bottom:4px;">CHOOSE YOUR PATH</div>
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Each class plays differently. Choose wisely.</div>
-      <div id="class-cards"></div>
-      <button class="big-btn" id="btn-begin" disabled style="margin-top:14px;">Begin Descent</button>
+    <div id="class-section" style="display:none;flex-direction:column;width:100%;flex:1;min-height:0;">
+      <div style="color:var(--gold);font-weight:800;font-size:19px;letter-spacing:0.12em;margin-bottom:4px;text-align:center;">CHOOSE YOUR PATH</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;text-align:center;">Each class plays differently. Choose wisely.</div>
+      <div id="class-cards-scroll" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;">
+        <div id="class-cards"></div>
+      </div>
+      <div id="class-footer" style="padding-top:10px;display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
+        <div id="selected-class-label" style="font-size:12px;color:var(--text-dim);min-height:18px;letter-spacing:0.04em;"></div>
+        <button class="big-btn" id="btn-begin" disabled>Begin Descent</button>
+      </div>
     </div>
   </div>
 
