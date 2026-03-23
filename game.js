@@ -250,7 +250,7 @@ function showMasteryToast(mastery) {
 }
 
 function getMasteryBonuses(classId) {
-  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, upgradeBow: false, revealRune: false, fastIllusion: false, startGold: 0 };
+  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, charmBonus: 0, necroBonus: 0, upgradeBow: false, revealRune: false, fastFlip: false, extraEscape: false, fastIllusion: false, startGold: 0 };
   for (const m of MASTERY_DEFS) {
     if (!masteryState[m.id]) continue;
     if (m.classReq && m.classReq !== classId) continue;
@@ -258,8 +258,12 @@ function getMasteryBonuses(classId) {
     if (m.bonus.attack) bonuses.attack += m.bonus.attack;
     if (m.bonus.defense) bonuses.defense += m.bonus.defense;
     if (m.bonus.critChance) bonuses.critChance += m.bonus.critChance;
+    if (m.bonus.charmBonus) bonuses.charmBonus += m.bonus.charmBonus;
+    if (m.bonus.necroBonus) bonuses.necroBonus += m.bonus.necroBonus;
     if (m.bonus.upgradeBow) bonuses.upgradeBow = true;
     if (m.bonus.revealRune) bonuses.revealRune = true;
+    if (m.bonus.fastFlip) bonuses.fastFlip = true;
+    if (m.bonus.extraEscape) bonuses.extraEscape = true;
     if (m.bonus.fastIllusion) bonuses.fastIllusion = true;
     if (m.bonus.startGold) bonuses.startGold += m.bonus.startGold;
   }
@@ -6010,6 +6014,52 @@ function updateUI() {
         const canAfford = p.gold >= 15;
         setBtn(`🔧 FORGE (15💰)`, canAfford);
         setBar(canAfford ? 100 : 0, canAfford ? 'var(--gold)' : 'var(--text-dim)');
+      }
+    } else if (cls === 'ninja') {
+      spRow.style.display = '';
+      if (p.starThrowCooldown > 0) {
+        setBtn(`🌟 STARS ${p.starThrowCooldown}t`, false);
+        setBar(((6 - p.starThrowCooldown) / 6) * 100, '#ffdd44');
+      } else {
+        setBtn('🌟 STAR THROW', true);
+        setBar(100, 'var(--gold)');
+      }
+    } else if (cls === 'darkwizard') {
+      spRow.style.display = '';
+      if (p.acidBoltCooldown > 0) {
+        setBtn(`🟢 BOLT ${p.acidBoltCooldown}t`, false);
+        setBar(((7 - p.acidBoltCooldown) / 7) * 100, '#44cc44');
+      } else {
+        setBtn('🟢 ACID BOLT', true, '#44cc44');
+        setBar(100, '#44cc44');
+      }
+    } else if (cls === 'mason') {
+      spRow.style.display = '';
+      if (p.fortifyFloorUsed) {
+        setBtn('🧱 FORTIFY ✓ (next floor)', false);
+        setBar(0, 'var(--text-dim)');
+      } else {
+        setBtn('🧱 FORTIFY', true);
+        setBar(100, 'var(--gold)');
+      }
+    } else if (cls === 'daredevil') {
+      spRow.style.display = '';
+      const flipMax = getMasteryBonuses(cls).fastFlip ? 3 : 4;
+      if (p.flipCooldown > 0) {
+        setBtn(`🤸 FLIP ${p.flipCooldown}t`, false);
+        setBar(((flipMax - p.flipCooldown) / flipMax) * 100, '#ff8844');
+      } else {
+        setBtn('🤸 FLIP', true, '#ff8844');
+        setBar(100, '#ff8844');
+      }
+    } else if (cls === 'escapeartist') {
+      spRow.style.display = '';
+      if (p.stairsTeleportFloorUsed && !getMasteryBonuses(cls).extraEscape) {
+        setBtn('💨 ESCAPE ✓ (next floor)', false);
+        setBar(0, 'var(--text-dim)');
+      } else {
+        setBtn('💨 ESCAPE ROUTE', true, '#80ffff');
+        setBar(100, '#80ffff');
       }
     } else if (cls === 'conjurer') {
       spRow.style.display = '';
