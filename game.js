@@ -421,10 +421,10 @@ const CLASS_DEFS = [
     flavor: 'A steady hand and keen instincts. Heals slowly over time.',
     hp: 15, attack: 2, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '♻ Rapid Regeneration',
+    passive: '♻ Rapid Regeneration · 🧭 Pathfinder',
     startItems: 'Leather Vest · Healing Potion',
     statBadges: [{ label: '15 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Regen', cls: 'pos' }]
+    passBadges: [{ label: 'Regen', cls: 'pos' }, { label: 'Pathfinder', cls: 'pos' }]
   },
   {
     id: 'berserker',
@@ -738,6 +738,7 @@ function createPlayer(classId = 'adventurer') {
     runes: [], // collected glyph runes for this run
     statusEffects: [],
     hasRegen: classId === 'adventurer',
+    pathfinder: classId === 'adventurer', // always see stairs on minimap
     hasVampire: false,
     ironSkin: false,
     hasFury: false,
@@ -1012,10 +1013,18 @@ function generateFloor() {
     generateBSP();
   }
 
-  // Announce biome when entering a new region
-  if ([1, 5, 9, 13, 17, MAX_FLOOR].includes(state.floor)) {
+  // Announce biome when entering a new region — lore-flavored messages
+  const BIOME_ENTRY = {
+    1: 'The drowned foundations of Erathis. Water drips from stone that remembers sunlight.',
+    5: 'The air turns cold. Corridors stretch in directions the dead have chosen.',
+    9: 'Runed armor lines the walls. The Citadel\'s knights still remember their orders.',
+    13: 'Reality thins. The darkness here is not empty — it watches.',
+    17: 'Crystalline walls hum with glyph energy. The Sanctum is beautiful. It is also a trap.',
+  };
+  BIOME_ENTRY[MAX_FLOOR] = 'The throne room. The Glyph King waits in perfect silence.';
+  if (BIOME_ENTRY[state.floor]) {
     const biome = getFloorBiome(state.floor);
-    addMessage(`Entering ${biome.name}...`, 'gold');
+    addMessage(`${biome.name}: ${BIOME_ENTRY[state.floor]}`, 'gold');
   }
 
   // Place stairs down (except boss floor)
@@ -1525,27 +1534,37 @@ function spawnItems() {
 
 // === FRIENDLY NPCs ===
 const NPC_LORE = [
-  // Purpose / world
-  "A ghostly wanderer murmurs: \"The Glyph King once ruled these depths with forbidden runes. Destroy him before he rewrites reality.\"",
-  "A faint shade whispers: \"Ten floors stand between you and the Sanctum. Each deeper level is older, darker, more wrong.\"",
-  "A spectral scribe warns: \"The Glyph King feeds on the memories of adventurers who fell here. Do not add to his collection.\"",
-  "A spirit hisses: \"The glyphs on the walls are not decoration — they are locks. Only the King's death will break them.\"",
-  // Gameplay hints
-  "A lingering echo advises: \"Sealed doors can be bashed open. It will cost you, but you will survive — barely.\"",
-  "A wandering shade notes: \"One-way doors seal behind you. There is always a way out, but it will hurt.\"",
-  "A fading voice murmurs: \"Hunger is the silent killer here. Find rations before the torches run out.\"",
-  "An old shade cautions: \"Cursed items bind to the bearer. Seek a Scroll of Remove Curse before equipping unknown armor.\"",
-  "A translucent figure advises: \"Mimics disguise themselves as chests. Step close — their true nature reveals itself.\"",
-  "A spirit warns: \"Demons leave fire in their wake. Flames linger for several turns and burn deeply.\"",
-  "A shade recalls: \"Poison from spiders lasts many turns. Use a healing potion to cleanse it before it kills you.\"",
-  "A ghost mutters: \"Ghosts walk through walls. There is no wall thick enough to stop one that wants you dead.\"",
-  "A spectral guide says: \"Level up wisely. Extended Vision keeps enemies from ambushing you in dark corridors.\"",
-  "A faint voice observes: \"Gold is not just for merchants. Hoard enough and surviving becomes much more forgiving.\"",
+  // The Glyph King and the Runes
+  "A ghostly wanderer murmurs: \"The Glyph King was once a mortal scribe named Aldric. He carved the first rune into living stone and the stone screamed back a language no one had heard.\"",
+  "A spectral scribe warns: \"The twelve primordial glyphs are fragments of a word so old it predates speech. Aldric collected them all. He became something else.\"",
+  "A spirit hisses: \"Each rune you claim was carved from reality itself. Flame, Frost, Wrath — they are not magic. They are grammar. The grammar of unmaking.\"",
+  "A fading voice murmurs: \"The Glyph King does not guard the Sanctum. He IS the Sanctum. The walls pulse with his heartbeat. The floors shift with his breathing.\"",
+  "A shade confides: \"Aldric believed the glyphs could rewrite death. He was half right. He stopped dying. But he also stopped living.\"",
+  // The Depths and Biomes
+  "A pale wanderer says: \"The Sewers were a city once — Erathis, the Bright. Aldric's runes pulled it underground, stone by stone, until only a grate remained above.\"",
+  "A translucent pilgrim whispers: \"The Crypt was not built. It grew. Every adventurer who dies here adds another corridor, another empty room. The dead build their own tomb.\"",
+  "A lost soul sighs: \"The Citadel is where Aldric's knights still stand guard. They are bone now, but the runes in their armor remember duty.\"",
+  "A ghost mutters: \"Below the Citadel lies the Abyss — a wound in the earth where the runes tore too deep. Things dwell there that the King himself fears.\"",
+  "An old shade cautions: \"The Sanctum is beautiful. Crystalline walls, glowing glyphs, perfect silence. It is a throne room made for a god who was once just a man with a chisel.\"",
+  // Mini-Bosses and Enemies
+  "A wandering shade notes: \"The Cave Troll on the fourth floor was once the city's blacksmith. Aldric's runes gave him strength but took his mind. He regenerates because the runes won't let him rest.\"",
+  "A spectral guide says: \"The Lich on floor eight collects souls the way you collect gold. He was Aldric's first apprentice — the only one who understood the glyphs, and the first to be consumed by them.\"",
+  "A faint shade whispers: \"The Balrog was born when Aldric carved the Glyph of Flame into the earth itself. The fire took shape and purpose — but only the purpose of burning.\"",
+  "A spirit warns: \"The Void Titan was not created. It seeped in through the cracks the runes left in reality. It comes from the space between words.\"",
+  // Gameplay Hints with Lore
+  "A lingering echo advises: \"Sealed doors are bound by minor glyphs. You can break them with brute force — but the runes exact a blood price for defiance.\"",
+  "A translucent figure advises: \"Mimics are not creatures. They are mistakes — items that absorbed too much ambient glyph energy and developed hunger.\"",
+  "A shade recalls: \"The merchants who trade in these depths were cursed by the King to never leave. They cope by hoarding gold. Do not pity them — they have outlived empires.\"",
+  "A faint voice observes: \"The wandering sages are fragments of Aldric's original conscience. He carved his mercy out of himself and it wanders the floors, healing strangers.\"",
+  // Class-related Lore
+  "A ghost mutters: \"The first to challenge the King was an adventurer with nothing but leather armor and instinct. She reached the Sanctum. Her ghost still searches for the exit.\"",
+  "A spirit hisses: \"Berserkers burn through these halls like fire through parchment. The runes feed on their rage. The deeper they go, the angrier they become — and the glyphs drink deeply.\"",
+  "A spectral scribe warns: \"Rogues are wise to close doors behind them. The depths have a memory. Leave a path open and something will follow it back to you.\"",
+  "An old shade cautions: \"The wizards who enter these depths always believe they can master the glyphs. Some do. The rest become part of the walls.\"",
   // Atmosphere
-  "A lost soul sighs: \"I tried to run from the Glyph King. The depths simply do not end — until he does.\"",
-  "A pale wanderer says: \"The deeper biomes grow stranger. The Crypt remembers every death. The Citadel enjoys them.\"",
-  "A translucent pilgrim whispers: \"Many came before you. Fewer left. The ones who did left only footprints — and warnings.\"",
-  "A shade confides: \"The Sanctum on the tenth floor is beautiful. You will never want to see it again.\"",
+  "A pale wanderer says: \"The deeper biomes grow stranger. The Crypt remembers every death. The Citadel enjoys them. The Abyss doesn't notice. The Sanctum... the Sanctum applauds.\"",
+  "A translucent pilgrim whispers: \"Many came before you. Most added to the architecture. The Crypt has a room for each of them. It is a very large crypt.\"",
+  "A lost soul sighs: \"I tried to ascend with a pocketful of runes. The glyphs dissolved in the sunlight. Everything I suffered for turned to dust on the stairs. Only the King's death frees the magic.\"",
 ];
 
 function spawnNPCs() {
@@ -1710,6 +1729,9 @@ function renderSageServices(sage) {
     healDiv.style.pointerEvents = 'none';
   }
   container.appendChild(healDiv);
+
+  // Drop section for inventory management at the sage
+  renderDropSection(container, () => renderSageServices(sage));
 }
 
 // Apply a curse to a weapon/armor copy (15% chance on floor 3+)
@@ -3851,6 +3873,32 @@ function showMerchant(merchant) {
   $('merchant-overlay').classList.add('active');
 }
 
+function renderDropSection(container, refreshCallback) {
+  const p = state.player;
+  if (p.inventory.length === 0) return;
+  const dropLabel = document.createElement('div');
+  dropLabel.style.cssText = 'color:var(--text-dim);font-size:11px;margin:12px 0 4px;text-align:center;letter-spacing:0.05em;';
+  dropLabel.textContent = `— DROP ITEM (${p.inventory.length}/${MAX_INVENTORY}) —`;
+  container.appendChild(dropLabel);
+  for (let i = 0; i < p.inventory.length; i++) {
+    const item = p.inventory[i];
+    const div = document.createElement('div');
+    div.className = 'shop-item';
+    let detail = '';
+    if (item.itemType === 'weapon' && item.attack != null) detail = ` [+${item.attack} ATK]`;
+    else if (item.itemType === 'armor' && item.defense != null) detail = ` [+${item.defense} DEF]`;
+    else if (item.itemType === 'thrown') detail = ` [×${item.ammo}]`;
+    div.innerHTML = `<span>${item.glyph || ''} ${item.name}${detail}</span><span style="color:#ff6040;font-size:11px;">Drop</span>`;
+    const idx = i;
+    div.addEventListener('click', () => {
+      dropItem(idx);
+      addMessage(`Dropped ${item.name} to make room.`, '');
+      refreshCallback();
+    });
+    container.appendChild(div);
+  }
+}
+
 function renderShopItems(merchant) {
   $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
   const container = $('shop-items');
@@ -3920,6 +3968,9 @@ function renderShopItems(merchant) {
     refreshDiv.style.pointerEvents = 'none';
   }
   container.appendChild(refreshDiv);
+
+  // Drop section for inventory management while shopping
+  renderDropSection(container, () => renderShopItems(merchant));
 }
 
 // === TURN PROCESSING ===
@@ -4836,6 +4887,11 @@ function updateUI() {
   if (fireBtn) {
     fireBtn.style.display = p.equipped.ranged ? '' : 'none';
   }
+  // Rogue close door button
+  const closeDoorBtn = $('btn-closedoor');
+  if (closeDoorBtn) {
+    closeDoorBtn.style.display = p.classId === 'rogue' ? '' : 'none';
+  }
   $('hp-text').textContent = `${p.hp}/${p.maxHp}`;
 
   // HP bar
@@ -5356,6 +5412,12 @@ function setupInput() {
   const handleFire = () => { Audio.resume(); fireRangedWeapon(); };
   fireBtn.addEventListener('click', handleFire);
   fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleFire(); }, { passive: false });
+
+  // Rogue close door button
+  const closeDoorBtn = $('btn-closedoor');
+  const handleCloseDoor = () => { Audio.resume(); closeDoor(); };
+  closeDoorBtn.addEventListener('click', handleCloseDoor);
+  closeDoorBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleCloseDoor(); }, { passive: false });
 
   // Special class ability button — requires double-tap or tap-and-hold (300ms)
   // to prevent accidental activation
@@ -5928,6 +5990,8 @@ function closeManual() {
 }
 
 // === MINIMAP ===
+let minimapPulseRAF = null;
+
 function toggleMinimap() {
   if (!state) return;
   state.minimapOpen = !state.minimapOpen;
@@ -5935,8 +5999,77 @@ function toggleMinimap() {
   if (state.minimapOpen) {
     renderMinimap();
     overlay.classList.add('active');
+    startMinimapPulse();
   } else {
     overlay.classList.remove('active');
+    stopMinimapPulse();
+  }
+}
+
+function startMinimapPulse() {
+  stopMinimapPulse();
+  const mc = $('minimap-canvas');
+  const ctx = mc.getContext('2d');
+  const scale = 5;
+  function pulse() {
+    if (!state || !state.minimapOpen) return;
+    const px = state.player.x * scale;
+    const py = state.player.y * scale;
+    const t = Date.now() / 600;
+    const alpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t));
+    const radius = 1 + 2 * (0.5 + 0.5 * Math.sin(t));
+    // Clear just the player area + pulse ring
+    const clearR = 8;
+    // Redraw background behind player
+    const biome = getFloorBiome(state.floor);
+    ctx.fillStyle = biome.bg || '#0a0a0f';
+    ctx.fillRect(px - clearR, py - clearR, scale + clearR * 2, scale + clearR * 2);
+    // Redraw any tiles under the pulse area
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const tx = state.player.x + dx, ty = state.player.y + dy;
+        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
+        const idx = ty * MAP_W + tx;
+        if (!state.explored[idx]) continue;
+        const tile = state.map[idx];
+        const vis = state.visible[idx];
+        switch (tile) {
+          case T.WALL:  ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
+          case T.FLOOR: ctx.fillStyle = vis ? biome.floorVis : biome.floorDim; break;
+          case T.CORRIDOR: ctx.fillStyle = vis ? biome.corrVis : biome.corrDim; break;
+          case T.STAIRS_DOWN: ctx.fillStyle = '#00e060'; break;
+          case T.STAIRS_UP: ctx.fillStyle = '#60c0ff'; break;
+          case T.DOOR_CLOSED: ctx.fillStyle = '#8B6914'; break;
+          case T.DOOR_OPEN: ctx.fillStyle = vis ? '#a08030' : '#504020'; break;
+          case T.DOOR_ONEWAY: ctx.fillStyle = '#c06030'; break;
+          case T.DOOR_SEALED: ctx.fillStyle = '#6a2020'; break;
+          case T.SPECIAL: ctx.fillStyle = '#8060c0'; break;
+          default: continue;
+        }
+        ctx.fillRect(tx * scale, ty * scale, scale, scale);
+      }
+    }
+    // Pulse ring
+    ctx.beginPath();
+    ctx.arc(px + scale / 2, py + scale / 2, radius + scale / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,232,64,${alpha * 0.5})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Player cross
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffe840';
+    ctx.fillRect(px - 1, py, scale + 2, scale);
+    ctx.fillRect(px, py - 1, scale, scale + 2);
+    ctx.globalAlpha = 1;
+    minimapPulseRAF = requestAnimationFrame(pulse);
+  }
+  minimapPulseRAF = requestAnimationFrame(pulse);
+}
+
+function stopMinimapPulse() {
+  if (minimapPulseRAF) {
+    cancelAnimationFrame(minimapPulseRAF);
+    minimapPulseRAF = null;
   }
 }
 
@@ -6000,6 +6133,22 @@ function renderMinimap() {
     }
   }
 
+  // Adventurer Pathfinder: always reveal stairs on minimap
+  if (state.player.pathfinder) {
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const tile = state.map[y * MAP_W + x];
+        if (tile === T.STAIRS_DOWN || tile === T.STAIRS_UP) {
+          const explored = state.explored[y * MAP_W + x];
+          if (!explored) {
+            ctx.fillStyle = tile === T.STAIRS_DOWN ? 'rgba(0,224,96,0.5)' : 'rgba(96,192,255,0.5)';
+            ctx.fillRect(x * scale, y * scale, scale, scale);
+          }
+        }
+      }
+    }
+  }
+
   // Draw stairs labels (▼ down, ▲ up)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -6007,8 +6156,9 @@ function renderMinimap() {
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const idx = y * MAP_W + x;
-      if (!state.explored[idx]) continue;
       const tile = state.map[idx];
+      const show = state.explored[idx] || (state.player.pathfinder && (tile === T.STAIRS_DOWN || tile === T.STAIRS_UP));
+      if (!show) continue;
       if (tile === T.STAIRS_DOWN) {
         ctx.fillStyle = '#003818';
         ctx.fillText('▼', x * scale + scale / 2, y * scale + scale / 2);

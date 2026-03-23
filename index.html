@@ -968,6 +968,7 @@
         </div>
         <div class="action-row">
           <div class="act-btn" id="btn-fire" style="display:none;border-color:#4a9;color:#4a9;"><span class="icon">🏹</span>Fire</div>
+          <div class="act-btn" id="btn-closedoor" style="display:none;border-color:#a08030;color:#a08030;"><span class="icon">🚪</span>Close</div>
           <div class="act-btn" id="btn-minimap"><span class="icon">🗺️</span>Map</div>
           <div class="act-btn" id="btn-quickuse"><span class="icon">🧪</span>Use</div>
           <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Stats</div>
@@ -1135,9 +1136,24 @@
       <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
 
       <div class="help-section">
+        <div class="help-heading">The Backstory</div>
+        <p class="help-note">In the age before kingdoms, the city of Erathis the Bright stood where no city should — atop a vein of primordial stone older than language. A scribe named Aldric discovered that certain marks cut into this stone could reshape reality. He called them <em>glyphs</em>.</p>
+        <p class="help-note" style="margin-top:6px;">Aldric catalogued twelve fundamental glyphs — Flame, Frost, Thorns, Vitality, Swiftness, Sight, Greed, Sustenance, Wrath, Warding, Vampirism, and Fortune — each a syllable in a forgotten grammar of creation. Combined, they could unmake and rewrite anything: flesh, stone, time, death.</p>
+        <p class="help-note" style="margin-top:6px;">He carved them all into himself.</p>
+        <p class="help-note" style="margin-top:6px;">The transformation was not kind. Aldric became the Glyph King — immortal, immense, and no longer entirely human. His runes pulled Erathis underground stone by stone. The Sewers formed from the city's drowned foundations. The Crypt grew from the bodies of those who tried to flee. The Citadel rose from the barracks of his runed knights. The Abyss opened where his power tore reality too thin. And the Sanctum — his throne room — crystallized from pure glyph energy, beautiful and lethal.</p>
+        <p class="help-note" style="margin-top:6px;">Now, twenty floors deep, the Glyph King sits in perfect silence, writing and rewriting the laws of his domain. The glyphs scattered across each floor are fragments of his power — and the only weapon that can unmake him. Collect them. Survive his guardians. Descend.</p>
+        <p class="help-note" style="margin-top:6px;">Many have tried. The Crypt has a room for each of them.</p>
+      </div>
+
+      <div class="help-section">
         <div class="help-heading">The World</div>
-        <p class="help-note">Beneath the forgotten city of Erathis lies the Unnamed Depths — a shifting labyrinth of ten floors ruled by the Glyph King. Long ago, the King discovered primordial runes that could rewrite reality itself. He carved them into the walls of his domain, bending stone and shadow to his will. The depths grew, consuming the city above. Now only monsters and ghosts remain. Brave souls descend seeking glory, treasure, or the power of the glyphs themselves. None have returned — until, perhaps, you.</p>
-        <p class="help-note" style="margin-top:6px;">Each floor grows darker and more dangerous. Merchants appear on floors 3, 6, and 9. Sages offer services on floors 2, 5, and 8. The Glyph King awaits on floor 10.</p>
+        <p class="help-note">Twenty floors of the Unnamed Depths, divided into five biomes:</p>
+        <div class="help-row"><span class="hl">🟢 The Sewers (1–4)</span><span>Drowned ruins of Erathis. Rats, bats, and things that grew in the dark.</span></div>
+        <div class="help-row"><span class="hl">🔵 The Crypt (5–8)</span><span>Built by the dead, for the dead. Goblins, ghosts, and the Lich's domain.</span></div>
+        <div class="help-row"><span class="hl">🔴 The Citadel (9–12)</span><span>The King's fortress. Runed knights and demons still guard the halls.</span></div>
+        <div class="help-row"><span class="hl">🔷 The Abyss (13–16)</span><span>A wound in reality. Void creatures and things from between the words.</span></div>
+        <div class="help-row"><span class="hl">🟣 The Sanctum (17–20)</span><span>The throne of the Glyph King. Crystalline, beautiful, and lethal.</span></div>
+        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
       </div>
 
       <div class="help-section">
@@ -1145,7 +1161,7 @@
 
         <div style="margin-bottom:10px;">
           <div style="color:var(--gold);font-weight:700;font-size:13px;">🧝 Adventurer</div>
-          <p class="help-note">The balanced choice. Natural regeneration heals 1 HP every 15 turns. 10% crit chance. Starts with Leather Vest and Healing Potion.</p>
+          <p class="help-note">The balanced choice. Natural regeneration heals 1 HP every 15 turns. 10% crit chance. Pathfinder: stairs are always visible on the minimap. Starts with Leather Vest and Healing Potion.</p>
           <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Survivor's Instinct — auto-eat food when starving.</p>
         </div>
 
@@ -1188,7 +1204,7 @@
         <div class="help-row"><span class="hl">+1 Defense</span><span>Increase base defense</span></div>
         <div class="help-row"><span class="hl">Rapid Regen ⭐</span><span>Heal 1 HP every 15 turns (unique)</span></div>
         <div class="help-row"><span class="hl">+5 Max HP ⭐</span><span>+5 max HP and full heal</span></div>
-        <div class="help-row"><span class="hl">Glass Cannon ⭐</span><span>Double ATK but halve max HP</span></div>
+        <div class="help-row"><span class="hl">Glass Cannon ⭐</span><span>Double ATK but reduce max HP by 30%</span></div>
         <div class="help-row"><span class="hl">Vampiric Strikes ⭐</span><span>Heal 20% of damage dealt (unique)</span></div>
         <div class="help-row"><span class="hl">Iron Skin ⭐</span><span>Reduce all incoming damage by 1 (unique)</span></div>
         <div class="help-row"><span class="hl">Battle Fury ⭐</span><span>+3 ATK below 30% HP (unique)</span></div>
@@ -1251,21 +1267,27 @@
 
       <div class="help-section">
         <div class="help-heading">Enemies</div>
-        <p class="help-note"><strong>Tier 1 (F1–3):</strong> Rats, Bats, Skeletons, Slimes, Spiders<br>
-        <strong>Tier 2 (F4–6):</strong> Goblins, Wraiths, Trolls, Lizardfolk, Fire Elementals<br>
-        <strong>Tier 3 (F7–9):</strong> Demons, Liches, Minotaurs, Shadow Stalkers, Mimics<br>
-        <strong>Floor 10:</strong> The Glyph King — boss fight</p>
-        <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths</strong> drain max HP. <strong>Slimes</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls.</p>
+        <p class="help-note"><strong>Tier 1 (F1–4):</strong> Rats, Bats, Skeletons, Slimes — the vermin of drowned Erathis.<br>
+        <strong>Tier 2 (F5–8):</strong> Goblins, Ghosts, Spiders, Ogres — the Crypt's inhabitants.<br>
+        <strong>Tier 3 (F9–12):</strong> Wraiths, Mimics, Necromancers, Demons — the Citadel's runed guardians.<br>
+        <strong>Tier 4 (F13–16):</strong> Dark Knights, Banshees, Hydras, Warlocks — horrors of the Abyss.<br>
+        <strong>Tier 5 (F17–19):</strong> Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches — the Sanctum's last defenders.<br>
+        <strong>Floor 20:</strong> The Glyph King — a three-phase boss fight.</p>
+        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Lich (F8), Balrog (F12), Void Titan (F16), Glyph Guardian (F19).</p>
+        <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths/Void Wraiths</strong> drain max HP. <strong>Slimes/Hydras</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls. <strong>Demons</strong> leave fire trails.</p>
       </div>
 
       <div class="help-section">
         <div class="help-heading">Tips</div>
-        <p class="help-note">• Food is scarce — manage hunger carefully.<br>
-        • One-way doors can create shortcuts but never trap you permanently.<br>
-        • Sealed doors can be bashed open at a steep HP cost.<br>
-        • The ghost of your previous run haunts the floor where you died.<br>
-        • Identify potions carefully — some are harmful.<br>
-        • Rune synergies can turn a weak build into an unstoppable one.</p>
+        <p class="help-note">• Food is scarce — the depths devour hunger faster than steel.<br>
+        • One-way doors seal behind you. The depths always offer a way forward, never back.<br>
+        • Sealed doors are bound by minor glyphs. Bash them open — the blood price is steep but survivable.<br>
+        • The ghost of your previous run haunts the floor where you fell. Defeat it for its treasure.<br>
+        • Identify potions carefully — some were left as traps by the King's alchemists.<br>
+        • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
+        • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. You can drop items from your inventory while shopping to make room.<br>
+        • Rogues can close doors behind them (🚪 Close button or C key) to break enemy pursuit.<br>
+        • Adventurers always see the stairs on the minimap — the pathfinder's instinct.</p>
       </div>
 
       <div style="text-align:center;margin-top:8px;">
@@ -1371,7 +1393,7 @@
 
       <div class="help-section">
         <div class="help-heading">Classes (6)</div>
-        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>15 HP, +2 ATK. Passive regen. ★ Survivor's Instinct: auto-eat when starving.</span></div>
+        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>15 HP, +2 ATK. Regen, Pathfinder (stairs on map). ★ Survivor's Instinct.</span></div>
         <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP, +4 ATK. Rage, Enrage ability. ★ Undying Fury: survive lethal hit 1/floor.</span></div>
         <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP, +3 ATK. 15% dodge, 20% crit. Can close doors (<kbd>C</kbd>). ★ Shadow Step: invisible 2 turns on kill.</span></div>
         <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP, +1 ATK. Double scrolls, Arcane Blast. ★ Mana Shield: 25% damage negation.</span></div>
