@@ -2991,7 +2991,10 @@ function bossAI(enemy) {
 }
 
 function allyAI(ally) {
-  // Find nearest enemy
+  const p = state.player;
+  const distToPlayer = Math.abs(ally.x - p.x) + Math.abs(ally.y - p.y);
+
+  // Find nearest enemy within a reasonable range
   let nearestEnemy = null, nearestDist = 999;
   for (const e of state.entities) {
     if (e.type !== 'enemy' || e.isAlly || e.hp <= 0) continue;
@@ -2999,10 +3002,8 @@ function allyAI(ally) {
     if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
   }
 
-  if (!nearestEnemy) return;
-
-  if (nearestDist === 1) {
-    // Attack
+  // Priority 1: Attack adjacent enemy
+  if (nearestEnemy && nearestDist === 1) {
     const dmg = Math.max(1, ally.attack - nearestEnemy.defense + Math.floor(Math.random() * 3) - 1);
     nearestEnemy.hp -= dmg;
     addMessage(`Your ${ally.name} hits ${nearestEnemy.name} for ${dmg}!`, '');
@@ -3011,10 +3012,29 @@ function allyAI(ally) {
       removeEntity(nearestEnemy);
       state.enemiesKilled++;
     }
-  } else {
+    return;
+  }
+
+  // Priority 2: Chase nearby enemy (within 5 tiles) if not too far from player
+  if (nearestEnemy && nearestDist <= 5 && distToPlayer <= 6) {
+    const step = findPath(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y, false);
+    if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
+    return;
+  }
+
+  // Priority 3: Move toward player if too far away (>3 tiles)
+  if (distToPlayer > 3) {
+    const step = findPath(ally.x, ally.y, p.x, p.y, false);
+    if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
+    return;
+  }
+
+  // Priority 4: Chase any enemy if close to player
+  if (nearestEnemy) {
     const step = findPath(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y, false);
     if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
   }
+  // Otherwise: idle near the player
 }
 
 function tryMoveEnemy(enemy, nx, ny) {
@@ -3376,17 +3396,48 @@ function tryAutoEquip(item) {
     : null;
   if (!slot) return;
 
+  // Never auto-equip cursed items
+  if (item.cursed) return;
+
   const current = p.equipped[slot];
   let isBetter = false;
 
   if (!current) {
     isBetter = true; // empty slot — always equip
-  } else if (slot === 'weapon' && item.attack > current.attack) {
-    isBetter = true;
-  } else if (slot === 'armor' && item.defense > current.defense) {
-    isBetter = true;
-  } else if (slot === 'ranged' && item.damage > current.damage) {
-    isBetter = true;
+  } else if (current.cursed) {
+    // Don't replace cursed gear (it's stuck)
+    isBetter = false;
+  } else if (slot === 'weapon') {
+    if (item.attack > current.attack) {
+      isBetter = true;
+    } else if (item.attack === current.attack) {
+      // Same ATK: prefer specialty over plain, or higher tier
+      const newHasSpecial = !!item.special;
+      const oldHasSpecial = !!current.special;
+      if (newHasSpecial && !oldHasSpecial) isBetter = true;
+      else if (newHasSpecial === oldHasSpecial && (item.tier || 0) > (current.tier || 0)) isBetter = true;
+    }
+  } else if (slot === 'armor') {
+    if (item.defense > current.defense) {
+      isBetter = true;
+    } else if (item.defense === current.defense) {
+      // Same DEF: prefer specialty over plain, or higher tier
+      const newHasSpecial = !!item.special;
+      const oldHasSpecial = !!current.special;
+      if (newHasSpecial && !oldHasSpecial) isBetter = true;
+      else if (newHasSpecial === oldHasSpecial && (item.tier || 0) > (current.tier || 0)) isBetter = true;
+    }
+  } else if (slot === 'ranged') {
+    if (item.damage > current.damage) {
+      isBetter = true;
+    } else if (item.damage === current.damage) {
+      // Same damage: prefer longer range, then specialty, then higher tier
+      if ((item.range || 0) > (current.range || 0)) isBetter = true;
+      else if ((item.range || 0) === (current.range || 0)) {
+        if (!!item.special && !current.special) isBetter = true;
+        else if ((item.tier || 0) > (current.tier || 0)) isBetter = true;
+      }
+    }
   }
   // Rings: don't auto-swap (subjective which is "better")
 
