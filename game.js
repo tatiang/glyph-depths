@@ -6436,6 +6436,7 @@ function setupInput() {
       case 'c': closeDoor(); break;
       case 'b': if (state && !state.gameOver) showBadgeOverlay(); break;
       case 'h': case '?': showHelp(); break;
+      case 'q': doSpecial(); break;
     }
   });
 
