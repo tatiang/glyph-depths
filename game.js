@@ -10,6 +10,7 @@ const MAP_W = 50, MAP_H = 50;
 const VIEW_COLS = 15, VIEW_ROWS = 19;
 const FOV_RADIUS = 8;
 const MAX_INVENTORY = 10;
+const MAX_FLOOR = 20;
 const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
@@ -23,8 +24,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'Auto-equip, Rogue doors, ability safety'; // updated each push
-const LAST_UPDATED = '2026-03-22 22:00';
+const GAME_VERSION = '20 floors, harder boss, bug fixes'; // updated each push
+const LAST_UPDATED = '2026-03-22 23:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -40,8 +41,8 @@ const BADGE_DEFS = [
   { id: 'sharpshooter', name: 'Sharpshooter', icon: '🏹', desc: 'Kill 3 enemies with thrown weapons in one run', cat: 'combat' },
   { id: 'boss_rush', name: 'Boss Rush', icon: '☠️', desc: 'Defeat all 3 mini-bosses in one run', cat: 'combat' },
   // Exploration & Survival
-  { id: 'deep_diver', name: 'Deep Diver', icon: '🚪', desc: 'Reach floor 5', cat: 'explore' },
-  { id: 'citadel_bound', name: 'Citadel Bound', icon: '🏰', desc: 'Reach floor 7', cat: 'explore' },
+  { id: 'deep_diver', name: 'Deep Diver', icon: '🚪', desc: 'Reach floor 8', cat: 'explore' },
+  { id: 'citadel_bound', name: 'Citadel Bound', icon: '🏰', desc: 'Reach floor 15', cat: 'explore' },
   { id: 'ascendant', name: 'Ascendant', icon: '🌟', desc: 'Win the game', cat: 'explore' },
   { id: 'cartographer', name: 'Cartographer', icon: '🗺️', desc: 'Reveal 90%+ of a floor', cat: 'explore' },
   { id: 'iron_stomach', name: 'Iron Stomach', icon: '🍖', desc: 'Reach floor 5 without eating', cat: 'explore' },
@@ -58,7 +59,7 @@ const BADGE_DEFS = [
   { id: 'win_ranger', name: "Ranger's Mark", icon: '🏹', desc: 'Win as Ranger', cat: 'class' },
   { id: 'win_cleric', name: 'Divine Crusade', icon: '⛪', desc: 'Win as Cleric', cat: 'class' },
   // Challenge
-  { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 500 turns', cat: 'challenge' },
+  { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
   { id: 'skeleton_key', name: 'Skeleton Key', icon: '🦴', desc: 'Bash 10 sealed doors total', cat: 'challenge', cumulative: true },
   { id: 'scroll_scholar', name: 'Scroll Scholar', icon: '📜', desc: 'Use 20 scrolls total', cat: 'challenge', cumulative: true },
@@ -144,7 +145,13 @@ function showBadgeOverlay() {
     grid.appendChild(row);
   }
   $('badge-count-display').textContent = `${getBadgeCount()} / ${BADGE_DEFS.length}`;
+  inputLocked = true;
   $('badge-overlay').classList.add('active');
+}
+
+function closeBadgeOverlay() {
+  $('badge-overlay').classList.remove('active');
+  inputLocked = false;
 }
 
 function renderBadgesEarned(containerId) {
@@ -349,8 +356,8 @@ function checkBadgesOnKill(enemy) {
 
 function checkBadgesOnFloorChange() {
   const floor = state.floor;
-  if (floor >= 5) unlockBadge('deep_diver');
-  if (floor >= 7) unlockBadge('citadel_bound');
+  if (floor >= 8) unlockBadge('deep_diver');
+  if (floor >= 15) unlockBadge('citadel_bound');
 
   // Untouchable — check previous floor (no damage taken)
   if (floor > 1) {
@@ -380,7 +387,7 @@ function checkBadgesOnVictory() {
   unlockBadge('win_' + classId);
 
   // Speed Runner
-  if (state.player.turnsSurvived < 500) unlockBadge('speed_runner');
+  if (state.player.turnsSurvived < 1000) unlockBadge('speed_runner');
 
   // Hoarder
   if (state.player.gold >= 200) unlockBadge('hoarder');
@@ -677,7 +684,7 @@ function newRun(classId = 'adventurer') {
     minimapOpen: false,
     throwMode: false,
     throwItem: null,
-    floorData: Array.from({length: 11}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
+    floorData: Array.from({length: MAX_FLOOR + 1}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
     peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
     doorBashes: {},
     runStats: {
@@ -956,19 +963,33 @@ const ENEMY_TIERS = {
     { name: 'Mimic', glyph: '📦', hp: 12, attack: 4, defense: 3, ai: 'ambush', xp: 18, special: 'mimic', detect: 3 },
     { name: 'Necromancer', glyph: '☠️', hp: 8, attack: 2, defense: 1, ai: 'flee', xp: 20, special: 'summon', detect: 8 },
     { name: 'Demon', glyph: '😈', hp: 18, attack: 5, defense: 3, ai: 'chase', xp: 22, special: 'fire_trail', detect: 7 }
+  ],
+  4: [
+    { name: 'Dark Knight', glyph: '🗡️', hp: 25, attack: 7, defense: 4, ai: 'chase', xp: 28, special: null, detect: 8 },
+    { name: 'Banshee', glyph: '👻', hp: 14, attack: 6, defense: 1, ai: 'chase', xp: 25, special: 'phase', detect: 9 },
+    { name: 'Hydra', glyph: '🐉', hp: 30, attack: 5, defense: 3, ai: 'chase', xp: 32, special: 'split', detect: 7 },
+    { name: 'Warlock', glyph: '🧙', hp: 16, attack: 4, defense: 2, ai: 'flee', xp: 30, special: 'summon', detect: 9 }
+  ],
+  5: [
+    { name: 'Abyssal Fiend', glyph: '👿', hp: 35, attack: 8, defense: 5, ai: 'chase', xp: 40, special: 'fire_trail', detect: 10 },
+    { name: 'Void Wraith', glyph: '🌀', hp: 20, attack: 7, defense: 2, ai: 'chase', xp: 38, special: 'drain', detect: 10 },
+    { name: 'Elder Mimic', glyph: '📦', hp: 28, attack: 6, defense: 5, ai: 'ambush', xp: 35, special: 'mimic', detect: 4 },
+    { name: 'Arch Lich', glyph: '☠️', hp: 22, attack: 5, defense: 3, ai: 'flee', xp: 45, special: 'summon', detect: 10 }
   ]
 };
 
 const BOSS = {
-  name: 'Glyph King', glyph: '👑', hp: 40, attack: 6, defense: 4,
-  ai: 'boss', xp: 100, special: 'boss', detect: 50
+  name: 'Glyph King', glyph: '👑', hp: 100, attack: 10, defense: 6,
+  ai: 'boss', xp: 200, special: 'boss', detect: 50
 };
 
-// Mini-bosses guard milestone floors (3, 6, 9)
+// Mini-bosses guard milestone floors
 const MINI_BOSSES = {
-  3: { name: 'Cave Troll', glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
-  6: { name: 'Lich',       glyph: '💀', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
-  9: { name: 'Balrog',     glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 }
+  4:  { name: 'Cave Troll',    glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
+  8:  { name: 'Lich',          glyph: '💀', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
+  12: { name: 'Balrog',        glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 },
+  16: { name: 'Void Titan',    glyph: '🌀', hp: 45, attack: 8, defense: 5, ai: 'chase', xp: 80, special: 'drain',      detect: 10 },
+  19: { name: 'Glyph Guardian', glyph: '⚔️', hp: 55, attack: 9, defense: 6, ai: 'chase', xp: 90, special: 'boss',      detect: 12 },
 };
 
 // === DUNGEON GENERATION (BSP) ===
@@ -985,20 +1006,20 @@ function generateFloor() {
   p.engageTurnsLeft = 0;
   state.rooms = [];
 
-  if (state.floor === 10) {
+  if (state.floor === MAX_FLOOR) {
     generateBossFloor();
   } else {
     generateBSP();
   }
 
   // Announce biome when entering a new region
-  if ([1, 4, 7, 10].includes(state.floor)) {
+  if ([1, 5, 9, 13, 17, MAX_FLOOR].includes(state.floor)) {
     const biome = getFloorBiome(state.floor);
     addMessage(`Entering ${biome.name}...`, 'gold');
   }
 
-  // Place stairs down (except floor 10)
-  if (state.floor < 10) {
+  // Place stairs down (except boss floor)
+  if (state.floor < MAX_FLOOR) {
     const farthestRoom = getFarthestRoom(p.x, p.y);
     const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
     const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
@@ -1017,12 +1038,12 @@ function generateFloor() {
   }
 
   // Merchant on floors 3, 6, 9
-  if ([3, 6, 9].includes(state.floor)) {
+  if ([3, 7, 11, 15, 19].includes(state.floor)) {
     spawnMerchant();
   }
 
   // Sage on floors 2, 5, 8 (uncurse, identify, heal)
-  if ([2, 5, 8].includes(state.floor)) {
+  if ([2, 5, 9, 13, 17].includes(state.floor)) {
     spawnSage();
   }
 
@@ -1246,7 +1267,7 @@ function bfsReachable(sx, sy, tx, ty) {
 }
 
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= 10) return;
+  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return;
 
   // Find stairs
   let stx = -1, sty = -1;
@@ -1436,7 +1457,7 @@ function removeEntity(e) {
 
 // === SPAWNING ===
 function spawnEnemies() {
-  if (state.floor === 10) return; // Boss already placed
+  if (state.floor === MAX_FLOOR) return; // Boss already placed
   // Spawn mini-boss on milestone floors
   if (MINI_BOSSES[state.floor]) spawnMiniBoss();
   const floorConfig = getFloorConfig(state.floor);
@@ -1825,16 +1846,26 @@ function randomRoomFloorTile() {
 
 function getFloorConfig(floor) {
   const configs = {
-    1:  { tier: 1, nextTier: null,  minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 1 },
-    2:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
-    3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
-    4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
-    5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
-    6:  { tier: 2, nextTier: 3,     minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
-    7:  { tier: 3, nextTier: null,  minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    8:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    9:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
-    10: { tier: 3, nextTier: null,  minEnemies: 0, maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
+    1:  { tier: 1, nextTier: null, minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 1 },
+    2:  { tier: 1, nextTier: null, minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
+    3:  { tier: 1, nextTier: 2,   minEnemies: 4, maxEnemies: 5, minItems: 3, maxItems: 4, food: 1 },
+    4:  { tier: 1, nextTier: 2,   minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
+    5:  { tier: 2, nextTier: null, minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
+    6:  { tier: 2, nextTier: null, minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
+    7:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    8:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    9:  { tier: 3, nextTier: null, minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    10: { tier: 3, nextTier: null, minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: 1 },
+    11: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 11, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    12: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
+    13: { tier: 4, nextTier: null, minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    14: { tier: 4, nextTier: null, minEnemies: 9, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
+    15: { tier: 4, nextTier: 5,   minEnemies: 9, maxEnemies: 13, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    16: { tier: 4, nextTier: 5,   minEnemies: 10, maxEnemies: 14, minItems: 2, maxItems: 3, food: 1 },
+    17: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 14, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
+    18: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
+    19: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: 1 },
+    20: { tier: 5, nextTier: null, minEnemies: 0,  maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
   };
   return configs[floor] || configs[1];
 }
@@ -2130,7 +2161,7 @@ function attackEntity(attacker, defender) {
   const targetIsPlayer = defender === state.player;
 
   // Track damage for death recap
-  const floorIdx = Math.min(state.floor, 10);
+  const floorIdx = Math.min(state.floor, MAX_FLOOR);
   if (isPlayer && !targetIsPlayer) state.floorData[floorIdx].damageDealt += damage;
   else if (!isPlayer && targetIsPlayer) state.floorData[floorIdx].damageTaken += damage;
 
@@ -2293,7 +2324,7 @@ function applyWeaponSpecial(weapon, target) {
 function killEnemy(enemy) {
   state.player.xp += enemy.xp;
   state.enemiesKilled++;
-  state.floorData[Math.min(state.floor, 10)].kills++;
+  state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
 
@@ -2579,9 +2610,10 @@ function processStatusEffects() {
   // Player effects
   processEntityEffects(state.player);
 
-  // Enemy effects
-  for (const e of state.entities) {
-    if (e.type === 'enemy') processEntityEffects(e);
+  // Enemy effects — snapshot array to avoid mutation during iteration
+  const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0);
+  for (const e of enemies) {
+    processEntityEffects(e);
   }
 }
 
@@ -2827,69 +2859,109 @@ function bossAI(enemy) {
   const px = state.player.x, py = state.player.y;
   const dist = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
 
-  // Phase 2
-  if (enemy.hp <= 20 && enemy.phase === 1) {
+  // Phase transitions (3 phases)
+  if (enemy.hp <= 35 && enemy.phase === 1) {
     enemy.phase = 2;
-    addMessage('The Glyph King enters a fury!', 'damage');
+    enemy.attack += 2; // 10 → 12
+    addMessage('The Glyph King roars! "You dare challenge a god?"', 'damage');
     screenShake();
+    animateAoeBlast(enemy.x, enemy.y, 4, '#a040ff');
+  }
+  if (enemy.hp <= 15 && enemy.phase === 2) {
+    enemy.phase = 3;
+    enemy.attack += 2; // 12 → 14
+    enemy.defense += 2; // 6 → 8
+    addMessage('The Glyph King shimmers with dark energy! FINAL PHASE!', 'damage');
+    screenShake();
+    animateAoeBlast(enemy.x, enemy.y, 5, '#ff2020');
+    // Heal slightly on phase 3 entry
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + 10);
   }
 
-  // Summon minions
+  // Summon minions — tier scales with phase
   if (enemy.summonCooldown <= 0) {
-    const template = ENEMY_TIERS[1][1]; // Skeleton
-    for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
-      const nx = enemy.x + dx, ny = enemy.y + dy;
+    const summonTier = enemy.phase === 1 ? 2 : enemy.phase === 2 ? 3 : 4;
+    const templates = ENEMY_TIERS[summonTier] || ENEMY_TIERS[3];
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    let spawned = 0;
+    const maxMinions = enemy.phase === 3 ? 2 : 1;
+    for (const [ddx, ddy] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]) {
+      if (spawned >= maxMinions) break;
+      const nx = enemy.x + ddx, ny = enemy.y + ddy;
       if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
         const minion = createEnemy(template, nx, ny);
         minion.alertness = 2;
         state.entities.push(minion);
-        addMessage('The Glyph King summons a minion!', 'damage');
-        break;
+        spawned++;
       }
     }
-    enemy.summonCooldown = enemy.phase === 1 ? 5 : 3;
+    if (spawned > 0) addMessage(`The Glyph King conjures ${spawned > 1 ? 'servants' : 'a servant'}!`, 'damage');
+    enemy.summonCooldown = enemy.phase === 1 ? 6 : enemy.phase === 2 ? 4 : 3;
   } else {
     enemy.summonCooldown--;
   }
 
-  // Phase 2: teleport
-  if (enemy.phase === 2 && enemy.teleportCooldown <= 0 && dist > 2) {
-    const pos = randomFloorTile();
-    if (pos) {
-      enemy.x = pos.x;
-      enemy.y = pos.y;
-      addMessage('The Glyph King teleports!', 'damage');
-      enemy.teleportCooldown = 3;
+  // Phase 2+: teleport when far away
+  if (enemy.phase >= 2 && enemy.teleportCooldown <= 0 && dist > 3) {
+    // Teleport near the player
+    for (const [ddx, ddy] of [[2,0],[-2,0],[0,2],[0,-2],[2,2],[-2,-2]]) {
+      const tx = px + ddx, ty = py + ddy;
+      if (tx >= 0 && tx < MAP_W && ty >= 0 && ty < MAP_H && isWalkable(tx, ty) && !enemyAt(tx, ty)) {
+        enemy.x = tx; enemy.y = ty;
+        addMessage('The Glyph King teleports beside you!', 'damage');
+        enemy.teleportCooldown = enemy.phase === 3 ? 2 : 4;
+        break;
+      }
     }
-  } else {
+  } else if (enemy.teleportCooldown > 0) {
     enemy.teleportCooldown--;
   }
 
-  // Phase 2: projectile
-  if (enemy.phase === 2 && dist > 1 && Math.random() < 0.4) {
-    const dx = Math.sign(px - enemy.x);
-    const dy = Math.sign(py - enemy.y);
-    // Trace line
-    let bx = enemy.x + dx, by = enemy.y + dy;
-    for (let i = 0; i < 10; i++) {
+  // Phase 2+: dark bolt projectile
+  if (enemy.phase >= 2 && dist > 1 && Math.random() < (enemy.phase === 3 ? 0.6 : 0.4)) {
+    const ddx = Math.sign(px - enemy.x);
+    const ddy = Math.sign(py - enemy.y);
+    let bx = enemy.x + ddx, by = enemy.y + ddy;
+    const boltDmg = enemy.phase === 3 ? 5 : 3;
+    for (let i = 0; i < 12; i++) {
       if (!isWalkable(bx, by)) break;
       if (bx === px && by === py) {
-        state.player.hp -= 3;
-        addMessage('A dark bolt strikes you! (-3 HP)', 'damage');
+        state.player.hp -= boltDmg;
+        addMessage(`A dark bolt strikes you! (-${boltDmg} HP)`, 'damage');
         screenShake();
         Audio.playerHit();
         haptic(50);
         if (state.player.hp <= 0) { playerDeath('Glyph King', '👑'); return; }
         break;
       }
-      bx += dx;
-      by += dy;
+      bx += ddx; by += ddy;
     }
   }
 
-  // Melee
+  // Phase 3: AoE blast every few turns
+  if (enemy.phase === 3 && (enemy.aoeCooldown || 0) <= 0 && dist <= 4) {
+    const aoeDmg = 4;
+    if (dist <= 3) {
+      state.player.hp -= aoeDmg;
+      addMessage(`The Glyph King unleashes a glyph nova! (-${aoeDmg} HP)`, 'damage');
+      screenShake();
+      Audio.playerHit();
+      haptic(60);
+      if (state.player.hp <= 0) { playerDeath('Glyph King', '👑'); return; }
+    }
+    animateAoeBlast(enemy.x, enemy.y, 3, '#a040ff');
+    enemy.aoeCooldown = 4;
+  } else if (enemy.aoeCooldown > 0) {
+    enemy.aoeCooldown--;
+  }
+
+  // Melee attack (double attack in phase 3)
   if (dist === 1) {
     attackEntity(enemy, state.player);
+    if (enemy.phase === 3 && !state.gameOver && Math.random() < 0.4) {
+      addMessage('The Glyph King strikes again!', 'damage');
+      attackEntity(enemy, state.player);
+    }
   } else {
     const step = findPath(enemy.x, enemy.y, px, py, false);
     if (step) tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
@@ -3347,14 +3419,14 @@ function playerDescend() {
   setTimeout(() => {
     generateFloor();
     // Place player at stairs up position or first room
-    if (state.floor < 10) {
+    if (state.floor < MAX_FLOOR) {
       const firstRoom = state.rooms[0];
       state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
       state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
       setTile(state.player.x, state.player.y, T.STAIRS_UP);
     }
     addMessage(`You descend to floor ${state.floor}...`, '');
-    if (state.floor === 10) addMessage('You sense an overwhelming presence...', 'damage');
+    if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
     computeFOV();
     updateUI();
     render();
@@ -3589,7 +3661,7 @@ function applyScrollEffect(scroll) {
             removeEntity(e);
             state.player.xp += e.xp;
             state.enemiesKilled++;
-            state.floorData[Math.min(state.floor, 10)].kills++;
+            state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
           }
         }
       }
@@ -3928,9 +4000,9 @@ function endTurn() {
   }
 
   // After lingering too long (15+ turns), wandering monsters approach
-  if (state.idleTurns > 0 && state.idleTurns % 15 === 0 && state.floor < 10) {
+  if (state.idleTurns > 0 && state.idleTurns % 15 === 0 && state.floor < MAX_FLOOR) {
     const spawnCount = 1 + (state.idleTurns >= 30 ? 1 : 0);
-    const tier = Math.ceil(state.floor / 3);
+    const tier = Math.min(5, Math.ceil(state.floor / 4));
     const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[1];
     for (let i = 0; i < spawnCount; i++) {
       // Find a walkable tile just outside the visible area
@@ -3967,8 +4039,8 @@ function endTurn() {
   processStatusEffects();
   if (state.gameOver) return;
 
-  // Victory check (boss dead on floor 10)
-  if (state.floor === 10 && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
+  // Victory check (boss dead on boss floor)
+  if (state.floor === MAX_FLOOR && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
     showVictory();
     return;
   }
@@ -4636,9 +4708,10 @@ function render() {
     ctx.globalAlpha = 1.0;
   }
 
-  // Draw enemies (only visible ones)
+  // Draw enemies (only visible ones with hp > 0)
   for (const e of state.entities) {
     if (e.type !== 'enemy') continue;
+    if (e.hp <= 0) continue;
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
 
@@ -5194,7 +5267,7 @@ function setupInput() {
       // Minimap
       if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); return; }
       // Badge overlay
-      if ($('badge-overlay').classList.contains('active')) { $('badge-overlay').classList.remove('active'); return; }
+      if ($('badge-overlay').classList.contains('active')) { closeBadgeOverlay(); return; }
       // Merchant
       if ($('merchant-overlay').classList.contains('active')) { $('merchant-overlay').classList.remove('active'); inputLocked = false; endTurn(); return; }
       // Sage
@@ -5444,8 +5517,8 @@ function setupUI() {
   }
   const closeBadgeBtn = $('btn-close-badges');
   if (closeBadgeBtn) {
-    closeBadgeBtn.addEventListener('click', () => $('badge-overlay').classList.remove('active'));
-    closeBadgeBtn.addEventListener('touchend', (e) => { e.preventDefault(); $('badge-overlay').classList.remove('active'); }, { passive: false });
+    closeBadgeBtn.addEventListener('click', closeBadgeOverlay);
+    closeBadgeBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeBadgeOverlay(); }, { passive: false });
   }
 
   // Death screen
@@ -6177,26 +6250,33 @@ function showQuickThrow() {
 
 // === FLOOR BIOMES ===
 function getFloorBiome(floor) {
-  if (floor <= 3) return {
+  if (floor <= 4) return {
     name: 'The Sewers',
     wallVis: '#4a7a4a', wallDim: '#1e321e',
     floorVis: '#2e4e2e', floorDim: '#16221a',
     corrVis:  '#264020', corrDim:  '#121a10',
     bg: '#080f08'
   };
-  if (floor <= 6) return {
+  if (floor <= 8) return {
     name: 'The Crypt',
     wallVis: '#5a5a72', wallDim: '#282838',
     floorVis: '#40405a', floorDim: '#1e1e2c',
     corrVis:  '#38384e', corrDim:  '#181820',
     bg: '#0c0c14'
   };
-  if (floor <= 9) return {
+  if (floor <= 12) return {
     name: 'The Citadel',
     wallVis: '#6a3a3a', wallDim: '#301818',
     floorVis: '#4a2424', floorDim: '#201010',
     corrVis:  '#3e1e1e', corrDim:  '#180c0c',
     bg: '#100606'
+  };
+  if (floor <= 16) return {
+    name: 'The Abyss',
+    wallVis: '#3a5a6a', wallDim: '#152030',
+    floorVis: '#24405a', floorDim: '#101828',
+    corrVis:  '#1e3448', corrDim:  '#0c1420',
+    bg: '#060a10'
   };
   return {
     name: 'The Sanctum',
