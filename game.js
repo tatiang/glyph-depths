@@ -15,14 +15,14 @@ const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11 };
 
 // === GAME STATE ===
 let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝' };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1 };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = '20 floors, harder boss, bug fixes'; // updated each push
 const LAST_UPDATED = '2026-03-22 23:00';
@@ -58,6 +58,8 @@ const BADGE_DEFS = [
   { id: 'win_wizard', name: 'Arcane Mastery', icon: '🧙', desc: 'Win as Wizard', cat: 'class' },
   { id: 'win_ranger', name: "Ranger's Mark", icon: '🏹', desc: 'Win as Ranger', cat: 'class' },
   { id: 'win_cleric', name: 'Divine Crusade', icon: '⛪', desc: 'Win as Cleric', cat: 'class' },
+  { id: 'win_bard', name: "Bard's Ballad", icon: '🎵', desc: 'Win as Bard', cat: 'class' },
+  { id: 'win_artificer', name: "Artificer's Opus", icon: '⚒️', desc: 'Win as Artificer', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -179,6 +181,8 @@ const MASTERY_DEFS = [
   { id: 'wiz_mastery',  trigger: 'win_wizard',     name: 'Wizard Mastery',      desc: 'All Wizards start with +2 ATK',           classReq: 'wizard',     bonus: { attack: 2 } },
   { id: 'ran_mastery',  trigger: 'win_ranger',     name: 'Ranger Mastery',      desc: 'Rangers start with Hunting Bow',          classReq: 'ranger',     bonus: { upgradeBow: true } },
   { id: 'cle_mastery',  trigger: 'win_cleric',     name: 'Cleric Mastery',      desc: 'All Clerics start with +3 max HP',        classReq: 'cleric',     bonus: { maxHp: 3 } },
+  { id: 'brd_mastery',  trigger: 'win_bard',       name: 'Bard Mastery',        desc: 'All Bards start with +5% charm chance',   classReq: 'bard',       bonus: { charmBonus: 0.05 } },
+  { id: 'art_mastery',  trigger: 'win_artificer',  name: 'Artificer Mastery',   desc: 'All Artificers start with +2 max HP',     classReq: 'artificer',  bonus: { maxHp: 2 } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -485,6 +489,30 @@ const CLASS_DEFS = [
     startItems: 'Mace · Healing Potion · Scroll of Identify',
     statBadges: [{ label: '18 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Divine Heal', cls: 'pos' }]
+  },
+  {
+    id: 'bard',
+    name: 'Bard',
+    icon: '🎵',
+    flavor: 'Charming melodies soothe foes and rally allies.',
+    hp: 12, attack: 1, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.05, critChance: 0.10,
+    passive: '🎶 Charm: 25% pacify on hit · Song of Rest',
+    startItems: 'Rusty Dagger · Healing Potion',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: '25% Charm', cls: 'pos' }, { label: '5% Dodge', cls: 'pos' }, { label: '🎵 Song/floor', cls: 'pos' }]
+  },
+  {
+    id: 'artificer',
+    name: 'Artificer',
+    icon: '⚒️',
+    flavor: 'Master of metal and machinery. Upgrades gear on the fly.',
+    hp: 14, attack: 2, defense: 1,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🔧 Tinker: upgrade weapon/armor once per floor (15g)',
+    startItems: 'Short Sword · Leather Vest',
+    statBadges: [{ label: '14 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: 'Forge 1/floor', cls: 'pos' }, { label: '🔧 Tinker', cls: 'pos' }]
   }
 ];
 
@@ -768,7 +796,15 @@ function createPlayer(classId = 'adventurer') {
     // Cleric
     divineHealUsed: false,
     curseImmune: classId === 'cleric',
-    drainImmune: false // granted by shrine sacrifice
+    drainImmune: false, // granted by shrine sacrifice
+    // Bard
+    charmChance: classId === 'bard' ? 0.25 : 0,
+    encore: false,
+    songOfRestCooldown: 0,
+    songOfRestFloorUsed: false,
+    // Artificer
+    tinkerFloorUsed: false,
+    masterSmith: false
   };
 }
 
@@ -779,6 +815,7 @@ function applyMasteryBonuses(classId) {
   if (m.attack > 0)     { p.attack += m.attack; }
   if (m.defense > 0)    { p.defense += m.defense; }
   if (m.critChance > 0) { p.critChance += m.critChance; }
+  if (m.charmBonus > 0) { p.charmChance += m.charmBonus; }
 }
 
 function applyClassStartingItems(classId) {
@@ -830,6 +867,15 @@ function applyClassStartingItems(classId) {
       scrollIdentified[identifyScroll.id] = true;
       p.inventory.push({ ...identifyScroll, glyph: '📜', itemType: 'scroll', identified: true });
     }
+  } else if (classId === 'bard') {
+    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'artificer') {
+    const sword = WEAPONS.find(w => w.name === 'Short Sword');
+    if (sword) p.equipped.weapon = { ...sword };
+    const armor = ARMORS.find(a => a.name === 'Leather Vest');
+    if (armor) p.equipped.armor = { ...armor };
   }
 }
 
@@ -1095,9 +1141,34 @@ function generateFloor() {
     state.player.aimedShotCooldown = 0;
   }
 
+  // Bard: reset song of rest each floor
+  if (state.player.classId === 'bard') {
+    state.player.songOfRestFloorUsed = false;
+  }
+
+  // Artificer: reset tinker each floor
+  if (state.player.classId === 'artificer') {
+    state.player.tinkerFloorUsed = false;
+  }
+
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
     spawnSpecialTiles();
+  }
+
+  // Secret walls (2-4 per floor)
+  if (state.floor < MAX_FLOOR) {
+    spawnSecretWalls();
+  }
+
+  // Bonus wing on floors 6, 12, 18
+  if ([6, 12, 18].includes(state.floor)) {
+    generateBonusWing();
+  }
+
+  // Tavern on floors 5, 10, 14
+  if ([5, 10, 14].includes(state.floor)) {
+    spawnTavern();
   }
 
   // Spawn a glyph rune on each floor (from pool of runes player hasn't collected yet)
@@ -1388,12 +1459,12 @@ function setTile(x, y, t) {
 
 function isWalkable(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED;
+  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
 }
 
 function isTransparent(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED;
+  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
   // One-way doors are visible (transparent) but handled specially for movement
 }
 
@@ -1749,6 +1820,269 @@ function renderSageServices(sage) {
 
   // Drop section for inventory management at the sage
   renderDropSection(container, () => renderSageServices(sage));
+}
+
+// === SECRET WALLS ===
+function spawnSecretWalls() {
+  // Find wall tiles adjacent to at least one FLOOR tile
+  const candidates = [];
+  for (let y = 1; y < MAP_H - 1; y++) {
+    for (let x = 1; x < MAP_W - 1; x++) {
+      if (getTile(x, y) !== T.WALL) continue;
+      // Check if adjacent to FLOOR
+      let adjFloor = false;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        if (getTile(x + dx, y + dy) === T.FLOOR) { adjFloor = true; break; }
+      }
+      if (!adjFloor) continue;
+      // Must also have WALL on the other side (not on map edge)
+      candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) return;
+  // Pick 2-4 random candidates
+  const count = 2 + Math.floor(Math.random() * 3); // 2-4
+  const shuffled = candidates.sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, Math.min(count, shuffled.length));
+  for (const pos of picked) {
+    setTile(pos.x, pos.y, T.WALL_SECRET);
+  }
+}
+
+// === BONUS WING ===
+function generateBonusWing() {
+  // Find a suitable wall on a room edge to carve a bonus wing
+  if (!state.rooms || state.rooms.length < 3) return;
+  const room = state.rooms[Math.floor(Math.random() * (state.rooms.length - 1)) + 1];
+  // Try to carve rooms beyond the right or bottom edge of chosen room
+  const directions = [
+    { dx: 1, dy: 0, wallX: room.x + room.w, wallY: room.y + Math.floor(room.h / 2) },
+    { dx: 0, dy: 1, wallX: room.x + Math.floor(room.w / 2), wallY: room.y + room.h },
+    { dx: -1, dy: 0, wallX: room.x - 1, wallY: room.y + Math.floor(room.h / 2) },
+    { dx: 0, dy: -1, wallX: room.x + Math.floor(room.w / 2), wallY: room.y - 1 }
+  ];
+  // Shuffle directions and try each
+  directions.sort(() => Math.random() - 0.5);
+  for (const dir of directions) {
+    const { dx, dy, wallX, wallY } = dir;
+    if (wallX < 2 || wallX >= MAP_W - 2 || wallY < 2 || wallY >= MAP_H - 2) continue;
+    // Check if we have enough space for 2 small rooms in this direction
+    const startX = wallX + dx * 2;
+    const startY = wallY + dy * 2;
+    const wingRooms = [];
+    let cx = startX, cy = startY;
+    let canFit = true;
+    for (let r = 0; r < 2; r++) {
+      const rw = 3 + Math.floor(Math.random() * 2); // 3-4
+      const rh = 3 + Math.floor(Math.random() * 2);
+      // Check bounds
+      if (cx < 1 || cy < 1 || cx + rw >= MAP_W - 1 || cy + rh >= MAP_H - 1) { canFit = false; break; }
+      // Check that area is all walls (unclaimed space)
+      let allWall = true;
+      for (let yy = cy - 1; yy <= cy + rh; yy++) {
+        for (let xx = cx - 1; xx <= cx + rw; xx++) {
+          if (xx < 0 || xx >= MAP_W || yy < 0 || yy >= MAP_H) { allWall = false; break; }
+          if (getTile(xx, yy) !== T.WALL) { allWall = false; break; }
+        }
+        if (!allWall) break;
+      }
+      if (!allWall) { canFit = false; break; }
+      wingRooms.push({ x: cx, y: cy, w: rw, h: rh });
+      cx += (dx === 0 ? 0 : dx * (rw + 1));
+      cy += (dy === 0 ? 0 : dy * (rh + 1));
+    }
+    if (!canFit || wingRooms.length < 2) continue;
+
+    // Carve the wing rooms
+    for (const wr of wingRooms) {
+      for (let yy = wr.y; yy < wr.y + wr.h; yy++) {
+        for (let xx = wr.x; xx < wr.x + wr.w; xx++) {
+          setTile(xx, yy, T.FLOOR);
+        }
+      }
+      state.rooms.push(wr);
+    }
+    // Connect wing rooms with corridors
+    for (let r = 0; r < wingRooms.length - 1; r++) {
+      const a = wingRooms[r], b = wingRooms[r + 1];
+      const ax = a.x + Math.floor(a.w / 2), ay = a.y + Math.floor(a.h / 2);
+      const bx = b.x + Math.floor(b.w / 2), by = b.y + Math.floor(b.h / 2);
+      // Carve L-shaped corridor
+      let x = ax, y = ay;
+      while (x !== bx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < bx ? 1 : -1; }
+      while (y !== by) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < by ? 1 : -1; }
+    }
+    // Carve corridor from main room wall to first wing room
+    let x = wallX, y = wallY;
+    const firstWR = wingRooms[0];
+    const tx = firstWR.x + Math.floor(firstWR.w / 2), ty = firstWR.y + Math.floor(firstWR.h / 2);
+    while (x !== tx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < tx ? 1 : -1; }
+    while (y !== ty) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < ty ? 1 : -1; }
+    // Place locked door at the entrance
+    setTile(wallX, wallY, T.DOOR_LOCKED);
+    // Spawn Bone Key somewhere on the main floor (in a room)
+    const keyPos = randomRoomFloorTile();
+    if (keyPos) {
+      state.entities.push(createItemEntity({
+        name: 'Bone Key', glyph: '🗝️', itemType: 'key', keyType: 'bone', value: 0
+      }, keyPos.x, keyPos.y));
+    }
+    // Spawn tougher enemies in wing rooms
+    const tier = Math.min(7, Math.ceil(state.floor / 3) + 1);
+    for (const wr of wingRooms) {
+      const ex = wr.x + Math.floor(Math.random() * wr.w);
+      const ey = wr.y + Math.floor(Math.random() * wr.h);
+      if (getTile(ex, ey) === T.FLOOR && !enemyAt(ex, ey)) {
+        const template = getEnemyTemplate(tier);
+        if (template) {
+          const enemy = createEnemy(template, ex, ey);
+          enemy.alertness = 2; // already alert
+          state.entities.push(enemy);
+        }
+      }
+    }
+    // Spawn guaranteed rare loot in the last wing room
+    const lastWR = wingRooms[wingRooms.length - 1];
+    const lootPos = { x: lastWR.x + Math.floor(lastWR.w / 2), y: lastWR.y + Math.floor(lastWR.h / 2) };
+    const loot = generateRandomItem(state.floor + 3);
+    if (loot) {
+      state.entities.push(createItemEntity(loot, lootPos.x, lootPos.y));
+    }
+    // Also spawn some gold
+    const goldAmt = 15 + Math.floor(Math.random() * 20) + state.floor * 2;
+    state.entities.push(createItemEntity({ name: `${goldAmt} Gold`, glyph: '💰', itemType: 'gold', goldAmount: goldAmt, value: 0 }, lastWR.x + 1, lastWR.y + 1));
+    break; // only one bonus wing per floor
+  }
+}
+
+function getEnemyTemplate(tier) {
+  const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[Math.min(tier, Object.keys(ENEMY_TIERS).length)] || ENEMY_TIERS[1];
+  if (!templates || templates.length === 0) return null;
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+// === TAVERN ===
+function spawnTavern() {
+  const candidateRooms = state.rooms.length > 2 ? state.rooms.slice(2) : state.rooms;
+  const room = candidateRooms[Math.floor(Math.random() * candidateRooms.length)];
+  const x = room.x + Math.floor(room.w / 2);
+  const y = room.y + Math.floor(room.h / 2);
+  if (getTile(x, y) !== T.FLOOR) return;
+  // Don't overlap with other entities at this position
+  if (state.entities.some(e => e.x === x && e.y === y)) return;
+  state.entities.push({
+    type: 'tavern',
+    x, y,
+    glyph: '🍺',
+    name: 'Tavern',
+    visited: false
+  });
+}
+
+function showTavern(tavern) {
+  inputLocked = true;
+  Audio.merchant();
+
+  const overlay = $('levelup-overlay');
+  $('levelup-title').textContent = '🍺 TAVERN';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+
+  const p = state.player;
+
+  // Buy Ration — 5 gold
+  const rationBtn = document.createElement('button');
+  rationBtn.className = 'perk-btn';
+  rationBtn.innerHTML = `<div class="perk-name">🍖 Buy Ration (5💰)</div><div class="perk-desc">Add food to your inventory</div>`;
+  rationBtn.addEventListener('click', () => {
+    if (p.gold >= 5) {
+      p.gold -= 5;
+      // Stack with existing food
+      const existingFood = p.inventory.find(i => i.itemType === 'food');
+      if (existingFood) {
+        existingFood.stack = (existingFood.stack || 1) + 1;
+      } else if (p.inventory.length < MAX_INVENTORY) {
+        p.inventory.push({ ...FOOD, stack: 1 });
+      } else {
+        addMessage('Inventory full!', 'damage');
+        p.gold += 5; // refund
+        return;
+      }
+      addMessage('You buy a warm ration.', 'good');
+      Audio.gold();
+      updateUI();
+      showTavern(tavern);
+    } else {
+      addMessage('Not enough gold.', 'damage');
+    }
+  });
+  container.appendChild(rationBtn);
+
+  // Hear Rumor — 3 gold
+  const rumorBtn = document.createElement('button');
+  rumorBtn.className = 'perk-btn';
+  rumorBtn.innerHTML = `<div class="perk-name">🗣️ Hear Rumor (3💰)</div><div class="perk-desc">Learn about what lies ahead</div>`;
+  rumorBtn.addEventListener('click', () => {
+    if (p.gold >= 3) {
+      p.gold -= 3;
+      const nextFloor = state.floor + 1;
+      const rumors = [
+        `The barkeep leans in: "Floor ${nextFloor}? I hear the enemies grow fiercer there."`,
+        `A drunk whispers: "There's treasure hidden in the walls, if you know where to look."`,
+        `The barkeep warns: "Watch your back on the next floor. Something stalks the corridors."`,
+        `A patron mutters: "I heard the merchants on deeper floors carry finer wares."`,
+        `The barkeep nods: "Stock up on food. The path ahead is long and hungry."`,
+        `A traveler whispers: "Runes of power await those brave enough to seek them."`,
+      ];
+      addMessage(rumors[Math.floor(Math.random() * rumors.length)], 'gold');
+      Audio.gold();
+      updateUI();
+      showTavern(tavern);
+    } else {
+      addMessage('Not enough gold.', 'damage');
+    }
+  });
+  container.appendChild(rumorBtn);
+
+  // Gamble — 10 gold, 50/50
+  const gambleBtn = document.createElement('button');
+  gambleBtn.className = 'perk-btn';
+  gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (10💰)</div><div class="perk-desc">50% chance to double your bet, 50% to lose it all</div>`;
+  gambleBtn.addEventListener('click', () => {
+    if (p.gold >= 10) {
+      p.gold -= 10;
+      if (Math.random() < 0.5) {
+        p.gold += 20;
+        addMessage('You win! The dice favor you. (+20 gold)', 'gold');
+        Audio.gold();
+      } else {
+        addMessage('You lose... The house always wins.', 'damage');
+        Audio.hit();
+      }
+      haptic(30);
+      updateUI();
+      showTavern(tavern);
+    } else {
+      addMessage('Not enough gold to gamble.', 'damage');
+    }
+  });
+  container.appendChild(gambleBtn);
+
+  // Leave button
+  const leaveBtn = document.createElement('button');
+  leaveBtn.className = 'perk-btn';
+  leaveBtn.style.borderColor = 'var(--text-dim)';
+  leaveBtn.innerHTML = `<div class="perk-name">🚶 Leave Tavern</div><div class="perk-desc">Return to the dungeon</div>`;
+  leaveBtn.addEventListener('click', () => {
+    tavern.visited = true;
+    overlay.classList.remove('active');
+    inputLocked = false;
+    updateUI();
+    render();
+  });
+  container.appendChild(leaveBtn);
+
+  overlay.classList.add('active');
 }
 
 // Apply a curse to a weapon/armor copy (15% chance on floor 3+)
@@ -2259,6 +2593,21 @@ function attackEntity(attacker, defender) {
     applyWeaponSpecial(state.player.equipped.weapon, defender);
   }
 
+  // Bard Charm: 25% chance to pacify enemy on hit (skip 2 turns)
+  if (isPlayer && !targetIsPlayer && defender.hp > 0 && state.player.charmChance > 0) {
+    if (Math.random() < state.player.charmChance) {
+      // Encore perk: 30% chance to convert charmed enemy to temporary ally
+      if (state.player.encore && Math.random() < 0.30) {
+        defender.isAlly = true;
+        defender.ai = 'ally';
+        addMessage(`🎶 ${defender.name} is charmed and fights for you!`, 'gold');
+      } else {
+        defender.confused = (defender.confused || 0) + 2;
+        addMessage(`🎶 ${defender.name} is pacified by your melody!`, 'good');
+      }
+    }
+  }
+
   // Glyph Rune effects: flame, frost on player attack
   if (isPlayer && !targetIsPlayer && defender.hp > 0) {
     if (hasRune('flame') && Math.random() < 0.15) {
@@ -2610,6 +2959,8 @@ function showLevelUp() {
     { name: 'Mana Shield', desc: '25% chance to negate incoming damage', apply: () => { state.player.manaShield = true; }, rare: true, unique: true, flag: 'manaShield', classOnly: 'wizard' },
     { name: 'Quick Draw', desc: 'Aimed Shot cooldown reduced by 3 turns', apply: () => { state.player.quickDraw = true; }, rare: false, unique: true, flag: 'quickDraw', classOnly: 'ranger' },
     { name: 'Sanctified Ground', desc: 'Heal 1 HP when you wait (Space)', apply: () => { state.player.sanctifiedGround = true; }, rare: false, unique: true, flag: 'sanctifiedGround', classOnly: 'cleric' },
+    { name: 'Encore', desc: 'Charmed enemies have 30% chance to fight for you', apply: () => { state.player.encore = true; }, rare: true, unique: true, flag: 'encore', classOnly: 'bard' },
+    { name: 'Master Smith', desc: 'Forge upgrades give +2 instead of +1', apply: () => { state.player.masterSmith = true; }, rare: false, unique: true, flag: 'masterSmith', classOnly: 'artificer' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -3224,6 +3575,40 @@ function playerMove(dx, dy) {
     return;
   }
 
+  // Secret wall — reveals hidden passage and spawns item
+  if (getTile(nx, ny) === T.WALL_SECRET) {
+    setTile(nx, ny, T.FLOOR);
+    addMessage('You discover a hidden passage!', 'gold');
+    Audio.door();
+    haptic(40);
+    // Spawn a floor-scaled item
+    const secretItem = generateRandomItem(state.floor);
+    if (secretItem) {
+      state.entities.push(createItemEntity(secretItem, nx, ny));
+      addMessage(`A ${secretItem.name} was hidden in the wall!`, 'gold');
+    }
+    computeFOV();
+    endTurn();
+    return;
+  }
+
+  // Locked door — requires Bone Key
+  if (getTile(nx, ny) === T.DOOR_LOCKED) {
+    const keyIdx = p.inventory.findIndex(i => i.itemType === 'key' && i.keyType === 'bone');
+    if (keyIdx >= 0) {
+      p.inventory.splice(keyIdx, 1);
+      setTile(nx, ny, T.DOOR_OPEN);
+      addMessage('You use the Bone Key! The lock clicks open.', 'gold');
+      Audio.door();
+      haptic(30);
+      computeFOV();
+    } else {
+      addMessage('This door is locked. You need a key.', 'damage');
+    }
+    endTurn();
+    return;
+  }
+
   // Check walkable
   if (!isWalkable(nx, ny)) return;
 
@@ -3288,6 +3673,18 @@ function playerMove(dx, dy) {
       endTurn();
     } else {
       showSage(sage);
+    }
+    return;
+  }
+
+  // Check for tavern
+  const tavern = state.entities.find(e => e.type === 'tavern' && e.x === nx && e.y === ny);
+  if (tavern) {
+    if (tavern.visited) {
+      addMessage('The barkeep waves. "Come back next floor!"', '');
+      endTurn();
+    } else {
+      showTavern(tavern);
     }
     return;
   }
@@ -4778,7 +5175,7 @@ function render() {
           break;
         case T.DOOR_CLOSED:
           tileGlyph = '+';
-          tileColor = (state.rogueClosedDoors && state.rogueClosedDoors.has(ty * MAP_W + tx)) ? '#40a0a0' : '#8B6914';
+          tileColor = (state.rogueClosedDoors && state.rogueClosedDoors.has(my * MAP_W + mx)) ? '#40a0a0' : '#8B6914';
           break;
         case T.DOOR_OPEN:
           tileGlyph = '/';
@@ -4791,6 +5188,19 @@ function render() {
         case T.DOOR_SEALED:
           tileGlyph = '▓';
           tileColor = '#4a2020';
+          break;
+        case T.WALL_SECRET:
+          // Looks like a normal wall; Rogue class can detect with shimmer
+          tileGlyph = '▓';
+          tileColor = vis ? biome.wallVis : biome.wallDim;
+          if (vis && state.player.classId === 'rogue' && Math.random() < 0.30) {
+            // Subtle shimmer — slightly brighter color
+            tileColor = '#9090a0';
+          }
+          break;
+        case T.DOOR_LOCKED:
+          tileGlyph = '⊞';
+          tileColor = vis ? '#c08030' : '#604018';
           break;
         case T.SPECIAL:
           tileGlyph = '·';
@@ -4807,6 +5217,59 @@ function render() {
   }
 
   ctx.globalAlpha = 1.0;
+
+  // Targeting overlay when in throw/fire mode
+  if (state.throwMode) {
+    const throwItem = state.throwItem?.item;
+    const maxRange = throwItem?.itemType === 'aimed_shot' ? 15 : (throwItem?.range || 8);
+    const isBlast = throwItem?.itemType === 'special_arrow' && throwItem?.arrowType === 'blast';
+    // If a special arrow is loaded, check for blast
+    const loadedArrow = state.player.loadedSpecialArrow;
+    const hasBlast = isBlast || (loadedArrow?.arrowType === 'blast');
+
+    // Show targeting lines in all 8 directions
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+    for (const [ddx, ddy] of dirs) {
+      let tx = p.x + ddx, ty = p.y + ddy;
+      for (let i = 0; i < maxRange; i++) {
+        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) break;
+        const vx = tx - camX, vy = ty - camY;
+        if (vx >= 0 && vx < VIEW_COLS && vy >= 0 && vy < VIEW_ROWS) {
+          const enemy = enemyAt(tx, ty);
+          if (enemy && enemy.hp > 0) {
+            // Mark enemy position in red
+            ctx.globalAlpha = 0.25;
+            ctx.fillStyle = '#ff4040';
+            ctx.fillRect(vx * ts, vy * ts, ts, ts);
+            // Show blast radius if applicable
+            if (hasBlast) {
+              ctx.globalAlpha = 0.15;
+              ctx.fillStyle = '#ff8020';
+              for (let ax = -1; ax <= 1; ax++) {
+                for (let ay = -1; ay <= 1; ay++) {
+                  if (ax === 0 && ay === 0) continue;
+                  const bvx = vx + ax, bvy = vy + ay;
+                  if (bvx >= 0 && bvx < VIEW_COLS && bvy >= 0 && bvy < VIEW_ROWS) {
+                    ctx.fillRect(bvx * ts, bvy * ts, ts, ts);
+                  }
+                }
+              }
+            }
+            ctx.globalAlpha = 1.0;
+            break; // Stop at first enemy in this direction
+          }
+          if (!isWalkable(tx, ty)) break;
+          // Highlight path tile
+          ctx.globalAlpha = 0.12;
+          ctx.fillStyle = '#ffd700';
+          ctx.fillRect(vx * ts, vy * ts, ts, ts);
+          ctx.globalAlpha = 1.0;
+        }
+        tx += ddx;
+        ty += ddy;
+      }
+    }
+  }
 
   // Draw items (only visible ones)
   for (const e of state.entities) {
@@ -4863,6 +5326,24 @@ function render() {
     const sy = (e.y - camY) * ts + ts / 2;
     ctx.globalAlpha = e.visited ? 0.15 : 0.3;
     ctx.fillStyle = '#a060ff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, ts * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = e.visited ? 0.5 : 1.0;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Draw tavern (with amber glow)
+  for (const e of state.entities) {
+    if (e.type !== 'tavern') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    ctx.globalAlpha = e.visited ? 0.15 : 0.3;
+    ctx.fillStyle = '#d0a030';
     ctx.beginPath();
     ctx.arc(sx, sy, ts * 0.4, 0, Math.PI * 2);
     ctx.fill();
@@ -5125,6 +5606,25 @@ function updateUI() {
       } else {
         setBtn('✝ DIVINE HEAL', true);
         setBar(100, 'var(--gold)');
+      }
+    } else if (cls === 'bard') {
+      spRow.style.display = '';
+      if (p.songOfRestFloorUsed) {
+        setBtn('🎵 SONG ✓ (next floor)', false);
+        setBar(0, 'var(--text-dim)');
+      } else {
+        setBtn('🎵 SONG OF REST', true);
+        setBar(100, 'var(--gold)');
+      }
+    } else if (cls === 'artificer') {
+      spRow.style.display = '';
+      if (p.tinkerFloorUsed) {
+        setBtn('🔧 FORGE ✓ (next floor)', false);
+        setBar(0, 'var(--text-dim)');
+      } else {
+        const canAfford = p.gold >= 15;
+        setBtn(`🔧 FORGE (15💰)`, canAfford);
+        setBar(canAfford ? 100 : 0, canAfford ? 'var(--gold)' : 'var(--text-dim)');
       }
     } else {
       spRow.style.display = 'none';
@@ -5630,6 +6130,8 @@ function setupInput() {
     else if (state.player.classId === 'wizard') castAoeSpell();
     else if (state.player.classId === 'ranger') activateAimedShot();
     else if (state.player.classId === 'cleric') activateDivineHeal();
+    else if (state.player.classId === 'bard') activateSongOfRest();
+    else if (state.player.classId === 'artificer') activateForge();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -5978,6 +6480,15 @@ function showSettings() {
           abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
           abilities.push({ icon: '💛', name: 'Divine Heal', desc: `40% HP heal + cure (1/floor)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
+        case 'bard':
+          abilities.push({ icon: '🎶', name: 'Charm', desc: `${Math.round(p.charmChance * 100)}% chance to pacify on hit` });
+          abilities.push({ icon: '🎵', name: 'Song of Rest', desc: `Heal self + allies 3 HP (1/floor)${p.songOfRestFloorUsed ? ' — USED' : ' — Ready'}` });
+          abilities.push({ icon: '🎤', name: '5% Dodge', desc: 'Natural agility' });
+          break;
+        case 'artificer':
+          abilities.push({ icon: '🔧', name: 'Forge', desc: `Upgrade weapon/armor +${p.masterSmith ? 2 : 1} (15g, 1/floor)${p.tinkerFloorUsed ? ' — USED' : ' — Ready'}` });
+          abilities.push({ icon: '⚒️', name: 'Tinker', desc: 'Practical combat instincts' });
+          break;
       }
       // Add unlocked class-specific perks
       const classPerkFlags = [
@@ -5987,6 +6498,8 @@ function showSettings() {
         { flag: 'manaShield', icon: '✨', name: 'Mana Shield', desc: '25% chance to negate damage' },
         { flag: 'quickDraw', icon: '🎯', name: 'Quick Draw', desc: 'Aimed Shot cooldown 5 instead of 8' },
         { flag: 'sanctifiedGround', icon: '✝️', name: 'Sanctified Ground', desc: 'Heal 1 HP when waiting' },
+        { flag: 'encore', icon: '🎶', name: 'Encore', desc: '30% chance charmed foes fight for you' },
+        { flag: 'masterSmith', icon: '⚒️', name: 'Master Smith', desc: 'Forge gives +2 instead of +1' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -6178,9 +6691,53 @@ function showSettings() {
 }
 
 // === HELP SCREEN ===
+const HELP_FONT_SIZES = [12, 14, 16]; // small, medium, large
+const HELP_FONT_LABELS = ['A-', 'A', 'A+'];
+
+function applyHelpFontSize(overlay) {
+  const size = HELP_FONT_SIZES[settings.helpFontSize] || 14;
+  const content = overlay.querySelector('.overlay-scroll, .manual-scroll, .help-content, .manual-content');
+  if (content) content.style.fontSize = size + 'px';
+  // Also try all p, li, td elements in the overlay
+  overlay.querySelectorAll('p, li, td, th, dd, dt').forEach(el => {
+    el.style.fontSize = size + 'px';
+  });
+}
+
+function renderFontSizeBar(overlay) {
+  // Remove existing bar if present
+  let bar = overlay.querySelector('.font-size-bar');
+  if (bar) bar.remove();
+  bar = document.createElement('div');
+  bar.className = 'font-size-bar';
+  bar.style.cssText = 'display:flex;justify-content:center;gap:8px;padding:6px 0 2px;';
+  for (let i = 0; i < 3; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = HELP_FONT_LABELS[i];
+    btn.style.cssText = `min-width:36px;height:30px;border-radius:6px;border:1px solid var(--panel-border);background:${i === settings.helpFontSize ? 'var(--gold)' : 'var(--panel-bg)'};color:${i === settings.helpFontSize ? '#000' : 'var(--text)'};font-weight:bold;font-size:14px;cursor:pointer;`;
+    btn.addEventListener('click', () => {
+      settings.helpFontSize = i;
+      saveSettings();
+      applyHelpFontSize(overlay);
+      renderFontSizeBar(overlay);
+    });
+    bar.appendChild(btn);
+  }
+  // Insert at top of overlay content
+  const firstChild = overlay.querySelector('.overlay-header, h2, h3');
+  if (firstChild && firstChild.nextSibling) {
+    firstChild.parentNode.insertBefore(bar, firstChild.nextSibling);
+  } else {
+    overlay.insertBefore(bar, overlay.firstChild);
+  }
+}
+
 function showHelp() {
   inputLocked = true;
-  $('help-overlay').classList.add('active');
+  const overlay = $('help-overlay');
+  overlay.classList.add('active');
+  renderFontSizeBar(overlay);
+  applyHelpFontSize(overlay);
 }
 
 function closeHelp() {
@@ -6190,7 +6747,10 @@ function closeHelp() {
 
 function showManual() {
   inputLocked = true;
-  $('manual-overlay').classList.add('active');
+  const overlay = $('manual-overlay');
+  overlay.classList.add('active');
+  renderFontSizeBar(overlay);
+  applyHelpFontSize(overlay);
 }
 
 function closeManual() {
@@ -6252,6 +6812,8 @@ function startMinimapPulse() {
           case T.DOOR_OPEN: ctx.fillStyle = vis ? '#a08030' : '#504020'; break;
           case T.DOOR_ONEWAY: ctx.fillStyle = '#c06030'; break;
           case T.DOOR_SEALED: ctx.fillStyle = '#6a2020'; break;
+          case T.WALL_SECRET: ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
+          case T.DOOR_LOCKED: ctx.fillStyle = '#c08030'; break;
           case T.SPECIAL: ctx.fillStyle = '#8060c0'; break;
           default: continue;
         }
@@ -6330,6 +6892,13 @@ function renderMinimap() {
           break;
         case T.DOOR_SEALED:
           ctx.fillStyle = '#6a2020';
+          break;
+        case T.WALL_SECRET:
+          // Render as normal wall on minimap
+          ctx.fillStyle = vis ? biome.wallVis : biome.wallDim;
+          break;
+        case T.DOOR_LOCKED:
+          ctx.fillStyle = '#c08030';
           break;
         case T.SPECIAL:
           ctx.fillStyle = '#8060c0';
@@ -6429,6 +6998,15 @@ function renderMinimap() {
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
     ctx.fillStyle = '#a060ff';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
+  // Draw tavern as amber dot
+  for (const e of state.entities) {
+    if (e.type !== 'tavern') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    ctx.fillStyle = '#d0a030';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
@@ -7015,6 +7593,68 @@ function activateDivineHeal() {
   Audio.useItem();
   updateUI();
   endTurn();
+}
+
+// === BARD: SONG OF REST ===
+function activateSongOfRest() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.songOfRestFloorUsed) {
+    addMessage('Song of Rest already used this floor.', '');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  const p = state.player;
+  const healAmount = 3;
+  p.hp = Math.min(p.maxHp, p.hp + healAmount);
+  // Heal allies too
+  const allies = state.entities.filter(e => e.type === 'enemy' && e.isAlly && e.hp > 0);
+  for (const ally of allies) {
+    ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+  }
+  p.songOfRestFloorUsed = true;
+  const allyMsg = allies.length > 0 ? ` and ${allies.length} ally${allies.length > 1 ? 'es' : ''}` : '';
+  addMessage(`🎵 Song of Rest heals you${allyMsg} for ${healAmount} HP!`, 'good');
+  animateAoeBlast(p.x, p.y, 2, '#60c0a0');
+  Audio.useItem();
+  updateUI();
+  endTurn();
+}
+
+// === ARTIFICER: FORGE ===
+function activateForge() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.tinkerFloorUsed) {
+    addMessage('Forge already used this floor.', '');
+    return;
+  }
+  const p = state.player;
+  if (p.gold < 15) {
+    addMessage('Forge costs 15 gold.', 'damage');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  p.gold -= 15;
+  const bonus = p.masterSmith ? 2 : 1;
+  // Upgrade equipped weapon or armor (prefer weapon)
+  if (p.equipped.weapon) {
+    p.equipped.weapon.attack += bonus;
+    p.equipped.weapon.name = p.equipped.weapon.name.replace(/ \+\d+$/, '') + ` +${p.equipped.weapon.attack}`;
+    addMessage(`🔧 Forged weapon: +${bonus} ATK! (${p.equipped.weapon.name})`, 'gold');
+  } else if (p.equipped.armor) {
+    p.equipped.armor.defense += bonus;
+    p.equipped.armor.name = p.equipped.armor.name.replace(/ \+\d+$/, '') + ` +${p.equipped.armor.defense}`;
+    addMessage(`🔧 Forged armor: +${bonus} DEF! (${p.equipped.armor.name})`, 'gold');
+  } else {
+    addMessage('No weapon or armor equipped to upgrade.', 'damage');
+    p.gold += 15; // refund
+    return;
+  }
+  p.tinkerFloorUsed = true;
+  animateEntityFlash(p.x, p.y, '#f0a030');
+  Audio.gold();
+  updateUI();
 }
 
 // === BOOT ===

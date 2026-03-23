@@ -979,6 +979,14 @@
       border-radius: 4px;
       color: var(--gold);
     }
+
+    /* Font size toggle bar (Help / Manual) */
+    .font-size-bar { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+    .font-btn { background: var(--panel); border: 1px solid var(--panel-border); color: var(--text); padding: 4px 12px; border-radius: 4px; font-size: 14px; min-width: 36px; min-height: 44px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+    .font-btn.active { background: var(--gold); color: #000; }
+    .help-font-sm .help-note, .help-font-sm .help-row { font-size: 11px; }
+    .help-font-md .help-note, .help-font-md .help-row { font-size: 13px; }
+    .help-font-lg .help-note, .help-font-lg .help-row { font-size: 15px; }
   </style>
 </head>
 <body>
@@ -1213,6 +1221,11 @@
   <div class="overlay" id="manual-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
     <div style="max-width:340px;width:100%;padding:0 12px;">
       <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
+      <div class="font-size-bar" id="manual-font-bar" style="margin-top:10px;">
+        <button class="font-btn" data-size="0">A-</button>
+        <button class="font-btn active" data-size="1">A</button>
+        <button class="font-btn" data-size="2">A+</button>
+      </div>
 
       <div class="help-section">
         <div class="help-heading">The Backstory</div>
@@ -1232,7 +1245,9 @@
         <div class="help-row"><span class="hl">🔴 The Citadel (9–12)</span><span>The King's fortress. Runed knights and demons still guard the halls.</span></div>
         <div class="help-row"><span class="hl">🔷 The Abyss (13–16)</span><span>A wound in reality. Void creatures and things from between the words.</span></div>
         <div class="help-row"><span class="hl">🟣 The Sanctum (17–20)</span><span>The throne of the Glyph King. Crystalline, beautiful, and lethal.</span></div>
-        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
+        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Taverns provide rest on floors 5, 10, 14. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
+        <p class="help-note" style="margin-top:6px;">🧱 <strong>Secret Walls</strong> hide throughout the dungeon — bump walls to test them. Rogues can sense nearby secrets. Behind them lies hidden loot worth the search.</p>
+        <p class="help-note" style="margin-top:6px;">🗝️ <strong>Bone Keys</strong> appear on floors 6, 12, and 18. They unlock doors to bonus wings — dangerous side areas with rare loot and tougher enemies.</p>
       </div>
 
       <div class="help-section">
@@ -1272,6 +1287,18 @@
           <div style="color:var(--gold);font-weight:700;font-size:13px;">⛪ Cleric</div>
           <p class="help-note">Holy warrior (18 HP, +2 ATK, +1 DEF). +3 ATK vs undead. Curse immune. Life-drain immune. Divine Heal: full HP restore once per run. Starts with Mace, Healing Potion, Scroll of Identify.</p>
           <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Sanctified Ground — heal 1 HP each time you wait (Space).</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🎵 Bard</div>
+          <p class="help-note">Charismatic performer (12 HP, +1 ATK, +1 DEF). Charm: 25% chance to pacify an enemy on hit. Song of Rest: heal 3 HP on a 10-turn cooldown. Starts with Lute (weapon) and Healing Potion.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Encore — charmed enemies may fight for you.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">⚒️ Artificer</div>
+          <p class="help-note">Master crafter (14 HP, +2 ATK, +1 DEF). Tinker: upgrade a piece of gear for gold, once per floor. Starts with Wrench (weapon), Leather Vest, and extra gold.</p>
+          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Master Smith — upgrades give +2 instead of +1.</p>
         </div>
       </div>
 
@@ -1326,6 +1353,8 @@
         <div class="help-row"><span class="hl">Wizard Mastery</span><span>Win as Wizard → +2 ATK start</span></div>
         <div class="help-row"><span class="hl">Ranger Mastery</span><span>Win as Ranger → start with Hunting Bow</span></div>
         <div class="help-row"><span class="hl">Cleric Mastery</span><span>Win as Cleric → +3 max HP start</span></div>
+        <div class="help-row"><span class="hl">Bard Mastery</span><span>Win as Bard → +1 DEF, charm chance start</span></div>
+        <div class="help-row"><span class="hl">Artificer Mastery</span><span>Win as Artificer → start with bonus gold</span></div>
         <div class="help-row"><span class="hl">Veteran</span><span>Win any run → +1 max HP all classes</span></div>
         <div class="help-row"><span class="hl">Seasoned Slayer</span><span>Kill 100+ enemies total → +1 ATK all</span></div>
         <div class="help-row"><span class="hl">Rune Adept</span><span>Collect 15+ runes total → floor 1 rune revealed</span></div>
@@ -1367,6 +1396,9 @@
         • Identify potions carefully — some were left as traps by the King's alchemists.<br>
         • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
         • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. Drop items while shopping to make room.<br>
+        • Taverns on floors 5, 10, 14 offer a moment of respite — heal up and buy food for the journey ahead.<br>
+        • Bump walls to search for secret passages — Rogues can sense them nearby.<br>
+        • Bone Keys (floors 6, 12, 18) unlock bonus wings with rare loot and dangerous foes.<br>
         • Rogues can close doors behind them (🚪 or <kbd>C</kbd>) — closed doors appear teal on the map.<br>
         • Adventurers always see stairs on the minimap — the pathfinder's instinct.<br>
         • Shrines offer random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.<br>
@@ -1425,6 +1457,11 @@
         <h1 style="font-size:18px;margin:0;">📖 How to Play</h1>
         <button class="help-btn" id="btn-close-help">✕ Close</button>
       </div>
+      <div class="font-size-bar" id="help-font-bar">
+        <button class="font-btn" data-size="0">A-</button>
+        <button class="font-btn active" data-size="1">A</button>
+        <button class="font-btn" data-size="2">A+</button>
+      </div>
 
       <div class="help-section">
         <div class="help-heading">Objective</div>
@@ -1475,16 +1512,20 @@
         <div class="help-row"><span class="hl">≡ Stairs</span><span>Descend with 🚪 Stairs or <kbd>S</kbd>. No going back up.</span></div>
         <div class="help-row"><span class="hl">+ Door</span><span>Bump to open. Rogues can close doors with <kbd>C</kbd> or 🚪. Enemies on floor 5+ bash doors while chasing.</span></div>
         <div class="help-row"><span class="hl">⛩️ Shrine</span><span>Random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.</span></div>
+        <div class="help-row"><span class="hl">🧱 Secret Wall</span><span>Bump walls to test them. Rogues can sense nearby secrets. Contains hidden loot.</span></div>
+        <div class="help-row"><span class="hl">🗝️ Bone Key</span><span>Found on floors 6, 12, 18. Opens locked doors to bonus wings with rare loot and tougher enemies.</span></div>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Classes (6)</div>
+        <div class="help-heading">Classes (8)</div>
         <div class="help-row"><span class="hl">🧝 Adventurer</span><span>15 HP, +2 ATK. Regen, Pathfinder (stairs on map). ★ Survivor's Instinct.</span></div>
         <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP, +4 ATK. Rage, Enrage ability. ★ Undying Fury: survive lethal hit 1/floor.</span></div>
         <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP, +3 ATK. 15% dodge, 20% crit. Can close doors (<kbd>C</kbd>). ★ Shadow Step: invisible 2 turns on kill.</span></div>
         <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP, +1 ATK. Double scrolls, Arcane Blast. ★ Mana Shield: 25% damage negation.</span></div>
         <div class="help-row"><span class="hl">🏹 Ranger</span><span>13 HP, +2 ATK, +1 DEF. +2 FOV, infinite arrows. ★ Quick Draw: Aimed Shot CD 5 instead of 8.</span></div>
         <div class="help-row"><span class="hl">⛪ Cleric</span><span>18 HP, +2 ATK, +1 DEF. Holy Aura, curse/drain immune. ★ Sanctified Ground: heal 1 HP when waiting.</span></div>
+        <div class="help-row"><span class="hl">🎵 Bard</span><span>12 HP, +1 ATK, +1 DEF. 25% charm on hit, Song of Rest (heal 3, 10-turn CD). ★ Encore: charmed enemies fight for you.</span></div>
+        <div class="help-row"><span class="hl">⚒️ Artificer</span><span>14 HP, +2 ATK, +1 DEF. Tinker (upgrade gear for gold, 1/floor). ★ Master Smith: upgrades give +2.</span></div>
         <p class="help-note" style="margin-top:4px;color:#c0a0ff;">★ = Class Perk (exclusive perk that appears during level-up for that class only)</p>
       </div>
 
@@ -1523,6 +1564,7 @@
         <div class="help-heading">NPCs</div>
         <div class="help-row"><span class="hl">🧙 Merchant</span><span>Shops on floors 3, 7, 11, 15, 19. Buy gear, arrows, food. 🔄 Refresh to reroll.</span></div>
         <div class="help-row"><span class="hl">🔮 Sage</span><span>On floors 2, 5, 9, 13, 17. Uncurse (30💰), identify (15💰), heal (20💰).</span></div>
+        <div class="help-row"><span class="hl">🍺 Tavern</span><span>Rest stops on floors 5, 10, 14. Heal, buy food, and hear rumors from fellow adventurers.</span></div>
         <div class="help-row"><span class="hl">🗣️ Lore NPCs</span><span>Stationary friendly spirits. Bump to hear a hint.</span></div>
         <div class="help-row"><span class="hl">🗿 Golem</span><span>Summoned ally from Scroll of Summoning. Fights for you. Walk into to swap places (cannot be attacked).</span></div>
       </div>
@@ -1546,12 +1588,13 @@
 
       <div class="help-section">
         <div class="help-heading">Mastery ⭐</div>
-        <p class="help-note">Permanent cross-run bonuses earned from achievements. Win as each class to unlock a mastery bonus for that class. Win any run for +1 HP to all classes. Kill 100+ enemies total for +1 ATK. Collect 15+ runes across all runs for floor 1 rune reveal. View progress in Stats screen.</p>
+        <p class="help-note">Permanent cross-run bonuses earned from achievements. Win as each class (including Bard and Artificer) to unlock a mastery bonus. Win any run for +1 HP to all classes. Kill 100+ enemies total for +1 ATK. Collect 15+ runes across all runs for floor 1 rune reveal. View progress in Stats screen.</p>
       </div>
 
       <div class="help-section">
         <div class="help-heading">Badges 🏆</div>
         <p class="help-note">Badges across Combat, Exploration, Class Mastery, and Challenge categories. Earned across all runs and saved permanently. Press <kbd>B</kbd> or find 🏆 Badges in the Stats screen.</p>
+        <p class="help-note" style="margin-top:4px;">New class badges: <strong>🎵 Bardic Legend</strong> (win as Bard) and <strong>⚒️ Master Craftsman</strong> (win as Artificer).</p>
       </div>
 
       <div class="help-section">
@@ -1595,7 +1638,10 @@
           • Equipment gets stronger on deeper floors — explore further for better loot.<br>
           • Rogue-closed doors appear teal so you can spot your barricades at a glance.<br>
           • Your ghost from a previous death haunts the floor where you died.<br>
-          • Mastery bonuses from prior wins make future runs easier.
+          • Mastery bonuses from prior wins make future runs easier.<br>
+          • Taverns (floors 5, 10, 14) let you rest, heal, and stock up on food.<br>
+          • Bump walls to find secret passages — Rogues sense them automatically.<br>
+          • Bone Keys (floors 6, 12, 18) open bonus wings with rare loot and harder enemies.
         </p>
       </div>
 
