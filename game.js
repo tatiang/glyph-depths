@@ -481,7 +481,7 @@ const CLASS_DEFS = [
     flavor: 'Holy warrior. Undead fear the faithful. Heals through devotion.',
     hp: 18, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '✝ Holy Aura vs Undead · Curse Immune',
+    passive: '✝ Holy Aura vs Undead · Curse/Drain Immune',
     startItems: 'Mace · Healing Potion · Scroll of Identify',
     statBadges: [{ label: '18 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Divine Heal', cls: 'pos' }]
@@ -767,7 +767,8 @@ function createPlayer(classId = 'adventurer') {
     aimedShotCooldown: 0,
     // Cleric
     divineHealUsed: false,
-    curseImmune: classId === 'cleric'
+    curseImmune: classId === 'cleric',
+    drainImmune: false // granted by shrine sacrifice
   };
 }
 
@@ -937,7 +938,7 @@ const GLYPH_RUNES = [
   { id: 'greed',     name: 'Glyph of Greed',      symbol: '💎', desc: 'Enemies drop 50% more gold', effect: 'greed' },
   { id: 'hunger',    name: 'Glyph of Sustenance',  symbol: '🍞', desc: 'Hunger drains 25% slower', effect: 'hunger' },
   { id: 'wrath',     name: 'Glyph of Wrath',      symbol: '💢', desc: '+1 base attack', effect: 'wrath' },
-  { id: 'warding',   name: 'Glyph of Warding',    symbol: '🛡️', desc: '+1 base defense', effect: 'warding' },
+  { id: 'warding',   name: 'Glyph of Warding',    symbol: '🛡️', desc: '+1 base defense, 50% life-drain resist', effect: 'warding' },
   { id: 'vampirism', name: 'Glyph of Vampirism',  symbol: '🩸', desc: 'Heal 1 HP per kill', effect: 'vampirism' },
   { id: 'fortune',   name: 'Glyph of Fortune',    symbol: '🍀', desc: '+5% crit chance', effect: 'fortune' },
 ];
@@ -2251,10 +2252,18 @@ function attackEntity(attacker, defender) {
     addMessage(`Thorns deal 1 damage to ${attacker.name}!`, '');
   }
 
-  // Wraith drain
+  // Wraith drain — blocked by Cleric Holy Aura, resisted by Warding rune, blocked by sanctified soul
   if (attacker.special === 'drain' && targetIsPlayer) {
-    state.player.maxHp = Math.max(5, state.player.maxHp - 1);
-    addMessage('You feel your life force drain away!', 'damage');
+    if (state.player.classId === 'cleric') {
+      addMessage('✝️ Your holy aura repels the life drain!', 'good');
+    } else if (state.player.drainImmune) {
+      addMessage('🛡️ Your sanctified soul resists the drain!', 'good');
+    } else if (hasRune('warding') && Math.random() < 0.5) {
+      addMessage('🛡️ The Glyph of Warding deflects the drain!', 'good');
+    } else {
+      state.player.maxHp = Math.max(5, state.player.maxHp - 1);
+      addMessage('You feel your life force drain away!', 'damage');
+    }
   }
 
   // Spider web
@@ -3881,11 +3890,17 @@ function triggerSpecialEvent() {
 
 function showShrineChoice() {
   inputLocked = true;
-  const sacrifices = [
+  const allSacrifices = [
     { text: 'Sacrifice 5 Max HP for +2 Attack', apply: () => { state.player.maxHp -= 5; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.attack += 2; }},
     { text: 'Sacrifice 10 Gold for +1 Defense', apply: () => { state.player.gold = Math.max(0, state.player.gold - 10); state.player.defense += 1; }},
-    { text: 'Leave the shrine alone', apply: () => {} }
+    { text: 'Sanctify your soul — gain life-drain immunity', apply: () => { state.player.drainImmune = true; addMessage('🛡️ Your soul is shielded from the hunger of wraiths.', 'good'); }, condition: () => !state.player.drainImmune && state.player.classId !== 'cleric' },
+    { text: 'Sacrifice 3 Max HP to restore 30 hunger', apply: () => { state.player.maxHp -= 3; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.hunger = Math.min(100, state.player.hunger + 30); }},
   ];
+  // Filter to available options + always include "leave"
+  const sacrifices = allSacrifices.filter(s => !s.condition || s.condition());
+  // Pick 2 random options from available, plus "leave"
+  while (sacrifices.length > 2) sacrifices.splice(Math.floor(Math.random() * sacrifices.length), 1);
+  sacrifices.push({ text: 'Leave the shrine alone', apply: () => {} });
 
   const container = $('perk-choices');
   container.innerHTML = '';
@@ -5820,7 +5835,7 @@ function showSettings() {
           abilities.push({ icon: '♾️', name: 'Infinite Arrows', desc: 'Basic arrows never run out' });
           break;
         case 'cleric':
-          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead enemies' });
+          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead, drain immune' });
           abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
           abilities.push({ icon: '💛', name: 'Divine Heal', desc: `40% HP heal + cure (1/floor)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
@@ -5836,6 +5851,10 @@ function showSettings() {
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
+      }
+      // Shrine-granted abilities
+      if (p.drainImmune && p.classId !== 'cleric') {
+        abilities.push({ icon: '🛡️', name: 'Sanctified Soul', desc: 'Immune to life-drain (shrine)' });
       }
 
       const classAbilList = $('class-ability-list');
