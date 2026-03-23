@@ -6316,17 +6316,13 @@ function setupUI() {
   $('minimap-overlay').addEventListener('click', () => { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); });
 
   // Merchant close
-  $('btn-leave-shop').addEventListener('click', () => {
-    $('merchant-overlay').classList.remove('active');
-    inputLocked = false;
-    endTurn();
-  });
+  const leaveShopFn = () => { $('merchant-overlay').classList.remove('active'); inputLocked = false; endTurn(); };
+  $('btn-leave-shop').addEventListener('click', leaveShopFn);
+  $('btn-leave-shop').addEventListener('touchend', (e) => { e.preventDefault(); leaveShopFn(); }, { passive: false });
 
-  $('btn-leave-sage').addEventListener('click', () => {
-    $('sage-overlay').classList.remove('active');
-    inputLocked = false;
-    endTurn();
-  });
+  const leaveSageFn = () => { $('sage-overlay').classList.remove('active'); inputLocked = false; endTurn(); };
+  $('btn-leave-sage').addEventListener('click', leaveSageFn);
+  $('btn-leave-sage').addEventListener('touchend', (e) => { e.preventDefault(); leaveSageFn(); }, { passive: false });
 
   // Tap chevron to expand/collapse message log
   const msgToggle = $('msg-log-toggle');
@@ -6340,28 +6336,26 @@ function setupUI() {
   msgToggle.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); toggleLog(); }, { passive: false });
 
   // Settings
-  $('btn-close-settings').addEventListener('click', () => {
+  const closeSettingsFn = () => {
     $('settings-overlay').classList.remove('active');
     inputLocked = false;
-  });
+  };
+  $('btn-close-settings').addEventListener('click', closeSettingsFn);
+  $('btn-close-settings').addEventListener('touchend', (e) => { e.preventDefault(); closeSettingsFn(); }, { passive: false });
 
   // Help screen
   $('btn-help-from-title').addEventListener('click', showHelp);
-  $('btn-help-from-settings').addEventListener('click', () => {
-    $('settings-overlay').classList.remove('active');
-    showHelp();
-  });
-  $('btn-badges-from-settings').addEventListener('click', () => {
-    $('settings-overlay').classList.remove('active');
-    showBadgeOverlay();
-  });
-  $('btn-badges-from-settings').addEventListener('touchend', (e) => {
-    e.preventDefault();
-    $('settings-overlay').classList.remove('active');
-    showBadgeOverlay();
-  }, { passive: false });
+  $('btn-help-from-title').addEventListener('touchend', (e) => { e.preventDefault(); showHelp(); }, { passive: false });
+  const helpFromSettingsFn = () => { $('settings-overlay').classList.remove('active'); showHelp(); };
+  $('btn-help-from-settings').addEventListener('click', helpFromSettingsFn);
+  $('btn-help-from-settings').addEventListener('touchend', (e) => { e.preventDefault(); helpFromSettingsFn(); }, { passive: false });
+  const badgesFromSettingsFn = () => { $('settings-overlay').classList.remove('active'); showBadgeOverlay(); };
+  $('btn-badges-from-settings').addEventListener('click', badgesFromSettingsFn);
+  $('btn-badges-from-settings').addEventListener('touchend', (e) => { e.preventDefault(); badgesFromSettingsFn(); }, { passive: false });
   $('btn-close-help').addEventListener('click', closeHelp);
+  $('btn-close-help').addEventListener('touchend', (e) => { e.preventDefault(); closeHelp(); }, { passive: false });
   $('btn-close-help-bottom').addEventListener('click', closeHelp);
+  $('btn-close-help-bottom').addEventListener('touchend', (e) => { e.preventDefault(); closeHelp(); }, { passive: false });
 
   // Manual overlay
   const manualFromSettings = $('btn-manual-from-settings');
@@ -6381,6 +6375,12 @@ function setupUI() {
     const closeFn = () => closeManual();
     closeManualBtn.addEventListener('click', closeFn);
     closeManualBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
+  }
+  const closeManualTopBtn = $('btn-close-manual-top');
+  if (closeManualTopBtn) {
+    const closeFn2 = () => closeManual();
+    closeManualTopBtn.addEventListener('click', closeFn2);
+    closeManualTopBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn2(); }, { passive: false });
   }
 
   // Save/Load buttons in settings
@@ -6751,6 +6751,25 @@ function showManual() {
   overlay.classList.add('active');
   renderFontSizeBar(overlay);
   applyHelpFontSize(overlay);
+  // Wire search if not already wired
+  const searchInput = $('manual-search');
+  if (searchInput && !searchInput._wired) {
+    searchInput._wired = true;
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase().trim();
+      const sections = overlay.querySelectorAll('.help-section');
+      for (const sec of sections) {
+        if (!query) {
+          sec.classList.remove('manual-no-match');
+        } else {
+          const text = sec.textContent.toLowerCase();
+          sec.classList.toggle('manual-no-match', !text.includes(query));
+        }
+      }
+    });
+  }
+  // Clear search on open
+  if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
 }
 
 function closeManual() {

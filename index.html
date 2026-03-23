@@ -987,6 +987,9 @@
     .help-font-sm .help-note, .help-font-sm .help-row { font-size: 11px; }
     .help-font-md .help-note, .help-font-md .help-row { font-size: 13px; }
     .help-font-lg .help-note, .help-font-lg .help-row { font-size: 15px; }
+    #manual-search { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text); font-size: 14px; font-family: inherit; margin-bottom: 10px; box-sizing: border-box; -webkit-appearance: none; }
+    #manual-search::placeholder { color: var(--text-dim); }
+    .manual-no-match { display: none !important; }
   </style>
 </head>
 <body>
@@ -1067,7 +1070,7 @@
       <button class="big-btn" id="btn-start">Descend</button>
       <button class="big-btn" id="btn-load-from-title" style="display:none;margin-top:8px;background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Continue Saved Game</button>
       <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
-        <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">📖 How to Play</button>
+        <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
         <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
       </div>
@@ -1138,7 +1141,7 @@
     <button class="big-btn" id="btn-leave-sage" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
   </div>
 
-  <div class="overlay" id="settings-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(8px + var(--safe-bottom));overflow:hidden;display:flex;flex-direction:column;">
+  <div class="overlay" id="settings-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(8px + var(--safe-bottom));overflow:hidden;">
     <h1 style="margin-bottom:4px;flex-shrink:0;">⚙️ Config</h1>
     <div class="config-dots" id="config-dots">
       <div class="config-dot active" data-page="0"></div>
@@ -1205,7 +1208,7 @@
             </div>
             <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
               <button class="big-btn" id="btn-badges-from-settings" style="background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
-              <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">📖 How to Play</button>
+              <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">⚡ Quickstart</button>
               <button class="big-btn" id="btn-manual-from-settings" style="background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
             </div>
             <div id="game-version" style="margin-top:16px;font-size:10px;color:var(--text-dim);text-align:center;opacity:0.6;font-family:monospace;"></div>
@@ -1220,8 +1223,12 @@
 
   <div class="overlay" id="manual-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
     <div style="max-width:340px;width:100%;padding:0 12px;">
-      <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
-      <div class="font-size-bar" id="manual-font-bar" style="margin-top:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
+        <button class="help-btn" id="btn-close-manual-top">✕ Close</button>
+      </div>
+      <input type="text" id="manual-search" placeholder="🔍 Search manual..." autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="font-size-bar" id="manual-font-bar" style="margin-top:0;">
         <button class="font-btn" data-size="0">A-</button>
         <button class="font-btn active" data-size="1">A</button>
         <button class="font-btn" data-size="2">A+</button>
@@ -1454,7 +1461,7 @@
   <div id="help-overlay">
     <div style="width:100%;max-width:340px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <h1 style="font-size:18px;margin:0;">📖 How to Play</h1>
+        <h1 style="font-size:18px;margin:0;">⚡ Quickstart</h1>
         <button class="help-btn" id="btn-close-help">✕ Close</button>
       </div>
       <div class="font-size-bar" id="help-font-bar">
@@ -1464,184 +1471,65 @@
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Objective</div>
-        <p class="help-note">Descend 20 floors of the Unnamed Depths and defeat the Glyph King on Floor 20 to escape. Five biomes await: The Sewers (1–4), The Crypt (5–8), The Citadel (9–12), The Abyss (13–16), and The Sanctum (17–20).</p>
+        <div class="help-heading">Goal</div>
+        <p class="help-note">Descend 20 floors. Defeat the Glyph King on floor 20. Survive.</p>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Movement &amp; Combat</div>
-        <div class="help-row"><span class="hl">Move</span><span>D-pad, WASD, or arrow keys. Hold D-pad for continuous movement.</span></div>
-        <div class="help-row"><span class="hl">Attack</span><span>Bump into an enemy to attack it. Enemies act each turn you do.</span></div>
-        <div class="help-row"><span class="hl">Wait</span><span>⏳ button or Space — skip your turn without moving.</span></div>
-        <div class="help-row"><span class="hl">Crits</span><span>10% chance to deal double damage (enemies crit less on early floors).</span></div>
-        <div class="help-row"><span class="hl">Dodge</span><span>Base 5% chance to evade; Rogue class has +15% dodge.</span></div>
+        <div class="help-heading">Controls</div>
+        <div class="help-row"><span class="hl">Move</span><span>D-pad / WASD / arrow keys. Hold for repeat.</span></div>
+        <div class="help-row"><span class="hl">Attack</span><span>Walk into an enemy to hit it.</span></div>
+        <div class="help-row"><span class="hl">Wait</span><span>⏳ button or Space — skip a turn.</span></div>
+        <div class="help-row"><span class="hl">Fire</span><span>🏹 button or <kbd>F</kbd> — shoot an equipped bow.</span></div>
+        <div class="help-row"><span class="hl">Throw</span><span><kbd>T</kbd> — hurl throwing daggers.</span></div>
+        <div class="help-row"><span class="hl">Stairs</span><span>🚪 button or <kbd>S</kbd> — descend when on stairs.</span></div>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Items</div>
-        <div class="help-row"><span class="hl">Pick up</span><span>Walk over items or tap ✋ Get. Auto-pickup is on by default.</span></div>
-        <div class="help-row"><span class="hl">Use / Equip</span><span>Tap any slot in the inventory bar. Choose Equip, Use, Throw, or Drop.</span></div>
-        <div class="help-row"><span class="hl">Auto-Equip</span><span>Enable in Settings to auto-equip better weapons/armor when found.</span></div>
-        <div class="help-row"><span class="hl">Quick Use</span><span>🧪 Use button or <kbd>U</kbd> — opens a fast-select for potions &amp; scrolls.</span></div>
-        <div class="help-row"><span class="hl">Potions 🧪</span><span>Unknown until used. Effects are randomized each run. Classes start with identified potions.</span></div>
-        <div class="help-row"><span class="hl">Scrolls 📜</span><span>Randomized labels each run. Wizards start with identified scrolls.</span></div>
-        <div class="help-row"><span class="hl">Daggers 🗡️</span><span>Thrown at enemies — press <kbd>T</kbd> then pick a direction.</span></div>
-        <div class="help-row"><span class="hl">Cursed ⚠</span><span>Hidden until equipped! Cursed gear locks to your slot. Use a Scroll of Remove Curse to free it.</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Ranged Combat</div>
-        <div class="help-row"><span class="hl">Bows 🏹</span><span>Equip in the ranged slot (green border). Press <kbd>F</kbd> or tap 🏹 Fire, then choose a direction.</span></div>
-        <div class="help-row"><span class="hl">Arrows ➶</span><span>Rangers have unlimited arrows. Other classes find arrows on floors or buy from merchants.</span></div>
-        <div class="help-row"><span class="hl">Special ➶</span><span>🔥 Fire, ❄️ Frost, 💥 Blast, 🗡️ Piercing arrows — load from inventory before firing.</span></div>
-        <div class="help-row"><span class="hl">Bow types</span><span>Short Bow → Hunting Bow → Longbow/Crossbow/Elven Bow. Higher tier = more damage &amp; range.</span></div>
+        <div class="help-heading">Items &amp; Inventory</div>
+        <p class="help-note">Walk over items to auto-pick up. Tap an inventory slot to Equip, Use, Throw, or Drop. Potions and scrolls are unidentified until used — effects randomize each run.</p>
       </div>
 
       <div class="help-section">
         <div class="help-heading">Hunger</div>
-        <div class="help-row"><span class="hl">Drain</span><span>Hunger falls over time. At 0 you lose 1 HP every 5 turns.</span></div>
-        <div class="help-row"><span class="hl">Restore</span><span>Eat food rations 🍖 or use a Ring of Hunger to halve drain rate.</span></div>
-        <div class="help-row"><span class="hl">Stacking</span><span>Rations stack up to 5 per inventory slot. Auto-stacks on pickup.</span></div>
-        <div class="help-row"><span class="hl">Berserker</span><span>Hunger drains 2× faster — plan food carefully.</span></div>
+        <p class="help-note">Hunger drains over time. At 0 you lose HP. Eat rations 🍖 to restore it. Rations stack up to 5 per slot. Food is scarce — manage it carefully.</p>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Special Tiles</div>
-        <div class="help-row"><span class="hl">▼ One-Way</span><span>Entering seals the door behind you. Bash 5 times (–1 HP each) to break through.</span></div>
-        <div class="help-row"><span class="hl">✦ Glyph Rune</span><span>Permanent passive effect. One per floor. Walk over to collect.</span></div>
-        <div class="help-row"><span class="hl">≡ Stairs</span><span>Descend with 🚪 Stairs or <kbd>S</kbd>. No going back up.</span></div>
-        <div class="help-row"><span class="hl">+ Door</span><span>Bump to open. Rogues can close doors with <kbd>C</kbd> or 🚪. Enemies on floor 5+ bash doors while chasing.</span></div>
-        <div class="help-row"><span class="hl">⛩️ Shrine</span><span>Random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.</span></div>
-        <div class="help-row"><span class="hl">🧱 Secret Wall</span><span>Bump walls to test them. Rogues can sense nearby secrets. Contains hidden loot.</span></div>
-        <div class="help-row"><span class="hl">🗝️ Bone Key</span><span>Found on floors 6, 12, 18. Opens locked doors to bonus wings with rare loot and tougher enemies.</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Classes (8)</div>
-        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>15 HP, +2 ATK. Regen, Pathfinder (stairs on map). ★ Survivor's Instinct.</span></div>
-        <div class="help-row"><span class="hl">🪖 Berserker</span><span>22 HP, +4 ATK. Rage, Enrage ability. ★ Undying Fury: survive lethal hit 1/floor.</span></div>
-        <div class="help-row"><span class="hl">🥷 Rogue</span><span>10 HP, +3 ATK. 15% dodge, 20% crit. Can close doors (<kbd>C</kbd>). ★ Shadow Step: invisible 2 turns on kill.</span></div>
-        <div class="help-row"><span class="hl">🧙 Wizard</span><span>11 HP, +1 ATK. Double scrolls, Arcane Blast. ★ Mana Shield: 25% damage negation.</span></div>
-        <div class="help-row"><span class="hl">🏹 Ranger</span><span>13 HP, +2 ATK, +1 DEF. +2 FOV, infinite arrows. ★ Quick Draw: Aimed Shot CD 5 instead of 8.</span></div>
-        <div class="help-row"><span class="hl">⛪ Cleric</span><span>18 HP, +2 ATK, +1 DEF. Holy Aura, curse/drain immune. ★ Sanctified Ground: heal 1 HP when waiting.</span></div>
-        <div class="help-row"><span class="hl">🎵 Bard</span><span>12 HP, +1 ATK, +1 DEF. 25% charm on hit, Song of Rest (heal 3, 10-turn CD). ★ Encore: charmed enemies fight for you.</span></div>
-        <div class="help-row"><span class="hl">⚒️ Artificer</span><span>14 HP, +2 ATK, +1 DEF. Tinker (upgrade gear for gold, 1/floor). ★ Master Smith: upgrades give +2.</span></div>
-        <p class="help-note" style="margin-top:4px;color:#c0a0ff;">★ = Class Perk (exclusive perk that appears during level-up for that class only)</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Enemies (5 tiers)</div>
-        <div class="help-row"><span class="hl">Tier 1 (F1–4)</span><span>Rats, Skeletons, Bats, Slimes</span></div>
-        <div class="help-row"><span class="hl">Tier 2 (F5–8)</span><span>Goblins, Ghosts, Spiders, Ogres</span></div>
-        <div class="help-row"><span class="hl">Tier 3 (F9–12)</span><span>Wraiths, Mimics, Necromancers, Demons</span></div>
-        <div class="help-row"><span class="hl">Tier 4 (F13–16)</span><span>Dark Knights, Banshees, Hydras, Warlocks</span></div>
-        <div class="help-row"><span class="hl">Tier 5 (F17–19)</span><span>Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches</span></div>
-        <div class="help-row"><span class="hl">Floor 20</span><span>👑 The Glyph King (3-phase boss fight)</span></div>
-        <p class="help-note" style="margin-top:4px;">Mini-bosses appear on floors 4, 8, 12, 16, and 19.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Level Ups &amp; Perks</div>
-        <p class="help-note">Killing enemies gives XP. On level up, pick one of three perks:</p>
-        <div class="help-row"><span class="hl">Common</span><span>Extended Vision, +1 Attack, +1 Defense</span></div>
-        <div class="help-row"><span class="hl">Rare</span><span>+5 Max HP, Glass Cannon (2× ATK, –30% HP), Rapid Regen</span></div>
-        <div class="help-row"><span class="hl">Unique/Rare</span><span>Vampiric Strikes (20% life steal), Iron Skin (–1 dmg taken), Battle Fury (+3 ATK &lt;30% HP)</span></div>
-        <p class="help-note" style="margin-top:4px;">Each class also has an exclusive ★ Class Perk that only appears for that class.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Perk Synergies ⚡</div>
-        <p class="help-note">Combine specific perks with runes to unlock hidden bonuses. A gold message announces activation.</p>
-        <div class="help-row"><span class="hl">🔥 Soulfire</span><span>Vampiric Strikes + Flame rune → burn heals you</span></div>
-        <div class="help-row"><span class="hl">🏰 Fortress</span><span>Iron Skin + Thorns rune → reflect 3 damage</span></div>
-        <div class="help-row"><span class="hl">💢 Berserker's Rage</span><span>Battle Fury + Wrath rune → +5 ATK fury</span></div>
-        <div class="help-row"><span class="hl">🌿 Lifebloom</span><span>Rapid Regen + Vitality rune → heal 2/tick</span></div>
-        <div class="help-row"><span class="hl">🎯 Deadly Precision</span><span>Glass Cannon + Fortune rune → +15% crit</span></div>
-        <div class="help-row"><span class="hl">🩸 Blood Lord</span><span>Vampiric Strikes + Vampirism rune → 35% life steal</span></div>
+        <div class="help-heading">Key Mechanics</div>
+        <div class="help-row"><span class="hl">✦ Runes</span><span>One per floor. Walk over to collect. Permanent bonus for the run.</span></div>
+        <div class="help-row"><span class="hl">⛩️ Shrines</span><span>Trade HP or gold for stat boosts or drain immunity.</span></div>
+        <div class="help-row"><span class="hl">🧱 Secret Walls</span><span>Bump walls to find hidden rooms with loot.</span></div>
+        <div class="help-row"><span class="hl">🗝️ Bonus Wings</span><span>Find Bone Keys (F6, 12, 18) to unlock side areas.</span></div>
+        <div class="help-row"><span class="hl">⚡ Synergies</span><span>Combine perks + runes for powerful hidden combos.</span></div>
       </div>
 
       <div class="help-section">
         <div class="help-heading">NPCs</div>
-        <div class="help-row"><span class="hl">🧙 Merchant</span><span>Shops on floors 3, 7, 11, 15, 19. Buy gear, arrows, food. 🔄 Refresh to reroll.</span></div>
-        <div class="help-row"><span class="hl">🔮 Sage</span><span>On floors 2, 5, 9, 13, 17. Uncurse (30💰), identify (15💰), heal (20💰).</span></div>
-        <div class="help-row"><span class="hl">🍺 Tavern</span><span>Rest stops on floors 5, 10, 14. Heal, buy food, and hear rumors from fellow adventurers.</span></div>
-        <div class="help-row"><span class="hl">🗣️ Lore NPCs</span><span>Stationary friendly spirits. Bump to hear a hint.</span></div>
-        <div class="help-row"><span class="hl">🗿 Golem</span><span>Summoned ally from Scroll of Summoning. Fights for you. Walk into to swap places (cannot be attacked).</span></div>
+        <p class="help-note">🧙 Merchants (F3,7,11,15,19) sell gear. 🔮 Sages (F2,5,9,13,17) uncurse and heal. 🍺 Taverns (F5,10,14) sell food and rumors. 🗣️ Shades give lore hints.</p>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Glyph Runes ✦</div>
-        <p class="help-note">One rune spawns per floor (glowing purple). Walk over to collect. Permanent for the run. Shown as "✦ Runes:" below the status bar.</p>
-        <div class="help-row"><span class="hl">🔶 Flame</span><span>15% burn on hit</span></div>
-        <div class="help-row"><span class="hl">🔷 Frost</span><span>15% freeze on hit</span></div>
-        <div class="help-row"><span class="hl">🟢 Thorns</span><span>Reflect 1 damage</span></div>
-        <div class="help-row"><span class="hl">❤️ Vitality</span><span>+3 max HP</span></div>
-        <div class="help-row"><span class="hl">⚡ Swiftness</span><span>+8% dodge</span></div>
-        <div class="help-row"><span class="hl">👁️ Sight</span><span>+1 FOV</span></div>
-        <div class="help-row"><span class="hl">💎 Greed</span><span>+50% gold drops</span></div>
-        <div class="help-row"><span class="hl">🍞 Sustenance</span><span>25% slower hunger</span></div>
-        <div class="help-row"><span class="hl">💢 Wrath</span><span>+1 ATK</span></div>
-        <div class="help-row"><span class="hl">🛡️ Warding</span><span>+1 DEF, 50% drain resist</span></div>
-        <div class="help-row"><span class="hl">🩸 Vampirism</span><span>+1 HP per kill</span></div>
-        <div class="help-row"><span class="hl">🍀 Fortune</span><span>+5% crit</span></div>
+        <div class="help-heading">8 Classes</div>
+        <p class="help-note">Each class has unique stats, abilities, and an exclusive ★ perk. See the 📜 Manual for full details.</p>
+        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>Balanced. Regen + Pathfinder.</span></div>
+        <div class="help-row"><span class="hl">🪖 Berserker</span><span>High ATK. Rage mode. 2× hunger.</span></div>
+        <div class="help-row"><span class="hl">🥷 Rogue</span><span>Dodge + crit. Stealth. Close doors.</span></div>
+        <div class="help-row"><span class="hl">🧙 Wizard</span><span>Double scrolls. AoE blast.</span></div>
+        <div class="help-row"><span class="hl">🏹 Ranger</span><span>+2 FOV. Infinite arrows. Aimed Shot.</span></div>
+        <div class="help-row"><span class="hl">⛪ Cleric</span><span>Holy Aura. Curse/drain immune.</span></div>
+        <div class="help-row"><span class="hl">🎵 Bard</span><span>Charm enemies. Song of Rest heal.</span></div>
+        <div class="help-row"><span class="hl">⚒️ Artificer</span><span>Upgrade gear with gold.</span></div>
       </div>
 
       <div class="help-section">
-        <div class="help-heading">Mastery ⭐</div>
-        <p class="help-note">Permanent cross-run bonuses earned from achievements. Win as each class (including Bard and Artificer) to unlock a mastery bonus. Win any run for +1 HP to all classes. Kill 100+ enemies total for +1 ATK. Collect 15+ runes across all runs for floor 1 rune reveal. View progress in Stats screen.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Badges 🏆</div>
-        <p class="help-note">Badges across Combat, Exploration, Class Mastery, and Challenge categories. Earned across all runs and saved permanently. Press <kbd>B</kbd> or find 🏆 Badges in the Stats screen.</p>
-        <p class="help-note" style="margin-top:4px;">New class badges: <strong>🎵 Bardic Legend</strong> (win as Bard) and <strong>⚒️ Master Craftsman</strong> (win as Artificer).</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Save &amp; Load</div>
-        <p class="help-note">Save your run from ⚙ Settings → 💾 Save (3 slots). Load from title screen or Settings → 📂 Load. Saves are deleted automatically when a loaded run ends (death or victory).</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Settings</div>
-        <p class="help-note">Toggle Sound, Haptics, D-Pad, Auto-Pickup, and Auto-Equip. Access the 📜 Manual for full game lore, detailed class guides, and complete reference.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Keyboard Shortcuts</div>
-        <div class="help-row"><span class="hk">WASD / Arrows</span><span>Move (hold D-pad on mobile for repeat)</span></div>
-        <div class="help-row"><span class="hk">Space</span><span>Wait one turn</span></div>
-        <div class="help-row"><span class="hk">G</span><span>Pick up items</span></div>
-        <div class="help-row"><span class="hk">S</span><span>Use stairs</span></div>
-        <div class="help-row"><span class="hk">F</span><span>Fire ranged weapon (bow)</span></div>
-        <div class="help-row"><span class="hk">T</span><span>Throw daggers</span></div>
-        <div class="help-row"><span class="hk">C</span><span>Close door (Rogue only)</span></div>
-        <div class="help-row"><span class="hk">E</span><span>Quick equip</span></div>
-        <div class="help-row"><span class="hk">U</span><span>Quick-use consumable</span></div>
-        <div class="help-row"><span class="hk">M</span><span>Toggle minimap</span></div>
-        <div class="help-row"><span class="hk">B</span><span>View badges</span></div>
-        <div class="help-row"><span class="hk">ESC</span><span>Close menus / cancel aim</span></div>
-        <div class="help-row"><span class="hk">H / ?</span><span>This help screen</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Tips</div>
+        <div class="help-heading">Quick Tips</div>
         <p class="help-note">
-          • Special abilities require double-tap or hold on mobile to prevent accidental use.<br>
-          • Combine perks + runes for powerful synergies (check Stats screen).<br>
-          • Rations stack to 5 per slot. Glyph of Sustenance and Ring of Hunger slow drain.<br>
-          • Poison scales with depth — mild in the Sewers, lethal in the Sanctum.<br>
-          • Rogues can close doors (🚪 or <kbd>C</kbd>) to block enemies and create safe rooms.<br>
-          • On floor 5+ enemies can bash open closed doors while chasing you.<br>
-          • Wraiths drain max HP — Clerics are immune; Warding rune gives 50% resist; shrines can grant full immunity.<br>
-          • Auto-equip (⚙️ Config) prefers specialty weapons over plain ones at same stats.<br>
-          • Equipment gets stronger on deeper floors — explore further for better loot.<br>
-          • Rogue-closed doors appear teal so you can spot your barricades at a glance.<br>
-          • Your ghost from a previous death haunts the floor where you died.<br>
-          • Mastery bonuses from prior wins make future runs easier.<br>
-          • Taverns (floors 5, 10, 14) let you rest, heal, and stock up on food.<br>
-          • Bump walls to find secret passages — Rogues sense them automatically.<br>
-          • Bone Keys (floors 6, 12, 18) open bonus wings with rare loot and harder enemies.
+          • Special abilities: double-tap or hold on mobile.<br>
+          • Your ghost from a past death haunts where you fell.<br>
+          • One-way doors seal behind you. Bash sealed doors (5 hits).<br>
+          • Auto-equip (⚙️ Config) picks up better gear for you.<br>
+          • See the 📜 Manual for full class guides, enemy lists, synergies, and lore.
         </p>
       </div>
 
