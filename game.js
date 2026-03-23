@@ -65,6 +65,8 @@ const BADGE_DEFS = [
   { id: 'win_mason', name: "Mason's Bastion", icon: '🧱', desc: 'Win as Brick Mason', cat: 'class' },
   { id: 'win_daredevil', name: "Daredevil's Gamble", icon: '🤸', desc: 'Win as Daredevil', cat: 'class' },
   { id: 'win_escapeartist', name: "Escape Artist's Exit", icon: '💨', desc: 'Win as Escape Artist', cat: 'class' },
+  { id: 'win_conjurer', name: "Conjurer's Phantom", icon: '🎭', desc: 'Win as Conjurer', cat: 'class' },
+  { id: 'win_barterer', name: "Barterer's Fortune", icon: '🪙', desc: 'Win as Barterer', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -193,6 +195,8 @@ const MASTERY_DEFS = [
   { id: 'bm_mastery',   trigger: 'win_mason',      name: 'Mason Mastery',       desc: 'All Brick Masons start with +1 DEF',      classReq: 'mason',      bonus: { defense: 1 } },
   { id: 'dd_mastery',   trigger: 'win_daredevil',  name: 'Daredevil Mastery',   desc: 'All Daredevils start Flip at 3-turn CD',  classReq: 'daredevil',  bonus: { fastFlip: true } },
   { id: 'ea_mastery',   trigger: 'win_escapeartist', name: 'Escape Artist Mastery', desc: 'All Escape Artists get 2 Escape Route uses/floor', classReq: 'escapeartist', bonus: { extraEscape: true } },
+  { id: 'conj_mastery', trigger: 'win_conjurer',   name: 'Conjurer Mastery',    desc: 'All Conjurers start with Illusion cooldown 6 instead of 8', classReq: 'conjurer', bonus: { fastIllusion: true } },
+  { id: 'bart_mastery', trigger: 'win_barterer',   name: 'Barterer Mastery',    desc: 'All Barterers start with +5 gold',         classReq: 'barterer',   bonus: { startGold: 5 } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -573,6 +577,26 @@ const CLASS_DEFS = [
     startItems: 'Leather Vest · Invis Potion · 4 Throwing Daggers',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: 'Ice Traps', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '💨 Escape/floor', cls: 'pos' }]
+  },
+  {
+    id: 'conjurer', name: 'Conjurer', icon: '🎭',
+    flavor: 'Weaves phantoms from thin air. Enemies chase shadows while you survive.',
+    hp: 12, attack: 2, defense: 0,
+    hungerRate: 1, dodgeBonus: 0.10, critChance: 0.10,
+    passive: '🎭 Summon Illusion [8t CD] · Conjure Ration for −5 HP',
+    startItems: 'Rusty Dagger · Healing Potion',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: '10% Dodge', cls: 'pos' }, { label: '🎭 Illusion (8t CD)', cls: 'pos' }, { label: 'Ration −5 HP', cls: 'pos' }]
+  },
+  {
+    id: 'barterer', name: 'Barterer', icon: '🪙',
+    flavor: 'Everything has a price — and you always pay less than everyone else.',
+    hp: 13, attack: 2, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🪙 25% discount everywhere · Extra gold drops · Merchants always visible on map',
+    startItems: '20 Gold · Healing Potion',
+    statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: '25% Discount', cls: 'pos' }, { label: 'Extra Gold', cls: 'pos' }, { label: '🪙 Merchant Radar', cls: 'pos' }]
   }
 ];
 
@@ -727,7 +751,20 @@ function showClassSelect() {
       beginBtn.disabled = false;
     };
     card.addEventListener('click', selectFn);
-    card.addEventListener('touchend', (e) => { e.preventDefault(); selectFn(); }, { passive: false });
+    // Touch: only select on tap (not swipe). Track start position and reject if moved >10px.
+    let touchStartX = 0, touchStartY = 0;
+    card.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    card.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        e.preventDefault();
+        selectFn();
+      }
+    }, { passive: false });
     cardsEl.appendChild(card);
   }
 
@@ -879,7 +916,11 @@ function createPlayer(classId = 'adventurer') {
     flipMode: false,
     // Escape Artist
     stairsTeleportFloorUsed: false,
-    iceTrapPassive: classId === 'escapeartist'
+    iceTrapPassive: classId === 'escapeartist',
+    // Conjurer
+    illusionCooldown: 0,
+    // Barterer
+    bartererDiscount: classId === 'barterer'
   };
 }
 
@@ -891,6 +932,7 @@ function applyMasteryBonuses(classId) {
   if (m.defense > 0)    { p.defense += m.defense; }
   if (m.critChance > 0) { p.critChance += m.critChance; }
   if (m.charmBonus > 0) { p.charmChance += m.charmBonus; }
+  if (m.startGold > 0)  { p.gold += m.startGold; }
 }
 
 function applyClassStartingItems(classId) {
@@ -988,8 +1030,15 @@ function applyClassStartingItems(classId) {
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
     const invisPotion = potionNames.find(n => n.id === 'invisibility');
     if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
+  } else if (classId === 'conjurer') {
+    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'barterer') {
+    p.gold = 20;
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   }
-}
 
 // === POTION / SCROLL NAME RANDOMIZATION ===
 const POTION_COLORS = [
@@ -3370,18 +3419,34 @@ function wanderAI(enemy) {
 function chaseAI(enemy) {
   if (enemy.alertness < 2) { wanderAI(enemy); return; }
 
-  const px = state.player.x, py = state.player.y;
-  const dist = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
+  // Conjurer illusion: enemies prefer the decoy over the player
+  const illusion = state.entities.find(e => e.type === 'illusion');
+  const tx = illusion ? illusion.x : state.player.x;
+  const ty = illusion ? illusion.y : state.player.y;
 
-  // Adjacent — attack
+  const px = state.player.x, py = state.player.y;
+  const dist = Math.abs(enemy.x - tx) + Math.abs(enemy.y - ty);
+
+  // Adjacent to target — attack it
   if (dist === 1) {
-    attackEntity(enemy, state.player);
+    if (illusion) {
+      // Attack the illusion: deal damage to it, destroying it when hp runs out
+      illusion.hp--;
+      if (state.visible[illusion.y * MAP_W + illusion.x]) {
+        addMessage(`${enemy.name} strikes the illusion!`, '');
+      }
+      if (illusion.hp <= 0) {
+        removeEntity(illusion);
+        addMessage('The illusion shatters!', 'good');
+      }
+    } else {
+      attackEntity(enemy, state.player);
+    }
     return;
   }
 
   // Demon fire trail
   if (enemy.special === 'fire_trail' && getTile(enemy.x, enemy.y) === T.FLOOR) {
-    // Leave a burning effect that damages player if stepped on
     state.entities.push({
       type: 'hazard',
       x: enemy.x, y: enemy.y,
@@ -3392,7 +3457,7 @@ function chaseAI(enemy) {
     });
   }
 
-  const step = findPath(enemy.x, enemy.y, px, py, enemy.special === 'phase');
+  const step = findPath(enemy.x, enemy.y, tx, ty, enemy.special === 'phase');
   if (step) {
     tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
   }
@@ -4826,6 +4891,19 @@ function endTurn() {
   if (state.player.starThrowCooldown > 0) state.player.starThrowCooldown--;
   if (state.player.acidBoltCooldown > 0) state.player.acidBoltCooldown--;
   if (state.player.flipCooldown > 0) state.player.flipCooldown--;
+  if (state.player.illusionCooldown > 0) state.player.illusionCooldown--;
+
+  // Expire illusion entities
+  for (let i = state.entities.length - 1; i >= 0; i--) {
+    const e = state.entities[i];
+    if (e.type === 'illusion') {
+      e.turnsLeft--;
+      if (e.turnsLeft <= 0) {
+        state.entities.splice(i, 1);
+        addMessage('The illusion fades.', '');
+      }
+    }
+  }
 
   // Process hazards
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -5639,6 +5717,23 @@ function render() {
     ctx.fillStyle = '#40e0ff';
     ctx.fillRect((e.x - camX) * ts + 1, (e.y - camY) * ts + 1, ts - 2, ts - 2);
     ctx.globalAlpha = e.spoken ? 0.5 : 1.0;
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Draw Conjurer illusions (shimmering magenta tint)
+  for (const e of state.entities) {
+    if (e.type !== 'illusion') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    const pulse = 0.15 + 0.10 * Math.sin(Date.now() / 300);
+    ctx.globalAlpha = pulse + 0.35;
+    ctx.fillStyle = '#cc44ff';
+    ctx.fillRect((e.x - camX) * ts + 1, (e.y - camY) * ts + 1, ts - 2, ts - 2);
+    ctx.globalAlpha = 0.75;
     ctx.font = `${Math.floor(ts * 0.7)}px serif`;
     ctx.fillText(e.glyph, sx, sy);
     ctx.globalAlpha = 1.0;
@@ -7263,12 +7358,29 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale + 1, e.y * scale + 1, scale - 2, scale - 2);
   }
 
-  // Draw merchants as gold dots
+  // Draw merchants as gold dots (Barterer always sees them even through fog)
   for (const e of state.entities) {
     if (e.type !== 'merchant') continue;
     const idx = e.y * MAP_W + e.x;
+    const alwaysShow = state.player.bartererDiscount;
+    if (!state.visible[idx] && !alwaysShow) continue;
+    ctx.fillStyle = alwaysShow && !state.visible[idx] ? 'rgba(240,192,64,0.45)' : '#f0c040';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+    if (alwaysShow && !state.visible[idx]) {
+      ctx.fillStyle = '#f0c040';
+      ctx.font = 'bold 6px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', e.x * scale + scale / 2, e.y * scale + scale / 2);
+    }
+  }
+
+  // Draw Conjurer illusions as purple dots on minimap
+  for (const e of state.entities) {
+    if (e.type !== 'illusion') continue;
+    const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
-    ctx.fillStyle = '#f0c040';
+    ctx.fillStyle = '#cc44ff';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
