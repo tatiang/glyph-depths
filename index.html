@@ -166,12 +166,16 @@
     }
 
     /* === MESSAGE LOG === */
+    #msg-log-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
     #msg-log {
       padding: 4px 12px;
+      padding-bottom: 18px;
       background: var(--bg-dark);
       border-top: 1px solid var(--panel-border);
       border-bottom: 1px solid var(--panel-border);
-      flex-shrink: 0;
       min-height: 52px;
       max-height: 72px;
       overflow-y: auto;
@@ -191,24 +195,30 @@
     #msg-log.expanded {
       max-height: 40vh;
       justify-content: flex-start;
-      cursor: pointer;
-    }
-    #msg-log::after {
-      content: '▼ tap to expand';
-      display: block;
-      text-align: center;
-      font-size: 9px;
-      color: var(--text-dim);
-      opacity: 0.5;
-      padding-top: 2px;
-    }
-    #msg-log.expanded::after {
-      content: '▲ tap to collapse';
     }
     #msg-log .msg:last-child { color: var(--text); }
     #msg-log .msg.damage { color: var(--danger); }
     #msg-log .msg.good { color: var(--hp-high); }
     #msg-log .msg.gold { color: var(--gold); }
+
+    #msg-log-toggle {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(transparent, var(--bg-dark) 40%);
+      color: var(--text-dim);
+      font-size: 12px;
+      opacity: 0.6;
+      cursor: pointer;
+      z-index: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #msg-log-toggle:active { opacity: 1; }
 
     /* === INVENTORY BAR === */
     #inv-bar {
@@ -950,9 +960,12 @@
       <canvas id="game-canvas"></canvas>
     </div>
 
-    <div id="msg-log">
-      <div class="msg">Welcome to the Unnamed Depths. Nothing is what it seems.</div>
-      <div class="msg">Swipe or d-pad to move. Descend 10 floors and defeat the King.</div>
+    <div id="msg-log-wrap">
+      <div id="msg-log">
+        <div class="msg">Welcome to the Unnamed Depths. Nothing is what it seems.</div>
+        <div class="msg">Swipe or d-pad to move. Descend 20 floors and defeat the King.</div>
+      </div>
+      <div id="msg-log-toggle">▾</div>
     </div>
 
     <div id="inv-bar">

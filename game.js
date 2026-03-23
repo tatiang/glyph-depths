@@ -819,7 +819,7 @@ function applyClassStartingItems(classId) {
     p.equipped.ranged = { ...RANGED_WEAPONS.find(r => r.name === bowName) };
     p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
-    p.inventory.push({ ...FOOD });
+    p.inventory.push({ ...FOOD, stack: 1 });
     // Rangers have infinite basic arrows — no arrow count needed
   } else if (classId === 'cleric') {
     p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
@@ -905,6 +905,21 @@ const RINGS = [
 ];
 
 const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
+const FOOD_STACK_MAX = 5;
+
+// Try to add a ration to an existing stack; returns true if stacked, false if new slot needed
+function addFoodToInventory() {
+  const p = state.player;
+  const existing = p.inventory.find(i => i.itemType === 'food' && (i.stack || 1) < FOOD_STACK_MAX);
+  if (existing) {
+    existing.stack = (existing.stack || 1) + 1;
+    existing.name = `Ration ×${existing.stack}`;
+    return true;
+  }
+  if (p.inventory.length >= MAX_INVENTORY) return false;
+  p.inventory.push({ ...FOOD, stack: 1 });
+  return true;
+}
 const THROWING_DAGGERS = { name: 'Throwing Daggers', glyph: '🎯', itemType: 'thrown', ammo: 5, damage: 3, value: 30 };
 
 // Ranged weapons (bows/crossbows) — equipped in separate ranged slot
@@ -2664,10 +2679,13 @@ function processEntityEffects(entity) {
           addMessage('🔥 Soulfire heals you!', 'good');
         }
         break;
-      case 'poison':
-        entity.hp -= 3;
-        if (isPlayer) addMessage('Poison courses through you! (-3 HP)', 'damage');
+      case 'poison': {
+        // Poison scales with depth: 1 dmg floors 1-6, 2 dmg floors 7-13, 3 dmg floors 14+
+        const poisonDmg = state.floor <= 6 ? 1 : state.floor <= 13 ? 2 : 3;
+        entity.hp -= poisonDmg;
+        if (isPlayer) addMessage(`Poison courses through you! (-${poisonDmg} HP)`, 'damage');
         break;
+      }
     }
 
     eff.turns--;
@@ -3379,6 +3397,19 @@ function pickupItem(itemEntity) {
     removeEntity(itemEntity);
     return;
   }
+  // Food stacks (up to 5 per stack)
+  if (itemEntity.item.itemType === 'food') {
+    if (addFoodToInventory()) {
+      const stack = state.player.inventory.find(i => i.itemType === 'food');
+      state.itemsFound++;
+      addMessage(`You pick up a ration. (${stack.stack || 1} in stack)`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+    } else {
+      addMessage('Inventory full! Cannot pick up ration.', 'damage');
+    }
+    return;
+  }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     return;
@@ -3654,13 +3685,20 @@ function useItem(item, index) {
       render();
       return; // Don't end turn or call updateUI again
 
-    case 'food':
+    case 'food': {
       p.hunger = Math.min(100, p.hunger + 30);
-      p.inventory.splice(index, 1);
+      const foodItem = p.inventory[index];
+      if (foodItem.stack && foodItem.stack > 1) {
+        foodItem.stack--;
+        foodItem.name = foodItem.stack === 1 ? 'Ration' : `Ration ×${foodItem.stack}`;
+      } else {
+        p.inventory.splice(index, 1);
+      }
       addMessage('You eat a ration. (+30 hunger)', 'good');
       Audio.useItem();
       if (state.runStats) state.runStats.foodEaten++;
       break;
+    }
   }
 
   updateUI();
@@ -3839,10 +3877,7 @@ function applyScrollEffect(scroll) {
       const count = arcane ? 3 : 2;
       let added = 0;
       for (let i = 0; i < count; i++) {
-        if (state.player.inventory.length < MAX_INVENTORY) {
-          state.player.inventory.push({ ...FOOD });
-          added++;
-        }
+        if (addFoodToInventory()) added++;
       }
       if (added > 0) {
         addMessage(`${added} ration${added > 1 ? 's' : ''} materialize${added === 1 ? 's' : ''} in your pack!`, 'good');
@@ -4063,7 +4098,13 @@ function endTurn() {
   if (state.player.hunger <= 0 && state.player.survivorInstinct) {
     const foodIdx = state.player.inventory.findIndex(i => i.itemType === 'food');
     if (foodIdx >= 0) {
-      state.player.inventory.splice(foodIdx, 1);
+      const foodItem = state.player.inventory[foodIdx];
+      if (foodItem.stack && foodItem.stack > 1) {
+        foodItem.stack--;
+        foodItem.name = foodItem.stack === 1 ? 'Ration' : `Ration ×${foodItem.stack}`;
+      } else {
+        state.player.inventory.splice(foodIdx, 1);
+      }
       state.player.hunger = Math.min(100, state.player.hunger + 40);
       addMessage("🍖 Survivor's Instinct: you eat a ration automatically!", 'good');
     }
@@ -5122,6 +5163,8 @@ function renderInventory() {
       const countColor = isLoaded ? '#ff8020' : '#60ffb0';
       slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:${countColor};font-weight:bold;">${countLabel}</span>`;
       if (isLoaded) slot.style.boxShadow = '0 0 6px rgba(255,128,32,0.5)';
+    } else if (item.itemType === 'food' && item.stack && item.stack > 1) {
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#f0c040;font-weight:bold;">×${item.stack}</span>`;
     } else {
       slot.textContent = item.glyph;
     }
@@ -5694,11 +5737,16 @@ function setupUI() {
     endTurn();
   });
 
-  // Tap message log to expand/collapse history
-  $('msg-log').addEventListener('click', () => {
-    $('msg-log').classList.toggle('expanded');
+  // Tap chevron to expand/collapse message log
+  const msgToggle = $('msg-log-toggle');
+  const toggleLog = () => {
+    const log = $('msg-log');
+    log.classList.toggle('expanded');
+    msgToggle.textContent = log.classList.contains('expanded') ? '▴' : '▾';
     updateUI();
-  });
+  };
+  msgToggle.addEventListener('click', (e) => { e.stopPropagation(); toggleLog(); });
+  msgToggle.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); toggleLog(); }, { passive: false });
 
   // Settings
   $('btn-close-settings').addEventListener('click', () => {
