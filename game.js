@@ -24,8 +24,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1 };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = '20 floors, harder boss, bug fixes'; // updated each push
-const LAST_UPDATED = '2026-03-23 14:00';
+const GAME_VERSION = 'v0.9.5 — 15 classes, teleport tiles, avalanches'; // updated each push
+const LAST_UPDATED = '2026-03-23 16:30';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -4297,12 +4297,13 @@ function pickupItem(itemEntity) {
   }
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
-  let pickupMsg = `You pick up ${itemEntity.item.name}`;
   const it = itemEntity.item;
-  if (it.itemType === 'weapon' && it.attack != null) pickupMsg += ` (+${it.attack} ATK)`;
-  else if (it.itemType === 'armor' && it.defense != null) pickupMsg += ` (+${it.defense} DEF)`;
-  else if (it.itemType === 'ranged') pickupMsg += ` (${it.damage} DMG, ${it.range} rng)`;
-  else if (it.itemType === 'ring' && it.ringEffect) pickupMsg += ` [${it.ringEffect}]`;
+  let pickupMsg = `You pick up ${it.name}`;
+  if (it.itemType === 'weapon' && it.attack !== undefined) pickupMsg += ` (+${it.attack} ATK)`;
+  if (it.itemType === 'armor' && it.defense !== undefined) pickupMsg += ` (+${it.defense} DEF)`;
+  if (it.itemType === 'ranged' && it.damage !== undefined) pickupMsg += ` (${it.damage} DMG, ${it.range || '?'} rng)`;
+  if (it.itemType === 'ring' && it.ringEffect) pickupMsg += ` [${it.ringEffect}]`;
+  if (it.special) pickupMsg += ` {${it.special}}`;
   pickupMsg += '.';
   addMessage(pickupMsg, 'good');
   // Show hint on first item pickup
@@ -6847,9 +6848,10 @@ function setupInput() {
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
       if ($('settings-overlay').classList.contains('active')) { $('settings-overlay').classList.remove('active'); inputLocked = false; return; }
-      // Help / Manual
+      // Help / Manual / Update Log
       if ($('help-overlay').classList.contains('active')) { closeHelp(); return; }
       if ($('manual-overlay').classList.contains('active')) { closeManual(); return; }
+      if ($('updatelog-overlay').classList.contains('active')) { closeUpdateLog(); return; }
       // Minimap
       if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); stopMinimapPulse(); inputLocked = false; return; }
       // Badge overlay
@@ -7285,6 +7287,26 @@ function setupUI() {
     closeManualTopBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn2(); }, { passive: false });
   }
 
+  // Update Log buttons
+  const updatelogFromTitle = $('btn-updatelog-from-title');
+  if (updatelogFromTitle) {
+    const ulFn = () => showUpdateLog();
+    updatelogFromTitle.addEventListener('click', ulFn);
+    updatelogFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); ulFn(); }, { passive: false });
+  }
+  const closeUpdateLogBtn = $('btn-close-updatelog');
+  if (closeUpdateLogBtn) {
+    const closeFn = () => closeUpdateLog();
+    closeUpdateLogBtn.addEventListener('click', closeFn);
+    closeUpdateLogBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
+  }
+  const closeUpdateLogTopBtn = $('btn-close-updatelog-top');
+  if (closeUpdateLogTopBtn) {
+    const closeFn = () => closeUpdateLog();
+    closeUpdateLogTopBtn.addEventListener('click', closeFn);
+    closeUpdateLogTopBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
+  }
+
   // Save/Load buttons in settings
   const saveGameBtn = $('btn-save-game');
   if (saveGameBtn) {
@@ -7676,6 +7698,121 @@ function showManual() {
 
 function closeManual() {
   $('manual-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+// === UPDATE LOG ===
+const UPDATE_LOG = [
+  {
+    date: '2026-03-23',
+    version: 'v0.9.5',
+    changes: [
+      'Inventory full now shows a pop-up alert when buying or picking up items',
+      'Secret walls now require 2 hits — first hit cracks the wall (amber ▒), second breaks through',
+      'Fireball and Confusion scrolls now show animated AOE blast effects',
+      'Lich mini-boss now has a unique 🧿 icon (was same as Skeleton)',
+      'Level-up screen shows your current ATK, DEF, and HP to help you choose perks',
+      'Item pickup messages now show full stats (e.g. "+6 ATK", "+3 DEF")',
+    ]
+  },
+  {
+    date: '2026-03-23',
+    version: 'v0.9.4',
+    changes: [
+      'New feature: invisible teleport floor tiles (floor 3+) — warp you on contact, then stay visible',
+      'New feature: avalanche events (floor 4+) — rocks collapse in nearby rooms',
+      'Cloud saves via Google account (opt-in, requires Firebase config)',
+      'Save slots increased from 3 to 5',
+      'Shrine now displays your current HP and gold',
+      'Minimap now pauses the game — no accidental moves while viewing',
+      'Tavern rumors now cost 1 gold (was 3) and limited to one per visit',
+      'Merchant purchases now trigger auto-equip when the setting is enabled',
+      'Danger border made thicker and more visible when HP or food is low',
+    ]
+  },
+  {
+    date: '2026-03-23',
+    version: 'v0.9.3',
+    changes: [
+      'Added keyboard shortcut Q for special class abilities',
+      'Special ability button now visible for all 15 classes with cooldown bars',
+      'Fixed syntax error preventing Conjurer and Barterer abilities from working',
+    ]
+  },
+  {
+    date: '2026-03-23',
+    version: 'v0.9.2',
+    changes: [
+      'Added 7 new character classes: Ninja, Dark Wizard, Brick Mason, Daredevil, Escape Artist, Conjurer, Barterer',
+      'Each new class has unique abilities, stats, and play styles',
+      'Daredevil can flip over enemies and ricochet melee hits to adjacent foes',
+      'Ninja has stealth kills and thrown star attacks',
+      'Escape Artist can teleport to stairs and leaves ice traps',
+      'Fixed class selection screen: improved scroll-aware tap detection',
+    ]
+  },
+  {
+    date: '2026-03-23',
+    version: 'v0.9.1',
+    changes: [
+      'Arrows now brighter and easier to see in-game',
+      'Fixed Load button not working on certain devices',
+      'Implemented 9 gameplay fixes including improved combat feedback',
+      'Fixed tavern crash on older browsers',
+      'Renamed "How to Play" to "Quickstart" and added searchable Manual',
+    ]
+  },
+  {
+    date: '2026-03-23',
+    version: 'v0.9.0',
+    changes: [
+      'Added Taverns on floors 5, 10, 14 — buy food, hear rumors, gamble',
+      'Added secret walls with hidden loot throughout the dungeon',
+      'Added bonus wings on floors 6, 12, 18 — find Bone Keys to unlock',
+      'Added Bard and Artificer classes',
+      'Added targeting overlay for ranged attacks and thrown items',
+      'Added font size toggle (A-/A/A+) for accessibility',
+    ]
+  },
+  {
+    date: '2026-03-22',
+    version: 'v0.8.0',
+    changes: [
+      'Floor-scaled loot: deeper floors now drop better equipment (+1 from F9, +2 from F16)',
+      'Paged Config screen with Stats, Settings, and Save/Load tabs',
+      'Rogue-closed doors now appear teal on the minimap',
+      'Poison now scales with floor depth (1-3 HP/turn)',
+      'Food stacks up to 5 per inventory slot',
+      'Auto-equip now prefers specialty weapons over plain at same stats',
+      'Allies now follow the player between rooms',
+      'Added life-drain protection: Cleric immunity, Warding rune resist, shrine option',
+      'Expanded How to Play and Manual with full class guides, synergies, and mastery info',
+    ]
+  },
+];
+
+function showUpdateLog() {
+  inputLocked = true;
+  const overlay = $('updatelog-overlay');
+  const content = $('updatelog-content');
+  content.innerHTML = '';
+  for (const entry of UPDATE_LOG) {
+    const section = document.createElement('div');
+    section.className = 'help-section';
+    let html = `<div class="help-heading">${entry.version} — ${entry.date}</div>`;
+    html += '<ul style="margin:4px 0 0 16px;padding:0;list-style:disc;">';
+    for (const change of entry.changes) {
+      html += `<li class="help-note" style="margin-bottom:3px;">${change}</li>`;
+    }
+    html += '</ul>';
+    section.innerHTML = html;
+    content.appendChild(section);
+  }
+  overlay.classList.add('active');
+}
+
+function closeUpdateLog() {
+  $('updatelog-overlay').classList.remove('active');
   inputLocked = false;
 }
 

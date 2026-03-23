@@ -1091,6 +1091,7 @@
         <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
         <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
+        <button class="help-btn" id="btn-updatelog-from-title" style="animation:none;opacity:1;">📋 Updates</button>
       </div>
       <div id="title-badge-count" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
     </div>
@@ -1276,8 +1277,10 @@
         <div class="help-row"><span class="hl">🔷 The Abyss (13–16)</span><span>A wound in reality. Void creatures and things from between the words.</span></div>
         <div class="help-row"><span class="hl">🟣 The Sanctum (17–20)</span><span>The throne of the Glyph King. Crystalline, beautiful, and lethal.</span></div>
         <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Taverns provide rest on floors 5, 10, 14. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
-        <p class="help-note" style="margin-top:6px;">🧱 <strong>Secret Walls</strong> hide throughout the dungeon — bump walls to test them. Rogues can sense nearby secrets. Behind them lies hidden loot worth the search.</p>
+        <p class="help-note" style="margin-top:6px;">🧱 <strong>Secret Walls</strong> hide throughout the dungeon — bump a wall to crack it, then hit again to break through. Cracked walls turn amber (▒). Rogues can sense nearby secrets with a shimmer. Behind them lies hidden loot worth the search.</p>
         <p class="help-note" style="margin-top:6px;">🗝️ <strong>Bone Keys</strong> appear on floors 6, 12, and 18. They unlock doors to bonus wings — dangerous side areas with rare loot and tougher enemies.</p>
+        <p class="help-note" style="margin-top:6px;">◊ <strong>Teleport Tiles</strong> are invisible floor glyphs that warp you to a random location when stepped on. Once triggered, they become visible (cyan ◊) and remain active. Appear on floors 3+.</p>
+        <p class="help-note" style="margin-top:6px;">🪨 <strong>Avalanches</strong> occasionally collapse parts of rooms with rocks (25% chance on floors 4+). They never hit the player directly but can reshape the dungeon around you.</p>
       </div>
 
       <div class="help-section">
@@ -1329,6 +1332,41 @@
           <div style="color:var(--gold);font-weight:700;font-size:13px;">⚒️ Artificer</div>
           <p class="help-note">Master crafter (14 HP, +2 ATK, +1 DEF). Tinker: upgrade a piece of gear for gold, once per floor. Starts with Wrench (weapon), Leather Vest, and extra gold.</p>
           <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Master Smith — upgrades give +2 instead of +1.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🌑 Ninja</div>
+          <p class="help-note">Shadow assassin (11 HP, +3 ATK). 20% dodge, 25% crit chance. Star Throw: ranged shuriken attack on a 6-turn cooldown. High stealth reduces detection range.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🟣 Dark Wizard</div>
+          <p class="help-note">Corrupted mage (12 HP, +2 ATK). Acid Bolt: ranged poison attack on a 7-turn cooldown. Immune to poison. Scroll effects enhanced. Dark knowledge identifies potions.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧱 Brick Mason</div>
+          <p class="help-note">Stone-tough warrior (20 HP, +1 ATK, +3 DEF). Fortify: seal a doorway with a wall, once per floor. Extremely tanky but low offense.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🤸 Daredevil</div>
+          <p class="help-note">Acrobatic fighter (13 HP, +2 ATK). 20% dodge. Flip: jump over an adjacent enemy (4-turn cooldown). Ricochet: melee hits chain to adjacent enemies at 50% then 25% damage.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">💨 Escape Artist</div>
+          <p class="help-note">Evasive specialist (12 HP, +1 ATK, +1 DEF). 15% dodge. Escape Route: teleport to the stairs, once per floor. Leaves ice traps behind when fleeing enemies.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🎭 Conjurer</div>
+          <p class="help-note">Trickster mage (11 HP, +2 ATK). Summon illusory decoys to distract enemies (8-turn cooldown). Illusions draw enemy attention away from you.</p>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🪙 Barterer</div>
+          <p class="help-note">Merchant-blooded survivor (14 HP, +1 ATK, +1 DEF). 25% discount at shops. Conjure Ration: sacrifice 5 HP to create food. Starts with extra gold.</p>
         </div>
       </div>
 
@@ -1411,7 +1449,7 @@
         <strong>Tier 4 (F13–16):</strong> Dark Knights, Banshees, Hydras, Warlocks — horrors of the Abyss.<br>
         <strong>Tier 5 (F17–19):</strong> Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches — the Sanctum's last defenders.<br>
         <strong>Floor 20:</strong> The Glyph King — a three-phase boss fight.</p>
-        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Lich (F8), Balrog (F12), Void Titan (F16), Glyph Guardian (F19).</p>
+        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Lich 🧿 (F8), Balrog (F12), Void Titan (F16), Glyph Guardian (F19).</p>
         <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths/Void Wraiths</strong> drain max HP (Clerics are immune; Glyph of Warding gives 50% resist; shrines can grant full immunity). <strong>Slimes/Hydras</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls. <strong>Demons</strong> leave fire trails.</p>
         <p class="help-note" style="margin-top:4px;"><strong>Poison</strong> scales with depth: 1 HP/turn (floors 1–6), 2 HP/turn (floors 7–13), 3 HP/turn (floors 14+). Lasts 5 turns.</p>
       </div>
@@ -1426,7 +1464,7 @@
         • Identify potions carefully — some were left as traps by the King's alchemists.<br>
         • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
         • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. Drop items while shopping to make room.<br>
-        • Taverns on floors 5, 10, 14 offer a moment of respite — heal up and buy food for the journey ahead.<br>
+        • Taverns on floors 5, 10, 14 offer respite — buy food, hear one rumor (1 gold), or gamble.<br>
         • Bump walls to search for secret passages — Rogues can sense them nearby.<br>
         • Bone Keys (floors 6, 12, 18) unlock bonus wings with rare loot and dangerous foes.<br>
         • Rogues can close doors behind them (🚪 or <kbd>C</kbd>) — closed doors appear teal on the map.<br>
@@ -1438,6 +1476,20 @@
 
       <div style="text-align:center;margin-top:8px;">
         <button class="big-btn" id="btn-close-manual">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Log Overlay -->
+  <div class="overlay" id="updatelog-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
+    <div style="max-width:360px;width:100%;padding:0 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h1 style="font-size:18px;margin:0;">📋 Update Log</h1>
+        <button class="help-btn" id="btn-close-updatelog-top">✕ Close</button>
+      </div>
+      <div id="updatelog-content" style="margin-top:12px;"></div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="big-btn" id="btn-close-updatelog">Close</button>
       </div>
     </div>
   </div>
@@ -1522,7 +1574,8 @@
         <div class="help-heading">Key Mechanics</div>
         <div class="help-row"><span class="hl">✦ Runes</span><span>One per floor. Walk over to collect. Permanent bonus for the run.</span></div>
         <div class="help-row"><span class="hl">⛩️ Shrines</span><span>Trade HP or gold for stat boosts or drain immunity.</span></div>
-        <div class="help-row"><span class="hl">🧱 Secret Walls</span><span>Bump walls to find hidden rooms with loot.</span></div>
+        <div class="help-row"><span class="hl">🧱 Secret Walls</span><span>Bump walls twice — first hit cracks, second breaks through for loot.</span></div>
+        <div class="help-row"><span class="hl">◊ Teleport Tiles</span><span>Invisible floor glyphs that warp you to a random location.</span></div>
         <div class="help-row"><span class="hl">🗝️ Bonus Wings</span><span>Find Bone Keys (F6, 12, 18) to unlock side areas.</span></div>
         <div class="help-row"><span class="hl">⚡ Synergies</span><span>Combine perks + runes for powerful hidden combos.</span></div>
       </div>
@@ -1533,7 +1586,7 @@
       </div>
 
       <div class="help-section">
-        <div class="help-heading">8 Classes</div>
+        <div class="help-heading">15 Classes</div>
         <p class="help-note">Each class has unique stats, abilities, and an exclusive ★ perk. See the 📜 Manual for full details.</p>
         <div class="help-row"><span class="hl">🧝 Adventurer</span><span>Balanced. Regen + Pathfinder.</span></div>
         <div class="help-row"><span class="hl">🪖 Berserker</span><span>High ATK. Rage mode. 2× hunger.</span></div>
@@ -1543,6 +1596,13 @@
         <div class="help-row"><span class="hl">⛪ Cleric</span><span>Holy Aura. Curse/drain immune.</span></div>
         <div class="help-row"><span class="hl">🎵 Bard</span><span>Charm enemies. Song of Rest heal.</span></div>
         <div class="help-row"><span class="hl">⚒️ Artificer</span><span>Upgrade gear with gold.</span></div>
+        <div class="help-row"><span class="hl">🌑 Ninja</span><span>Stealth kills. Star Throw ranged attack.</span></div>
+        <div class="help-row"><span class="hl">🟣 Dark Wizard</span><span>Acid Bolt. Poison resist. Dark power.</span></div>
+        <div class="help-row"><span class="hl">🧱 Brick Mason</span><span>Fortify walls. High DEF. Tanky.</span></div>
+        <div class="help-row"><span class="hl">🤸 Daredevil</span><span>Flip over enemies. Ricochet melee.</span></div>
+        <div class="help-row"><span class="hl">💨 Escape Artist</span><span>Teleport to stairs. Ice traps.</span></div>
+        <div class="help-row"><span class="hl">🎭 Conjurer</span><span>Summon illusions to distract enemies.</span></div>
+        <div class="help-row"><span class="hl">🪙 Barterer</span><span>Discount shopping. Conjure rations.</span></div>
       </div>
 
       <div class="help-section">
@@ -1551,6 +1611,8 @@
           • Special abilities: double-tap or hold on mobile.<br>
           • Your ghost from a past death haunts where you fell.<br>
           • One-way doors seal behind you. Bash sealed doors (5 hits).<br>
+          • Cracked walls (amber ▒) can be broken with one more hit.<br>
+          • Teleport tiles are invisible until triggered — stay alert on deeper floors.<br>
           • Auto-equip (⚙️ Config) picks up better gear for you.<br>
           • See the 📜 Manual for full class guides, enemy lists, synergies, and lore.
         </p>
