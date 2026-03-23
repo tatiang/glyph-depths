@@ -1984,7 +1984,8 @@ function showTavern(tavern) {
   Audio.merchant();
 
   const overlay = $('levelup-overlay');
-  $('levelup-title').textContent = '🍺 TAVERN';
+  overlay.querySelector('h1').textContent = '🍺 TAVERN';
+  $('levelup-label').textContent = 'What\'ll it be?';
   const container = $('perk-choices');
   container.innerHTML = '';
 
@@ -2075,10 +2076,10 @@ function showTavern(tavern) {
   leaveBtn.innerHTML = `<div class="perk-name">🚶 Leave Tavern</div><div class="perk-desc">Return to the dungeon</div>`;
   leaveBtn.addEventListener('click', () => {
     tavern.visited = true;
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
-    updateUI();
-    render();
+    endTurn();
   });
   container.appendChild(leaveBtn);
 
