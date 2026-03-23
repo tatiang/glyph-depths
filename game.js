@@ -25,7 +25,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1 };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = '20 floors, harder boss, bug fixes'; // updated each push
-const LAST_UPDATED = '2026-03-22 23:00';
+const LAST_UPDATED = '2026-03-23 12:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -1567,8 +1567,8 @@ function spawnEnemies() {
   for (let i = 0; i < count; i++) {
     const pos = randomFloorTile();
     if (!pos) continue;
-    // Don't spawn on player
-    if (pos.x === state.player.x && pos.y === state.player.y) continue;
+    // Don't spawn on or adjacent to player (1-tile buffer)
+    if (Math.abs(pos.x - state.player.x) <= 1 && Math.abs(pos.y - state.player.y) <= 1) continue;
     let template;
     if (nextTemplates.length > 0 && i === count - 1) {
       template = nextTemplates[Math.floor(Math.random() * nextTemplates.length)];
@@ -1653,6 +1653,36 @@ const NPC_LORE = [
   "A pale wanderer says: \"The deeper biomes grow stranger. The Crypt remembers every death. The Citadel enjoys them. The Abyss doesn't notice. The Sanctum... the Sanctum applauds.\"",
   "A translucent pilgrim whispers: \"Many came before you. Most added to the architecture. The Crypt has a room for each of them. It is a very large crypt.\"",
   "A lost soul sighs: \"I tried to ascend with a pocketful of runes. The glyphs dissolved in the sunlight. Everything I suffered for turned to dust on the stairs. Only the King's death frees the magic.\"",
+  // Additional Lore — Rangers and Clerics
+  "A spectral archer murmurs: \"Rangers used to patrol these tunnels before the fall. Their bows still work. Their aim is still true. Only their hearts have stopped.\"",
+  "A phantom priest intones: \"The Clerics prayed to the light, but down here the light forgot them. Now they carry it themselves, burning from within.\"",
+  // Additional Lore — Bards and Artificers
+  "A humming shade says: \"The Bards discovered something terrifying: the glyphs respond to music. Sing the right note near a rune and it vibrates with sympathy. Sing the wrong note and it shatters.\"",
+  "A ghostly smith explains: \"Artificers are practical folk. While wizards argue about the grammar of power, Artificers simply hammer it into steel. Crude, effective, and surprisingly hard to kill.\"",
+  "A translucent minstrel sighs: \"I was a Bard once. I charmed a demon on floor seven. It followed me like a puppy for three floors. Then the charm broke during dinner.\"",
+  // Additional Lore — Deeper World
+  "A shade of a merchant grumbles: \"Gold has no value down here. We trade in it because the alternative is silence, and silence in these halls means something is hunting you.\"",
+  "A wandering scribe notes: \"The walls on the deeper floors are warm to the touch. Not from fire — from the runes. They generate heat like living things. Because they are.\"",
+  "A fading knight whispers: \"I sealed a door once to trap a Wraith. When I returned, the door had moved. The Wraith was waiting on the other side, as if it knew.\"",
+  "A translucent child giggles: \"The Mimics aren't trying to eat you. They're lonely. Everything they consume becomes part of them. They just want company, forever and ever.\"",
+  "An ancient shade rasps: \"Floor thirteen changes its layout when no one is looking. I mapped it seventeen times. Seventeen different maps. All correct. All wrong.\"",
+  // Additional Lore — Taverns and Secrets
+  "A shade of a barkeep says: \"The taverns exist because even the cursed need a drink. Aldric built them as a joke. The joke outlasted his sanity.\"",
+  "A ghostly prospector whispers: \"Some walls aren't walls. Tap them. Listen. If they sound hollow, push. If they push back, run.\"",
+  "A pale figure warns: \"Bone keys unlock more than doors. They unlock appetite. Whatever waits in those side passages has been starving for a very long time.\"",
+  "A spectral sage muses: \"The shrines were built for worship. Now they are vending machines for miracles. Insert suffering, receive power. Aldric would be proud.\"",
+  // Additional Lore — Enemies and Hazards
+  "A ghostly soldier trembles: \"The Hydra on the deep floors was a garden snake before the runes found it. Now it splits and splits, each piece remembering the whole.\"",
+  "A shade clutches at nothing: \"Wraiths drain your life because they've forgotten their own. Each stolen year reminds them what warmth felt like. They weep while they kill.\"",
+  "A spectral figure points downward: \"The Necromancers don't raise the dead. They convince the dead that they never died. The skeletons believe they are still alive. It is the cruelest magic.\"",
+  "A wandering ghost says: \"Spiders in the depths spin webs from crystallized silence. Step on one and the world goes quiet. In the quiet, you can hear the King breathing.\"",
+  "A faded warrior mutters: \"Demons leave fire in their wake not as a weapon, but as a signature. They are artists. The medium is suffering. The gallery is everywhere.\"",
+  // Additional Atmosphere
+  "A shade drifts past murmuring: \"Every torch you see was lit by someone who came before. They are all dead now, but their fires remember.\"",
+  "A translucent wanderer pauses: \"The stairs go down, always down. Some say there is no bottom. Others say the bottom found them before they found it.\"",
+  "A pale figure stares at the ceiling: \"I can hear the surface sometimes. Rain. Birds. Laughter. Then I remember that I died four hundred years ago and the surface I hear may not exist anymore.\"",
+  "A ghost kneels in the corridor: \"I was an adventurer. I found every rune. I slew the King. I won. And then I woke up back on floor one. And again. And again.\"",
+  "A spectral wanderer whispers: \"The potions you find are brewed by the dungeon itself. It wants you alive long enough to suffer. Death is easy. Survival is the punishment.\"",
 ];
 
 function spawnNPCs() {
@@ -1985,88 +2015,101 @@ function showTavern(tavern) {
 
   const overlay = $('levelup-overlay');
   overlay.querySelector('h1').textContent = '🍺 TAVERN';
-  $('levelup-label').textContent = 'What\'ll it be?';
+  const p = state.player;
+  $('levelup-label').textContent = `💰 ${p.gold} gold`;
   const container = $('perk-choices');
   container.innerHTML = '';
 
-  const p = state.player;
+  // Inline feedback area
+  const feedbackDiv = document.createElement('div');
+  feedbackDiv.style.cssText = 'color:var(--gold);font-size:13px;text-align:center;min-height:20px;margin:4px 0 8px;padding:4px 8px;';
+  feedbackDiv.textContent = "What'll it be?";
+  container.appendChild(feedbackDiv);
+
+  function tavernFeedback(text, cls) {
+    feedbackDiv.textContent = text;
+    feedbackDiv.style.color = cls === 'damage' ? 'var(--hp-low)' : cls === 'gold' ? 'var(--gold)' : 'var(--accent)';
+  }
+
+  function refreshGold() {
+    $('levelup-label').textContent = `💰 ${p.gold} gold`;
+    updateUI();
+  }
 
   // Buy Ration — 5 gold
   const rationBtn = document.createElement('button');
   rationBtn.className = 'perk-btn';
   rationBtn.innerHTML = `<div class="perk-name">🍖 Buy Ration (5💰)</div><div class="perk-desc">Add food to your inventory</div>`;
-  rationBtn.addEventListener('click', () => {
+  const rationHandler = () => {
     if (p.gold >= 5) {
-      p.gold -= 5;
-      // Stack with existing food
-      const existingFood = p.inventory.find(i => i.itemType === 'food');
-      if (existingFood) {
-        existingFood.stack = (existingFood.stack || 1) + 1;
-      } else if (p.inventory.length < MAX_INVENTORY) {
-        p.inventory.push({ ...FOOD, stack: 1 });
+      if (addFoodToInventory()) {
+        p.gold -= 5;
+        tavernFeedback('You buy a warm ration.', 'good');
+        Audio.gold();
       } else {
-        addMessage('Inventory full!', 'damage');
-        p.gold += 5; // refund
-        return;
+        tavernFeedback('Inventory full!', 'damage');
       }
-      addMessage('You buy a warm ration.', 'good');
-      Audio.gold();
-      updateUI();
-      showTavern(tavern);
+      refreshGold();
     } else {
-      addMessage('Not enough gold.', 'damage');
+      tavernFeedback('Not enough gold.', 'damage');
     }
-  });
+  };
+  rationBtn.addEventListener('click', rationHandler);
+  rationBtn.addEventListener('touchend', (e) => { e.preventDefault(); rationHandler(); }, { passive: false });
   container.appendChild(rationBtn);
 
   // Hear Rumor — 3 gold
   const rumorBtn = document.createElement('button');
   rumorBtn.className = 'perk-btn';
   rumorBtn.innerHTML = `<div class="perk-name">🗣️ Hear Rumor (3💰)</div><div class="perk-desc">Learn about what lies ahead</div>`;
-  rumorBtn.addEventListener('click', () => {
+  const rumorHandler = () => {
     if (p.gold >= 3) {
       p.gold -= 3;
       const nextFloor = state.floor + 1;
       const rumors = [
         `The barkeep leans in: "Floor ${nextFloor}? I hear the enemies grow fiercer there."`,
-        `A drunk whispers: "There's treasure hidden in the walls, if you know where to look."`,
-        `The barkeep warns: "Watch your back on the next floor. Something stalks the corridors."`,
-        `A patron mutters: "I heard the merchants on deeper floors carry finer wares."`,
+        `A drunk whispers: "Treasure hides in the walls, if you know where to look."`,
+        `The barkeep warns: "Something stalks the corridors of the next floor."`,
+        `A patron mutters: "Merchants on deeper floors carry finer wares."`,
         `The barkeep nods: "Stock up on food. The path ahead is long and hungry."`,
-        `A traveler whispers: "Runes of power await those brave enough to seek them."`,
+        `A traveler whispers: "Runes of power await the brave."`,
+        `The barkeep says: "A sage wanders the mid floors. Pay for his wisdom."`,
+        `A drunk slurs: "I once found a ring in a secret wall... changed my life."`,
       ];
-      addMessage(rumors[Math.floor(Math.random() * rumors.length)], 'gold');
+      tavernFeedback(rumors[Math.floor(Math.random() * rumors.length)], 'gold');
       Audio.gold();
-      updateUI();
-      showTavern(tavern);
+      refreshGold();
     } else {
-      addMessage('Not enough gold.', 'damage');
+      tavernFeedback('Not enough gold.', 'damage');
     }
-  });
+  };
+  rumorBtn.addEventListener('click', rumorHandler);
+  rumorBtn.addEventListener('touchend', (e) => { e.preventDefault(); rumorHandler(); }, { passive: false });
   container.appendChild(rumorBtn);
 
   // Gamble — 10 gold, 50/50
   const gambleBtn = document.createElement('button');
   gambleBtn.className = 'perk-btn';
-  gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (10💰)</div><div class="perk-desc">50% chance to double your bet, 50% to lose it all</div>`;
-  gambleBtn.addEventListener('click', () => {
+  gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (10💰)</div><div class="perk-desc">50/50: double your bet or lose it</div>`;
+  const gambleHandler = () => {
     if (p.gold >= 10) {
       p.gold -= 10;
       if (Math.random() < 0.5) {
         p.gold += 20;
-        addMessage('You win! The dice favor you. (+20 gold)', 'gold');
+        tavernFeedback('You win! The dice favor you. (+20 gold)', 'gold');
         Audio.gold();
       } else {
-        addMessage('You lose... The house always wins.', 'damage');
+        tavernFeedback('You lose... The house always wins. (-10 gold)', 'damage');
         Audio.hit();
       }
       haptic(30);
-      updateUI();
-      showTavern(tavern);
+      refreshGold();
     } else {
-      addMessage('Not enough gold to gamble.', 'damage');
+      tavernFeedback('Not enough gold to gamble.', 'damage');
     }
-  });
+  };
+  gambleBtn.addEventListener('click', gambleHandler);
+  gambleBtn.addEventListener('touchend', (e) => { e.preventDefault(); gambleHandler(); }, { passive: false });
   container.appendChild(gambleBtn);
 
   // Leave button
@@ -2074,13 +2117,15 @@ function showTavern(tavern) {
   leaveBtn.className = 'perk-btn';
   leaveBtn.style.borderColor = 'var(--text-dim)';
   leaveBtn.innerHTML = `<div class="perk-name">🚶 Leave Tavern</div><div class="perk-desc">Return to the dungeon</div>`;
-  leaveBtn.addEventListener('click', () => {
+  const leaveHandler = () => {
     tavern.visited = true;
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
     endTurn();
-  });
+  };
+  leaveBtn.addEventListener('click', leaveHandler);
+  leaveBtn.addEventListener('touchend', (e) => { e.preventDefault(); leaveHandler(); }, { passive: false });
   container.appendChild(leaveBtn);
 
   overlay.classList.add('active');
@@ -2747,15 +2792,19 @@ function killEnemy(enemy) {
     state.toughestKill = { name: enemy.name, glyph: enemy.glyph, xp: enemy.xp };
   }
 
-  // Slime split — disabled on floors 1-2 so new players aren't overwhelmed
+  // Split mechanic — disabled on floors 1-2 so new players aren't overwhelmed
   if (enemy.special === 'split' && state.floor >= 3) {
-    const existingMinis = state.entities.filter(e => e.type === 'enemy' && e.name === 'Mini Slime' && e.hp > 0).length;
+    const isHydra = enemy.name === 'Hydra';
+    const miniName = isHydra ? 'Hatchling' : 'Mini Slime';
+    const existingMinis = state.entities.filter(e => e.type === 'enemy' && e.name === miniName && e.hp > 0).length;
     const maxMinis = 6;
     if (existingMinis < maxMinis) {
-      const template = { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true };
+      const template = isHydra
+        ? { name: 'Hatchling', glyph: '🐍', hp: 6, attack: 3, defense: 1, ai: 'chase', xp: 5, special: null, detect: 6 }
+        : { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true };
       let spawned = 0;
-      for (const [dx, dy] of [[0, 1], [1, 0]]) {
-        if (spawned >= 2) break;
+      for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
+        if (spawned >= (isHydra ? 3 : 2)) break;
         const nx = enemy.x + dx, ny = enemy.y + dy;
         if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
           const mini = createEnemy(template, nx, ny);
@@ -2764,9 +2813,13 @@ function killEnemy(enemy) {
           spawned++;
         }
       }
-      addMessage(spawned > 1 ? 'The Slime splits in two!' : 'The Slime oozes apart!', 'damage');
+      if (isHydra) {
+        addMessage(spawned > 1 ? `The Hydra spawns ${spawned} hatchlings!` : 'A hatchling slithers from the Hydra!', 'damage');
+      } else {
+        addMessage(spawned > 1 ? 'The Slime splits in two!' : 'The Slime oozes apart!', 'damage');
+      }
     } else {
-      addMessage('The Slime dissolves!', '');
+      addMessage(isHydra ? 'The Hydra collapses!' : 'The Slime dissolves!', '');
     }
   }
 
@@ -4408,11 +4461,13 @@ function renderDropSection(container, refreshCallback) {
     else if (item.itemType === 'thrown') detail = ` [×${item.ammo}]`;
     div.innerHTML = `<span>${item.glyph || ''} ${item.name}${detail}</span><span style="color:#ff6040;font-size:11px;">Drop</span>`;
     const idx = i;
-    div.addEventListener('click', () => {
+    const dropHandler = () => {
       dropItem(idx);
       addMessage(`Dropped ${item.name} to make room.`, '');
       refreshCallback();
-    });
+    };
+    div.addEventListener('click', dropHandler);
+    div.addEventListener('touchend', (e) => { e.preventDefault(); dropHandler(); }, { passive: false });
     container.appendChild(div);
   }
 }
@@ -4432,7 +4487,8 @@ function renderShopItems(merchant) {
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
     div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${shopItem.price}💰</span>`;
-    div.addEventListener('click', () => {
+    const buyHandler = () => {
+      if (div.style.pointerEvents === 'none') return;
       if (state.player.gold >= shopItem.price) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food' && shopItem.item.itemType !== 'arrows') {
           addMessage('Inventory full!', 'damage');
@@ -4457,7 +4513,9 @@ function renderShopItems(merchant) {
       } else {
         addMessage("You can't afford that.", 'damage');
       }
-    });
+    };
+    div.addEventListener('click', buyHandler);
+    div.addEventListener('touchend', (e) => { e.preventDefault(); buyHandler(); }, { passive: false });
     container.appendChild(div);
   }
 
@@ -4467,7 +4525,7 @@ function renderShopItems(merchant) {
   refreshDiv.className = 'shop-item';
   if (merchant.refreshesLeft > 0) {
     refreshDiv.innerHTML = `<span>🔄 Refresh Stock</span><span class="price" style="color:var(--accent)">${REFRESH_COST}💰 (${merchant.refreshesLeft} left)</span>`;
-    refreshDiv.addEventListener('click', () => {
+    const refreshHandler = () => {
       if (state.player.gold >= REFRESH_COST) {
         state.player.gold -= REFRESH_COST;
         merchant.shopItems = generateShopItems(state.floor);
@@ -4479,7 +4537,9 @@ function renderShopItems(merchant) {
       } else {
         addMessage("Not enough gold to refresh.", 'damage');
       }
-    });
+    };
+    refreshDiv.addEventListener('click', refreshHandler);
+    refreshDiv.addEventListener('touchend', (e) => { e.preventDefault(); refreshHandler(); }, { passive: false });
   } else {
     refreshDiv.innerHTML = `<span style="color:var(--text-dim)">🔄 No more refreshes</span><span></span>`;
     refreshDiv.style.opacity = '0.4';
@@ -5228,8 +5288,8 @@ function render() {
     const loadedArrow = state.player.loadedSpecialArrow;
     const hasBlast = isBlast || (loadedArrow?.arrowType === 'blast');
 
-    // Show targeting lines in all 8 directions
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+    // Show targeting lines in 4 cardinal directions (no diagonal input available)
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
     for (const [ddx, ddy] of dirs) {
       let tx = p.x + ddx, ty = p.y + ddy;
       for (let i = 0; i < maxRange; i++) {
@@ -5422,8 +5482,8 @@ function render() {
 
   // Danger border — red glow when low HP or low food
   const hpPct = p.hp / p.maxHp;
-  const dangerHP = hpPct <= 0.25;
-  const dangerHunger = p.hunger <= 15;
+  const dangerHP = p.hp <= 5;
+  const dangerHunger = p.hunger <= 30;
   if (dangerHP || dangerHunger) {
     const intensity = dangerHP ? Math.max(0.3, 1 - hpPct * 4) : 0.3; // stronger as HP drops
     const pulseAlpha = intensity * (0.7 + 0.3 * Math.sin(Date.now() / 300)); // subtle pulse
@@ -7294,7 +7354,15 @@ function renderStatusFX() {
 // === RANGED COMBAT — BOW FIRING ===
 function fireRangedWeapon() {
   if (inputLocked || !state || state.gameOver || state.victory) return;
-  if (state.throwMode) return; // already in aim mode
+  // If already in aim mode, cancel it
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
 
   const p = state.player;
   const bow = p.equipped.ranged;
@@ -7653,28 +7721,76 @@ function activateForge() {
     addMessage('Forge costs 15 gold.', 'damage');
     return;
   }
-  Audio.resume();
-  haptic(40);
-  p.gold -= 15;
-  const bonus = p.masterSmith ? 2 : 1;
-  // Upgrade equipped weapon or armor (prefer weapon)
-  if (p.equipped.weapon) {
-    p.equipped.weapon.attack += bonus;
-    p.equipped.weapon.name = p.equipped.weapon.name.replace(/ \+\d+$/, '') + ` +${p.equipped.weapon.attack}`;
-    addMessage(`🔧 Forged weapon: +${bonus} ATK! (${p.equipped.weapon.name})`, 'gold');
-  } else if (p.equipped.armor) {
-    p.equipped.armor.defense += bonus;
-    p.equipped.armor.name = p.equipped.armor.name.replace(/ \+\d+$/, '') + ` +${p.equipped.armor.defense}`;
-    addMessage(`🔧 Forged armor: +${bonus} DEF! (${p.equipped.armor.name})`, 'gold');
-  } else {
-    addMessage('No weapon or armor equipped to upgrade.', 'damage');
-    p.gold += 15; // refund
+  // Gather all forgeable items (weapons and armors, equipped and inventory)
+  const candidates = [];
+  if (p.equipped.weapon) candidates.push({ item: p.equipped.weapon, label: '⚔️ ' + p.equipped.weapon.name + ' (equipped)', slot: 'weapon' });
+  if (p.equipped.armor) candidates.push({ item: p.equipped.armor, label: '🛡️ ' + p.equipped.armor.name + ' (equipped)', slot: 'armor' });
+  if (p.equipped.ranged) candidates.push({ item: p.equipped.ranged, label: '🏹 ' + p.equipped.ranged.name + ' (equipped)', slot: 'ranged' });
+  for (let i = 0; i < p.inventory.length; i++) {
+    const it = p.inventory[i];
+    if (it.itemType === 'weapon') candidates.push({ item: it, label: '⚔️ ' + it.name + ` [+${it.attack} ATK]`, slot: null });
+    else if (it.itemType === 'armor') candidates.push({ item: it, label: '🛡️ ' + it.name + ` [+${it.defense} DEF]`, slot: null });
+    else if (it.itemType === 'ranged') candidates.push({ item: it, label: '🏹 ' + it.name + ` [${it.damage} DMG]`, slot: null });
+  }
+  if (candidates.length === 0) {
+    addMessage('No weapon or armor to forge.', 'damage');
     return;
   }
-  p.tinkerFloorUsed = true;
-  animateEntityFlash(p.x, p.y, '#f0a030');
-  Audio.gold();
-  updateUI();
+  // Show forge picker overlay
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🔧 FORGE';
+  const bonus = p.masterSmith ? 2 : 1;
+  $('levelup-label').textContent = `Choose an item to upgrade (+${bonus}). Cost: 15💰  You have: ${p.gold}💰`;
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  for (const cand of candidates) {
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    const isWeaponType = cand.item.itemType === 'weapon' || cand.item.itemType === 'ranged';
+    const statLabel = isWeaponType ? `+${bonus} ATK/DMG` : `+${bonus} DEF`;
+    btn.innerHTML = `<div class="perk-name">${cand.label}</div><div class="perk-desc">${statLabel}</div>`;
+    const handler = () => {
+      p.gold -= 15;
+      if (cand.item.itemType === 'weapon' || cand.item.itemType === 'ranged') {
+        const key = cand.item.attack !== undefined ? 'attack' : 'damage';
+        cand.item[key] = (cand.item[key] || 0) + bonus;
+        const val = cand.item[key];
+        cand.item.name = cand.item.name.replace(/ \+\d+$/, '') + ` +${val}`;
+        addMessage(`🔧 Forged: +${bonus} ${key === 'attack' ? 'ATK' : 'DMG'}! (${cand.item.name})`, 'gold');
+      } else {
+        cand.item.defense = (cand.item.defense || 0) + bonus;
+        cand.item.name = cand.item.name.replace(/ \+\d+$/, '') + ` +${cand.item.defense}`;
+        addMessage(`🔧 Forged: +${bonus} DEF! (${cand.item.name})`, 'gold');
+      }
+      p.tinkerFloorUsed = true;
+      animateEntityFlash(p.x, p.y, '#f0a030');
+      Audio.gold();
+      haptic(40);
+      overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+      overlay.classList.remove('active');
+      inputLocked = false;
+      updateUI();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
+    container.appendChild(btn);
+  }
+  // Cancel button
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = `<div class="perk-name">❌ Cancel</div><div class="perk-desc">Keep your gold</div>`;
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+  overlay.classList.add('active');
 }
 
 // === BOOT ===
