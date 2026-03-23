@@ -1228,7 +1228,7 @@ const BOSS = {
 // Mini-bosses guard milestone floors
 const MINI_BOSSES = {
   4:  { name: 'Cave Troll',    glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
-  8:  { name: 'Lich',          glyph: '💀', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
+  8:  { name: 'Lich',          glyph: '🧿', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
   12: { name: 'Balrog',        glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 },
   16: { name: 'Void Titan',    glyph: '🌀', hp: 45, attack: 8, defense: 5, ai: 'chase', xp: 80, special: 'drain',      detect: 10 },
   19: { name: 'Glyph Guardian', glyph: '⚔️', hp: 55, attack: 9, defense: 6, ai: 'chase', xp: 90, special: 'boss',      detect: 12 },
@@ -3273,7 +3273,10 @@ function showLevelUp() {
   setTimeout(() => $('canvas-wrap').classList.remove('levelup-flash'), 500);
 
   inputLocked = true;
-  $('levelup-label').textContent = `Level ${state.player.level}!`;
+  const p = state.player;
+  const atkTotal = p.attack + (p.equipped.weapon?.attack || 0);
+  const defTotal = p.defense + (p.equipped.armor?.defense || 0);
+  $('levelup-label').innerHTML = `Level ${p.level}! <span style="font-size:11px;color:var(--text-dim);display:block;margin-top:4px;">⚔️ ${atkTotal} ATK · 🛡️ ${defTotal} DEF · ❤️ ${p.hp}/${p.maxHp} HP</span>`;
 
   const allPerks = [
     { name: 'Extended Vision', desc: 'See 1 tile further in all directions', apply: () => { state.player.fovBonus = (state.player.fovBonus || 0) + 1; computeFOV(); } },
@@ -3988,17 +3991,28 @@ function playerMove(dx, dy) {
 
   // Secret wall — reveals hidden passage and spawns item
   if (getTile(nx, ny) === T.WALL_SECRET) {
-    setTile(nx, ny, T.FLOOR);
-    addMessage('You discover a hidden passage!', 'gold');
-    Audio.door();
-    haptic(40);
-    // Spawn a floor-scaled item
-    const secretItem = generateRandomItem(state.floor);
-    if (secretItem) {
-      state.entities.push(createItemEntity(secretItem, nx, ny));
-      addMessage(`A ${secretItem.name} was hidden in the wall!`, 'gold');
+    const key = ny * MAP_W + nx;
+    state.secretBashes = state.secretBashes || {};
+    state.secretBashes[key] = (state.secretBashes[key] || 0) + 1;
+    if (state.secretBashes[key] >= 2) {
+      // Break through on second hit
+      delete state.secretBashes[key];
+      setTile(nx, ny, T.FLOOR);
+      addMessage('You break through the cracked wall!', 'gold');
+      Audio.door();
+      haptic(40);
+      const secretItem = generateRandomItem(state.floor);
+      if (secretItem) {
+        state.entities.push(createItemEntity(secretItem, nx, ny));
+        addMessage(`A ${secretItem.name} was hidden in the wall!`, 'gold');
+      }
+      computeFOV();
+    } else {
+      // First hit — wall cracks, changes color
+      addMessage('The wall cracks! Hit it again to break through.', 'gold');
+      Audio.hit();
+      haptic(30);
     }
-    computeFOV();
     endTurn();
     return;
   }
@@ -4278,6 +4292,7 @@ function pickupItem(itemEntity) {
   }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
+    showPopupNotice('Inventory Full');
     return;
   }
   state.player.inventory.push(itemEntity.item);
@@ -4659,6 +4674,7 @@ function applyScrollEffect(scroll) {
         }
       }
       addMessage(`A fireball erupts! ${hits} enemies hit for ${fbDamage}!`, 'damage');
+      animateAoeBlast(state.player.x, state.player.y, fbRadius, 'rgba(255, 80, 20, 0.6)');
       screenShake();
       break;
     }
@@ -4684,6 +4700,7 @@ function applyScrollEffect(scroll) {
         }
       }
       addMessage(`Visible enemies look ${arcane ? 'completely lost' : 'dazed'}!`, 'good');
+      animateAoeBlast(state.player.x, state.player.y, 6, 'rgba(160, 80, 255, 0.4)');
       break;
     }
     case 'identify':
@@ -4896,6 +4913,7 @@ function renderShopItems(merchant) {
       if (state.player.gold >= effectivePrice) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food' && shopItem.item.itemType !== 'arrows') {
           addMessage('Inventory full!', 'damage');
+          showPopupNotice('Inventory Full — Drop or Destroy an item first');
           return;
         }
         state.player.gold -= effectivePrice;
@@ -5123,6 +5141,25 @@ function shuffle(arr) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function showPopupNotice(text) {
+  // Brief on-screen popup that auto-dismisses
+  let popup = $('popup-notice');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'popup-notice';
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.9);background:rgba(40,20,20,0.95);color:#ff6040;border:2px solid #ff4040;border-radius:10px;padding:14px 24px;font-size:15px;font-weight:700;text-align:center;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.15s,transform 0.15s;';
+    document.body.appendChild(popup);
+  }
+  popup.textContent = text;
+  popup.style.opacity = '1';
+  popup.style.transform = 'translate(-50%,-50%) scale(1)';
+  clearTimeout(popup._timer);
+  popup._timer = setTimeout(() => {
+    popup.style.opacity = '0';
+    popup.style.transform = 'translate(-50%,-50%) scale(0.9)';
+  }, 1500);
 }
 
 function screenShake() {
@@ -5944,15 +5981,17 @@ function render() {
           tileGlyph = '▓';
           tileColor = '#4a2020';
           break;
-        case T.WALL_SECRET:
+        case T.WALL_SECRET: {
           // Looks like a normal wall; Rogue class can detect with shimmer
-          tileGlyph = '▓';
-          tileColor = vis ? biome.wallVis : biome.wallDim;
-          if (vis && state.player.classId === 'rogue' && Math.random() < 0.30) {
-            // Subtle shimmer — slightly brighter color
+          const sKey = my * MAP_W + mx;
+          const cracked = state.secretBashes && state.secretBashes[sKey];
+          tileGlyph = cracked ? '▒' : '▓';
+          tileColor = cracked ? '#c09040' : (vis ? biome.wallVis : biome.wallDim);
+          if (!cracked && vis && state.player.classId === 'rogue' && Math.random() < 0.30) {
             tileColor = '#9090a0';
           }
           break;
+        }
         case T.DOOR_LOCKED:
           tileGlyph = '⊞';
           tileColor = vis ? '#c08030' : '#604018';
