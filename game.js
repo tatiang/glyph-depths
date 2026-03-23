@@ -4511,6 +4511,13 @@ function useItem(item, index) {
             inv.identified = true;
           }
         }
+        // Update matching potions on the ground (floor entities)
+        for (const e of state.entities) {
+          if (e.type === 'item' && e.item && e.item.itemType === 'potion' && e.item.effectId === item.effectId) {
+            e.item.name = e.item.trueName;
+            e.item.identified = true;
+          }
+        }
       }
       break;
 
@@ -4524,6 +4531,13 @@ function useItem(item, index) {
           if (inv.itemType === 'scroll' && inv.effectId === item.effectId) {
             inv.name = inv.trueName;
             inv.identified = true;
+          }
+        }
+        // Update matching scrolls on the ground
+        for (const e of state.entities) {
+          if (e.type === 'item' && e.item && e.item.itemType === 'scroll' && e.item.effectId === item.effectId) {
+            e.item.name = e.item.trueName;
+            e.item.identified = true;
           }
         }
       }
