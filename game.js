@@ -826,6 +826,8 @@ function newRun(classId = 'adventurer') {
     minimapOpen: false,
     throwMode: false,
     throwItem: null,
+    fortifyMode: false,
+    fortifyCandidates: null,
     floorData: Array.from({length: MAX_FLOOR + 1}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
     peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
     doorBashes: {},
@@ -3873,6 +3875,12 @@ function playerMove(dx, dy) {
     return;
   }
 
+  // Fortify mode — place wall in chosen direction
+  if (state.fortifyMode) {
+    executeFortify(dx, dy);
+    return;
+  }
+
   const p = state.player;
   const nx = p.x + dx, ny = p.y + dy;
 
@@ -5404,6 +5412,8 @@ function loadFromRaw(raw) {
     inputLocked = false;
     state.throwMode = false;
     state.throwItem = null;
+    state.fortifyMode = false;
+    state.fortifyCandidates = null;
     state.minimapOpen = false;
     document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
     $('minimap-overlay').classList.remove('active');
@@ -5445,6 +5455,8 @@ function loadGameFromSlot(slot) {
     inputLocked = false;
     state.throwMode = false;
     state.throwItem = null;
+    state.fortifyMode = false;
+    state.fortifyCandidates = null;
     state.minimapOpen = false;
 
     // Close all overlays
@@ -6088,6 +6100,29 @@ function render() {
         ty += ddy;
       }
     }
+  }
+
+  // Fortify mode — highlight candidate tiles
+  if (state.fortifyMode && state.fortifyCandidates) {
+    for (const cand of state.fortifyCandidates) {
+      const vx = cand.nx - camX, vy = cand.ny - camY;
+      if (vx >= 0 && vx < VIEW_COLS && vy >= 0 && vy < VIEW_ROWS) {
+        // Pulsing amber highlight
+        const pulse = 0.25 + 0.15 * Math.sin(Date.now() / 250);
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#c09040';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+        ctx.globalAlpha = 1.0;
+        // Draw a brick icon
+        ctx.font = `${Math.floor(ts * 0.6)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#c09040';
+        ctx.fillText('🧱', vx * ts + ts / 2, vy * ts + ts / 2);
+      }
+    }
+    // Request continuous redraw for pulsing effect
+    requestAnimationFrame(() => { if (state.fortifyMode) render(); });
   }
 
   // Draw items (only visible ones)
@@ -6876,6 +6911,8 @@ function setupInput() {
       if ($('sage-overlay').classList.contains('active')) { $('sage-overlay').classList.remove('active'); inputLocked = false; endTurn(); return; }
       // Throw/aim mode
       if (state && state.throwMode) { state.throwMode = false; state.throwItem = null; addMessage('Cancelled.', ''); updateUI(); render(); return; }
+      // Fortify mode
+      if (state && state.fortifyMode) { state.fortifyMode = false; state.fortifyCandidates = null; addMessage('Fortify cancelled.', ''); updateUI(); render(); return; }
       return;
     }
 
@@ -8341,7 +8378,7 @@ function renderStatusFX() {
   if (!state || !bar) return;
   const effects = state.player.statusEffects || [];
   const hasHaste = hasRingEffect('haste');
-  if (effects.length === 0 && !state.throwMode && !hasHaste) { bar.innerHTML = ''; return; }
+  if (effects.length === 0 && !state.throwMode && !state.fortifyMode && !hasHaste) { bar.innerHTML = ''; return; }
 
   const labels = {
     burning:      { icon: '🔥', text: 'Burn',   cls: 'fx-burning' },
@@ -8355,6 +8392,9 @@ function renderStatusFX() {
   let html = '';
   if (state.throwMode) {
     html += '<div class="fx-pill fx-throw-mode">🎯 Aim&hellip;</div>';
+  }
+  if (state.fortifyMode) {
+    html += '<div class="fx-pill" style="background:rgba(192,144,64,0.2);border-color:#c09040;color:#c09040;">🧱 Build&hellip;</div>';
   }
   for (const eff of effects) {
     const cfg = labels[eff.type];
@@ -8896,6 +8936,15 @@ function activateFortify() {
     addMessage('Fortify already used this floor.', '');
     return;
   }
+  // If already in fortify mode, cancel
+  if (state.fortifyMode) {
+    state.fortifyMode = false;
+    state.fortifyCandidates = null;
+    addMessage('Fortify cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
   // Find valid adjacent FLOOR tiles (not corridor, not adjacent to door)
   const candidates = [];
   for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
@@ -8903,7 +8952,6 @@ function activateFortify() {
     const t = getTile(nx, ny);
     if (t !== T.FLOOR) continue;
     if (enemyAt(nx, ny)) continue;
-    // Check no door tile adjacent to candidate
     let nearDoor = false;
     for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
       const nt = getTile(nx + ddx, ny + ddy);
@@ -8918,62 +8966,34 @@ function activateFortify() {
     return;
   }
   Audio.resume();
+  // Enter fortify targeting mode — player sees the map and picks a direction
+  state.fortifyMode = true;
+  state.fortifyCandidates = candidates;
+  addMessage('🧱 Fortify — choose direction to build! (Q to cancel)', 'good');
+  updateUI();
+  render();
+}
+
+function executeFortify(dx, dy) {
+  const p = state.player;
+  if (!state.fortifyMode || !state.fortifyCandidates) return false;
+  const cand = state.fortifyCandidates.find(c => c.dx === dx && c.dy === dy);
+  if (!cand) {
+    addMessage('Cannot build there.', '');
+    return false;
+  }
+  setTile(cand.nx, cand.ny, T.WALL);
+  p.fortifyFloorUsed = true;
+  state.fortifyMode = false;
+  state.fortifyCandidates = null;
+  animateEntityFlash(p.x, p.y, '#a0a0a0');
+  addMessage('🧱 You build a wall!', 'good');
+  Audio.door();
   haptic(50);
-  if (candidates.length === 1) {
-    const { nx, ny } = candidates[0];
-    setTile(nx, ny, T.WALL);
-    p.fortifyFloorUsed = true;
-    animateEntityFlash(p.x, p.y, '#a0a0a0');
-    addMessage('🧱 You build a wall!', 'good');
-    Audio.door();
-    computeFOV();
-    updateUI();
-    endTurn();
-    return;
-  }
-  // Multiple candidates — show picker overlay
-  inputLocked = true;
-  const dirLabels = { '-1,0': '← West', '1,0': '→ East', '0,-1': '↑ North', '0,1': '↓ South' };
-  const overlay = $('levelup-overlay');
-  overlay.querySelector('h1').textContent = '🧱 FORTIFY';
-  $('levelup-label').textContent = 'Choose where to build:';
-  const container = $('perk-choices');
-  container.innerHTML = '';
-  for (const cand of candidates) {
-    const btn = document.createElement('button');
-    btn.className = 'perk-btn';
-    const label = dirLabels[`${cand.dx},${cand.dy}`] || 'Direction';
-    btn.innerHTML = `<div class="perk-name">${label}</div><div class="perk-desc">Build wall here</div>`;
-    const handler = () => {
-      setTile(cand.nx, cand.ny, T.WALL);
-      p.fortifyFloorUsed = true;
-      animateEntityFlash(p.x, p.y, '#a0a0a0');
-      addMessage('🧱 You build a wall!', 'good');
-      Audio.door();
-      overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
-      overlay.classList.remove('active');
-      inputLocked = false;
-      computeFOV();
-      updateUI();
-      endTurn();
-    };
-    btn.addEventListener('click', handler);
-    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
-    container.appendChild(btn);
-  }
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'perk-btn';
-  cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div><div class="perk-desc">Keep your turn</div>';
-  const cancelH = () => {
-    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
-    overlay.classList.remove('active');
-    inputLocked = false;
-  };
-  cancelBtn.addEventListener('click', cancelH);
-  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelH(); }, { passive: false });
-  container.appendChild(cancelBtn);
-  overlay.classList.add('active');
+  computeFOV();
+  updateUI();
+  endTurn();
+  return true;
 }
 
 // === DAREDEVIL: FLIP ===
