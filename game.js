@@ -250,7 +250,7 @@ function showMasteryToast(mastery) {
 }
 
 function getMasteryBonuses(classId) {
-  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, upgradeBow: false, revealRune: false };
+  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, upgradeBow: false, revealRune: false, fastIllusion: false, startGold: 0 };
   for (const m of MASTERY_DEFS) {
     if (!masteryState[m.id]) continue;
     if (m.classReq && m.classReq !== classId) continue;
@@ -260,6 +260,8 @@ function getMasteryBonuses(classId) {
     if (m.bonus.critChance) bonuses.critChance += m.bonus.critChance;
     if (m.bonus.upgradeBow) bonuses.upgradeBow = true;
     if (m.bonus.revealRune) bonuses.revealRune = true;
+    if (m.bonus.fastIllusion) bonuses.fastIllusion = true;
+    if (m.bonus.startGold) bonuses.startGold += m.bonus.startGold;
   }
   return bonuses;
 }
@@ -1050,6 +1052,7 @@ function applyClassStartingItems(classId) {
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   }
+}
 
 // === POTION / SCROLL NAME RANDOMIZATION ===
 const POTION_COLORS = [
@@ -2525,9 +2528,10 @@ function generateMonsterDrop(floor, enemyXp) {
   const roll = Math.random();
   const tier = Math.ceil(floor / 3);
   if (roll < 0.3) {
-    // Gold (Greed rune: +50%)
+    // Gold (Greed rune: +50%, Barterer: +50%)
     let amount = 3 + Math.floor(Math.random() * (2 + floor * 2));
     if (state && hasRune('greed')) amount = Math.floor(amount * 1.5);
+    if (state && state.player.bartererDiscount) amount = Math.floor(amount * 1.5);
     return { name: `${amount} Gold`, glyph: '💰', itemType: 'gold', goldAmount: amount, value: 0 };
   } else if (roll < 0.5) {
     // Food
@@ -4772,15 +4776,16 @@ function renderShopItems(merchant) {
     else if (it.itemType === 'ranged') statTag = ` <span style="color:#4a9;font-size:11px;">[${it.damage} DMG, ${it.range} rng]</span>`;
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
-    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${shopItem.price}💰</span>`;
+    const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(shopItem.price * 0.75)) : shopItem.price;
+    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${effectivePrice}💰</span>`;
     const buyHandler = () => {
       if (div.style.pointerEvents === 'none') return;
-      if (state.player.gold >= shopItem.price) {
+      if (state.player.gold >= effectivePrice) {
         if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food' && shopItem.item.itemType !== 'arrows') {
           addMessage('Inventory full!', 'damage');
           return;
         }
-        state.player.gold -= shopItem.price;
+        state.player.gold -= effectivePrice;
         if (shopItem.item.itemType === 'food') {
           state.player.hunger = Math.min(100, state.player.hunger + 30);
           addMessage('You eat a ration. (+30 hunger)', 'good');
@@ -6006,6 +6011,21 @@ function updateUI() {
         setBtn(`🔧 FORGE (15💰)`, canAfford);
         setBar(canAfford ? 100 : 0, canAfford ? 'var(--gold)' : 'var(--text-dim)');
       }
+    } else if (cls === 'conjurer') {
+      spRow.style.display = '';
+      const maxCD = getMasteryBonuses(cls).fastIllusion ? 6 : 8;
+      if (p.illusionCooldown > 0) {
+        setBtn(`🎭 ILLUSION ${p.illusionCooldown}t`, false);
+        setBar(((maxCD - p.illusionCooldown) / maxCD) * 100, '#cc44ff');
+      } else {
+        setBtn('🎭 ILLUSION', true, '#cc44ff');
+        setBar(100, '#cc44ff');
+      }
+    } else if (cls === 'barterer') {
+      spRow.style.display = '';
+      const canAfford = p.hp > 5;
+      setBtn(`🪙 RATION (−5 HP)`, canAfford);
+      setBar(canAfford ? 100 : 0, canAfford ? '#f0c040' : 'var(--text-dim)');
     } else {
       spRow.style.display = 'none';
     }
@@ -6517,6 +6537,8 @@ function setupInput() {
     else if (state.player.classId === 'mason') activateFortify();
     else if (state.player.classId === 'daredevil') activateFlip();
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
+    else if (state.player.classId === 'conjurer') activateIllusion();
+    else if (state.player.classId === 'barterer') conjureRation();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -8343,6 +8365,65 @@ function activateTeleportStairs() {
   haptic(40);
   animateEntityFlash(sx, sy, '#80ffff');
   computeFOV();
+  updateUI();
+  endTurn();
+}
+
+// === CONJURER: SUMMON ILLUSION ===
+function activateIllusion() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  const maxCD = getMasteryBonuses(p.classId).fastIllusion ? 6 : 8;
+  if (p.illusionCooldown > 0) {
+    addMessage(`Illusion not ready. (${p.illusionCooldown} turns)`, '');
+    return;
+  }
+  // Remove any existing illusion
+  for (let i = state.entities.length - 1; i >= 0; i--) {
+    if (state.entities[i].type === 'illusion') state.entities.splice(i, 1);
+  }
+  // Place illusion on a nearby walkable tile
+  const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},{x:1,y:1},{x:-1,y:-1},{x:1,y:-1},{x:-1,y:1}];
+  let placed = false;
+  for (const d of dirs) {
+    const nx = p.x + d.x, ny = p.y + d.y;
+    const tile = getTile(nx, ny);
+    if (tile === T.FLOOR || tile === T.CORRIDOR) {
+      const blocked = state.entities.some(e => e.x === nx && e.y === ny && (e.type === 'enemy' || e.type === 'merchant'));
+      if (!blocked) {
+        state.entities.push({ type: 'illusion', x: nx, y: ny, hp: 3, turnsLeft: 8, glyph: '🎭' });
+        placed = true;
+        addMessage('🎭 You conjure a shimmering illusion!', 'good');
+        animateEntityFlash(nx, ny, '#cc44ff');
+        break;
+      }
+    }
+  }
+  if (!placed) {
+    addMessage('No space to summon an illusion!', 'damage');
+    return;
+  }
+  p.illusionCooldown = maxCD;
+  Audio.gold();
+  haptic(40);
+  computeFOV();
+  updateUI();
+  endTurn();
+}
+
+// === BARTERER: CONJURE RATION ===
+function conjureRation() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.hp <= 5) {
+    addMessage('Not enough HP to conjure a ration!', 'damage');
+    return;
+  }
+  p.hp -= 5;
+  p.hunger = Math.min(100, p.hunger + 30);
+  addMessage('🪙 You trade vitality for sustenance. (−5 HP, +30 hunger)', 'good');
+  Audio.gold();
+  haptic(40);
   updateUI();
   endTurn();
 }
