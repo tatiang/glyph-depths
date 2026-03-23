@@ -25,7 +25,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1 };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = '20 floors, harder boss, bug fixes'; // updated each push
-const LAST_UPDATED = '2026-03-23 12:00';
+const LAST_UPDATED = '2026-03-23 14:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -60,6 +60,11 @@ const BADGE_DEFS = [
   { id: 'win_cleric', name: 'Divine Crusade', icon: '⛪', desc: 'Win as Cleric', cat: 'class' },
   { id: 'win_bard', name: "Bard's Ballad", icon: '🎵', desc: 'Win as Bard', cat: 'class' },
   { id: 'win_artificer', name: "Artificer's Opus", icon: '⚒️', desc: 'Win as Artificer', cat: 'class' },
+  { id: 'win_ninja', name: "Ninja's Shadow", icon: '🌟', desc: 'Win as Ninja', cat: 'class' },
+  { id: 'win_darkwizard', name: "Necromancer's Throne", icon: '💀', desc: 'Win as Dark Wizard', cat: 'class' },
+  { id: 'win_mason', name: "Mason's Bastion", icon: '🧱', desc: 'Win as Brick Mason', cat: 'class' },
+  { id: 'win_daredevil', name: "Daredevil's Gamble", icon: '🤸', desc: 'Win as Daredevil', cat: 'class' },
+  { id: 'win_escapeartist', name: "Escape Artist's Exit", icon: '💨', desc: 'Win as Escape Artist', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -183,6 +188,11 @@ const MASTERY_DEFS = [
   { id: 'cle_mastery',  trigger: 'win_cleric',     name: 'Cleric Mastery',      desc: 'All Clerics start with +3 max HP',        classReq: 'cleric',     bonus: { maxHp: 3 } },
   { id: 'brd_mastery',  trigger: 'win_bard',       name: 'Bard Mastery',        desc: 'All Bards start with +5% charm chance',   classReq: 'bard',       bonus: { charmBonus: 0.05 } },
   { id: 'art_mastery',  trigger: 'win_artificer',  name: 'Artificer Mastery',   desc: 'All Artificers start with +2 max HP',     classReq: 'artificer',  bonus: { maxHp: 2 } },
+  { id: 'nj_mastery',   trigger: 'win_ninja',      name: 'Ninja Mastery',       desc: 'All Ninjas start with +1 ATK',            classReq: 'ninja',      bonus: { attack: 1 } },
+  { id: 'dw_mastery',   trigger: 'win_darkwizard', name: 'Dark Wizard Mastery', desc: 'All Dark Wizards start at 12% necromancy', classReq: 'darkwizard', bonus: { necroBonus: 0.04 } },
+  { id: 'bm_mastery',   trigger: 'win_mason',      name: 'Mason Mastery',       desc: 'All Brick Masons start with +1 DEF',      classReq: 'mason',      bonus: { defense: 1 } },
+  { id: 'dd_mastery',   trigger: 'win_daredevil',  name: 'Daredevil Mastery',   desc: 'All Daredevils start Flip at 3-turn CD',  classReq: 'daredevil',  bonus: { fastFlip: true } },
+  { id: 'ea_mastery',   trigger: 'win_escapeartist', name: 'Escape Artist Mastery', desc: 'All Escape Artists get 2 Escape Route uses/floor', classReq: 'escapeartist', bonus: { extraEscape: true } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -513,6 +523,56 @@ const CLASS_DEFS = [
     startItems: 'Short Sword · Leather Vest',
     statBadges: [{ label: '14 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: 'Forge 1/floor', cls: 'pos' }, { label: '🔧 Tinker', cls: 'pos' }]
+  },
+  {
+    id: 'ninja', name: 'Ninja', icon: '🌟',
+    flavor: 'Silent, precise. Strikes front and back simultaneously.',
+    hp: 11, attack: 3, defense: 0,
+    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
+    passive: '🗡️ Backstab: hits opposite tile · 🌟 Star Throw',
+    startItems: 'Rusty Dagger · Throwing Stars · Healing Potion',
+    statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Backstab', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '🌟 Stars ×4', cls: 'pos' }]
+  },
+  {
+    id: 'darkwizard', name: 'Dark Wizard', icon: '🧟',
+    flavor: 'Death is not the end. The fallen serve the Dark Wizard.',
+    hp: 10, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '💀 Necromance: chance to raise slain foes',
+    startItems: 'Arcane Staff · Healing Potion · 2 Scrolls',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Necromance', cls: 'pos' }, { label: '💀 Acid Bolt', cls: 'pos' }]
+  },
+  {
+    id: 'mason', name: 'Brick Mason', icon: '🧱',
+    flavor: 'Walls are not obstacles — they are options.',
+    hp: 16, attack: 2, defense: 3,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🚪 Can close doors · 🧱 Fortify: build a wall',
+    startItems: 'Mace · Chain Mail',
+    statBadges: [{ label: '16 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+3 DEF', cls: 'pos' }],
+    passBadges: [{ label: 'Close Doors', cls: 'pos' }, { label: '🧱 Fortify/floor', cls: 'pos' }]
+  },
+  {
+    id: 'daredevil', name: 'Daredevil', icon: '🤸',
+    flavor: 'Acrobatic and reckless. Ricochets through enemy ranks.',
+    hp: 12, attack: 3, defense: 0,
+    hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
+    passive: '💥 Ricochet: chain damage to nearby foes',
+    startItems: 'Short Sword · Leather Vest · Healing Potion',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+3 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '🤸 Flip', cls: 'pos' }]
+  },
+  {
+    id: 'escapeartist', name: 'Escape Artist', icon: '💨',
+    flavor: 'Leave nothing behind but ice and regrets.',
+    hp: 12, attack: 2, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.10,
+    passive: '❄️ Ice Traps on retreat · 💨 Escape Route',
+    startItems: 'Leather Vest · Invis Potion · 4 Throwing Daggers',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: 'Ice Traps', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '💨 Escape/floor', cls: 'pos' }]
   }
 ];
 
@@ -804,7 +864,22 @@ function createPlayer(classId = 'adventurer') {
     songOfRestFloorUsed: false,
     // Artificer
     tinkerFloorUsed: false,
-    masterSmith: false
+    masterSmith: false,
+    // Ninja
+    backstab: classId === 'ninja',
+    starThrowCooldown: 0,
+    // Dark Wizard
+    necromancer: classId === 'darkwizard',
+    acidBoltCooldown: 0,
+    // Brick Mason
+    fortifyFloorUsed: false,
+    // Daredevil
+    ricochetMelee: classId === 'daredevil',
+    flipCooldown: 0,
+    flipMode: false,
+    // Escape Artist
+    stairsTeleportFloorUsed: false,
+    iceTrapPassive: classId === 'escapeartist'
   };
 }
 
@@ -876,6 +951,43 @@ function applyClassStartingItems(classId) {
     if (sword) p.equipped.weapon = { ...sword };
     const armor = ARMORS.find(a => a.name === 'Leather Vest');
     if (armor) p.equipped.armor = { ...armor };
+  } else if (classId === 'ninja') {
+    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
+    p.inventory.push({ name: 'Throwing Stars', glyph: '🌟', itemType: 'thrown', damage: 3, ammo: 5 });
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'darkwizard') {
+    p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+    const usedIds = new Set();
+    let tries = 0;
+    while (p.inventory.length < 3 && tries < 30) {
+      tries++;
+      const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
+      if (!usedIds.has(s.id)) {
+        usedIds.add(s.id);
+        scrollIdentified[s.id] = true;
+        p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
+      }
+    }
+  } else if (classId === 'mason') {
+    p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
+    const chainMail = ARMORS.find(a => a.name === 'Chain Mail');
+    if (chainMail) p.equipped.armor = { ...chainMail };
+  } else if (classId === 'daredevil') {
+    const sword = WEAPONS.find(w => w.name === 'Short Sword');
+    if (sword) p.equipped.weapon = { ...sword };
+    const armor = ARMORS.find(a => a.name === 'Leather Vest');
+    if (armor) p.equipped.armor = { ...armor };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'escapeartist') {
+    const armor = ARMORS.find(a => a.name === 'Leather Vest');
+    if (armor) p.equipped.armor = { ...armor };
+    p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
+    const invisPotion = potionNames.find(n => n.id === 'invisibility');
+    if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
   }
 }
 
@@ -1150,6 +1262,10 @@ function generateFloor() {
   if (state.player.classId === 'artificer') {
     state.player.tinkerFloorUsed = false;
   }
+  // Brick Mason: reset fortify each floor
+  state.player.fortifyFloorUsed = false;
+  // Escape Artist: reset escape route each floor
+  state.player.stairsTeleportFloorUsed = false;
 
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
@@ -2823,6 +2939,26 @@ function killEnemy(enemy) {
     }
   }
 
+  // Dark Wizard necromancy — animate killed enemy as ally skeleton
+  if (state.player.classId === 'darkwizard' && state.player.necromancer) {
+    const undead = ['Skeleton', 'Wraith', 'Ghost', 'Banshee', 'Arch Lich', 'Void Wraith', 'Mini Slime', 'Hatchling'];
+    if (!undead.includes(enemy.name) && enemy.ai !== 'boss' && !enemy.isAlly) {
+      const necroChance = Math.min(0.30, 0.08 + 0.02 * state.player.level);
+      if (Math.random() < necroChance) {
+        const skel = createEnemy(
+          { name: 'Skeletal ' + enemy.name, glyph: '💀', hp: Math.max(3, Math.floor(enemy.maxHp / 2)),
+            attack: enemy.attack, defense: 0, ai: 'chase', xp: 0, special: null, detect: 10 },
+          enemy.x, enemy.y
+        );
+        skel.isAlly = true;
+        skel.allyTurns = 20;
+        skel.alertness = 2;
+        state.entities.push(skel);
+        addMessage(`💀 The ${enemy.name} rises to serve you!`, 'good');
+      }
+    }
+  }
+
   // Mini-boss guaranteed tier-appropriate drop
   if (enemy.isMiniBoss) {
     const tier = Math.ceil(state.floor / 3);
@@ -3511,6 +3647,14 @@ function tryMoveEnemy(enemy, nx, ny) {
 
   enemy.x = nx;
   enemy.y = ny;
+
+  // Check for ice trap placed by Escape Artist
+  const iceTrap = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'ice' && e.x === nx && e.y === ny);
+  if (iceTrap && !enemy.isAlly) {
+    addStatusEffect(enemy, 'frozen', 2);
+    addMessage(`❄️ ${enemy.name} hits an ice trap!`, 'good');
+    removeEntity(iceTrap);
+  }
 }
 
 function hasLOS(x1, y1, x2, y2) {
@@ -3532,6 +3676,34 @@ function hasLOS(x1, y1, x2, y2) {
 // === PLAYER ACTIONS ===
 function playerMove(dx, dy) {
   if (inputLocked || state.gameOver || state.victory) return;
+
+  // Flip mode — Daredevil jump over enemy
+  if (state.player && state.player.flipMode) {
+    state.player.flipMode = false;
+    const p = state.player;
+    const nx = p.x + dx, ny = p.y + dy;
+    const nx2 = p.x + 2 * dx, ny2 = p.y + 2 * dy;
+    const foe = enemyAt(nx, ny);
+    if (foe && foe.hp > 0 && !foe.isAlly && isWalkable(nx2, ny2) && !enemyAt(nx2, ny2)) {
+      p.x = nx2;
+      p.y = ny2;
+      p.flipCooldown = getMasteryBonuses(p.classId).fastFlip ? 3 : 4;
+      addMessage(`🤸 You flip over the ${foe.name}!`, 'good');
+      Audio.step();
+      haptic(30);
+      animateEntityFlash(p.x, p.y, '#ffee00');
+      computeFOV();
+      autoPickup();
+      updateUI();
+      render();
+      endTurn();
+    } else {
+      addMessage("Can't flip — no enemy to jump or landing blocked.", '');
+      updateUI();
+      render();
+    }
+    return;
+  }
 
   // Throw mode — launch projectile in chosen direction
   if (state.throwMode) {
@@ -3572,6 +3744,32 @@ function playerMove(dx, dy) {
       for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
         const bonus = enemyAt(p.x + ddx, p.y + ddy);
         if (bonus && bonus !== enemy && bonus.hp > 0) { attackEntity(p, bonus); break; }
+      }
+    }
+    // Ninja backstab: also attack enemy directly behind player
+    if (p.backstab) {
+      const backEnemy = enemyAt(p.x - dx, p.y - dy);
+      if (backEnemy && backEnemy.hp > 0 && !backEnemy.isAlly) {
+        attackEntity(p, backEnemy);
+        addMessage('🌟 Backstab!', 'good');
+      }
+    }
+    // Daredevil ricochet: chain to adjacent enemies at 50% then 25%
+    if (p.ricochetMelee) {
+      const atk = getEffectiveAttack(p);
+      let ricCount = 0;
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        if (ricCount >= 2) break;
+        const adj = enemyAt(p.x + ddx, p.y + ddy);
+        if (adj && adj.hp > 0 && adj !== enemy && !adj.isAlly) {
+          const pct = ricCount === 0 ? 0.5 : 0.25;
+          const dmg = Math.max(1, Math.floor(atk * pct));
+          adj.hp -= dmg;
+          addMessage(`💥 Ricochet! ${adj.name} takes ${dmg}.`, 'good');
+          haptic(20);
+          if (adj.hp <= 0) killEnemy(adj);
+          ricCount++;
+        }
       }
     }
     endTurn();
@@ -3666,10 +3864,22 @@ function playerMove(dx, dy) {
   // Check walkable
   if (!isWalkable(nx, ny)) return;
 
+  const oldX = p.x, oldY = p.y;
   p.x = nx;
   p.y = ny;
   Audio.step();
   haptic(10);
+
+  // Escape Artist ice trap: leave a trap at old tile if enemies were adjacent
+  if (p.iceTrapPassive) {
+    const wasNearEnemy = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]].some(([ddx, ddy]) => {
+      const e = enemyAt(oldX + ddx, oldY + ddy);
+      return e && e.hp > 0 && !e.isAlly;
+    });
+    if (wasNearEnemy) {
+      state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '❄️', name: 'Ice Trap', hazardType: 'ice', turns: 5 });
+    }
+  }
 
   // Check for items on ground
   autoPickup();
@@ -3768,8 +3978,8 @@ function playerMove(dx, dy) {
 
 function closeDoor() {
   if (inputLocked || state.gameOver || state.victory) return;
-  if (state.player.classId !== 'rogue') {
-    addMessage('Only Rogues can close doors.', '');
+  if (!['rogue', 'mason'].includes(state.player.classId)) {
+    addMessage('Only Rogues and Brick Masons can close doors.', '');
     return;
   }
   // Find adjacent open door
@@ -4613,6 +4823,9 @@ function endTurn() {
   }
   if (state.player.spellCooldown > 0) state.player.spellCooldown--;
   if (state.player.aimedShotCooldown > 0) state.player.aimedShotCooldown--;
+  if (state.player.starThrowCooldown > 0) state.player.starThrowCooldown--;
+  if (state.player.acidBoltCooldown > 0) state.player.acidBoltCooldown--;
+  if (state.player.flipCooldown > 0) state.player.flipCooldown--;
 
   // Process hazards
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -5562,7 +5775,7 @@ function updateUI() {
   // Rogue close door button
   const closeDoorBtn = $('btn-closedoor');
   if (closeDoorBtn) {
-    closeDoorBtn.style.display = p.classId === 'rogue' ? '' : 'none';
+    closeDoorBtn.style.display = (p.classId === 'rogue' || p.classId === 'mason') ? '' : 'none';
   }
   $('hp-text').textContent = `${p.hp}/${p.maxHp}`;
 
@@ -6193,6 +6406,11 @@ function setupInput() {
     else if (state.player.classId === 'cleric') activateDivineHeal();
     else if (state.player.classId === 'bard') activateSongOfRest();
     else if (state.player.classId === 'artificer') activateForge();
+    else if (state.player.classId === 'ninja') activateStarThrow();
+    else if (state.player.classId === 'darkwizard') activateAcidBolt();
+    else if (state.player.classId === 'mason') activateFortify();
+    else if (state.player.classId === 'daredevil') activateFlip();
+    else if (state.player.classId === 'escapeartist') activateTeleportStairs();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -7416,7 +7634,8 @@ function throwProjectile(dx, dy) {
   const { item } = throwData;
   const isAimedShot = item.itemType === 'aimed_shot';
   const isRangedShot = item.itemType === 'ranged_shot';
-  const maxRange = isAimedShot ? 50 : (isRangedShot ? (item.range || 8) : 8);
+  const isAcidBolt = item.itemType === 'acid_bolt';
+  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt ? (item.range || 8) : 8);
   const p = state.player;
 
   let x = p.x + dx;
@@ -7514,8 +7733,18 @@ function throwProjectile(dx, dy) {
   }
 
   // Animation
-  const projGlyph = (isAimedShot || isRangedShot) ? '🏹' : '🗡️';
+  const projGlyph = isAcidBolt ? '🟢' : (isAimedShot || isRangedShot) ? '🏹' : '🗡️';
   animateProjectile(p.x, p.y, landX, landY, projGlyph);
+
+  // Acid bolt: apply poison on hit, set cooldown
+  if (isAcidBolt) {
+    if (!hit) addMessage('The acid bolt splashes into the darkness.', '');
+    else if (hitTarget && hitTarget.hp > 0) {
+      addStatusEffect(hitTarget, 'poison', 5);
+      addMessage(`🟢 ${hitTarget.name} is coated in acid! (poison)`, 'good');
+    }
+    state.player.acidBoltCooldown = 7;
+  }
 
   if (isAimedShot) {
     if (!hit) addMessage('Your arrow flies into the darkness.', '');
@@ -7791,6 +8020,208 @@ function activateForge() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
   overlay.classList.add('active');
+}
+
+// === NINJA: STAR THROW ===
+function activateStarThrow() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.starThrowCooldown > 0) {
+    addMessage(`Throwing Stars not ready. (${p.starThrowCooldown} turns)`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  const dmg = p.attack + 2;
+  let hitCount = 0;
+  for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+    let x = p.x + dx, y = p.y + dy;
+    let landed = { x: p.x + dx, y: p.y + dy };
+    for (let i = 0; i < 8; i++) {
+      if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
+      const target = enemyAt(x, y);
+      if (target && target.hp > 0 && !target.isAlly) {
+        const def = getEffectiveDefense(target);
+        const d = Math.max(1, dmg - def + Math.floor(Math.random() * 3) - 1);
+        target.hp -= d;
+        addMessage(`🌟 Star hits ${target.name} for ${d}!`, 'good');
+        landed = { x, y };
+        hitCount++;
+        if (target.hp <= 0) killEnemy(target);
+        break;
+      }
+      if (!isWalkable(x, y)) break;
+      landed = { x, y };
+      x += dx; y += dy;
+    }
+    animateProjectile(p.x, p.y, landed.x, landed.y, '🌟');
+  }
+  if (hitCount === 0) addMessage('🌟 Stars fly in all directions!', 'good');
+  p.starThrowCooldown = 6;
+  Audio.hit();
+  updateUI();
+  endTurn();
+}
+
+// === DARK WIZARD: ACID BOLT ===
+function activateAcidBolt() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.acidBoltCooldown > 0) {
+    addMessage(`Acid Bolt not ready. (${p.acidBoltCooldown} turns)`, '');
+    return;
+  }
+  if (state.throwMode) {
+    state.throwMode = false;
+    state.throwItem = null;
+    addMessage('Cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
+  state.throwMode = true;
+  state.throwItem = {
+    item: { name: 'Acid Bolt', damage: p.attack, ammo: Infinity, itemType: 'acid_bolt', range: 10 },
+    index: -1
+  };
+  addMessage('🟢 Acid Bolt — choose direction!', 'good');
+  updateUI();
+  render();
+}
+
+// === BRICK MASON: FORTIFY ===
+function activateFortify() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.fortifyFloorUsed) {
+    addMessage('Fortify already used this floor.', '');
+    return;
+  }
+  // Find valid adjacent FLOOR tiles (not corridor, not adjacent to door)
+  const candidates = [];
+  for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+    const nx = p.x + dx, ny = p.y + dy;
+    const t = getTile(nx, ny);
+    if (t !== T.FLOOR) continue;
+    if (enemyAt(nx, ny)) continue;
+    // Check no door tile adjacent to candidate
+    let nearDoor = false;
+    for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nt = getTile(nx + ddx, ny + ddy);
+      if (nt === T.DOOR_CLOSED || nt === T.DOOR_OPEN || nt === T.DOOR_ONEWAY || nt === T.DOOR_SEALED || nt === T.DOOR_LOCKED) {
+        nearDoor = true; break;
+      }
+    }
+    if (!nearDoor) candidates.push({ nx, ny, dx, dy });
+  }
+  if (candidates.length === 0) {
+    addMessage('No room to build here.', '');
+    return;
+  }
+  Audio.resume();
+  haptic(50);
+  if (candidates.length === 1) {
+    const { nx, ny } = candidates[0];
+    setTile(nx, ny, T.WALL);
+    p.fortifyFloorUsed = true;
+    animateEntityFlash(p.x, p.y, '#a0a0a0');
+    addMessage('🧱 You build a wall!', 'good');
+    Audio.door();
+    computeFOV();
+    updateUI();
+    endTurn();
+    return;
+  }
+  // Multiple candidates — show picker overlay
+  inputLocked = true;
+  const dirLabels = { '-1,0': '← West', '1,0': '→ East', '0,-1': '↑ North', '0,1': '↓ South' };
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🧱 FORTIFY';
+  $('levelup-label').textContent = 'Choose where to build:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  for (const cand of candidates) {
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    const label = dirLabels[`${cand.dx},${cand.dy}`] || 'Direction';
+    btn.innerHTML = `<div class="perk-name">${label}</div><div class="perk-desc">Build wall here</div>`;
+    const handler = () => {
+      setTile(cand.nx, cand.ny, T.WALL);
+      p.fortifyFloorUsed = true;
+      animateEntityFlash(p.x, p.y, '#a0a0a0');
+      addMessage('🧱 You build a wall!', 'good');
+      Audio.door();
+      overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+      overlay.classList.remove('active');
+      inputLocked = false;
+      computeFOV();
+      updateUI();
+      endTurn();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
+    container.appendChild(btn);
+  }
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div><div class="perk-desc">Keep your turn</div>';
+  const cancelH = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelH);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelH(); }, { passive: false });
+  container.appendChild(cancelBtn);
+  overlay.classList.add('active');
+}
+
+// === DAREDEVIL: FLIP ===
+function activateFlip() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.flipCooldown > 0) {
+    addMessage(`Flip not ready. (${p.flipCooldown} turns)`, '');
+    return;
+  }
+  if (p.flipMode) {
+    p.flipMode = false;
+    addMessage('Flip cancelled.', '');
+    updateUI();
+    render();
+    return;
+  }
+  p.flipMode = true;
+  addMessage('🤸 Flip — choose direction to jump!', 'good');
+  updateUI();
+  render();
+}
+
+// === ESCAPE ARTIST: TELEPORT STAIRS ===
+function activateTeleportStairs() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.stairsTeleportFloorUsed && !getMasteryBonuses(p.classId).extraEscape) {
+    addMessage('Escape Route already used this floor.', '');
+    return;
+  }
+  // Find T.STAIRS_DOWN tile
+  let sx = -1, sy = -1;
+  for (let i = 0; i < MAP_W * MAP_H; i++) {
+    if (state.map[i] === T.STAIRS_DOWN) { sx = i % MAP_W; sy = Math.floor(i / MAP_W); break; }
+  }
+  if (sx < 0) { addMessage('No stairs found!', 'damage'); return; }
+  p.x = sx;
+  p.y = sy;
+  p.stairsTeleportFloorUsed = true;
+  addMessage('💨 You vanish and reappear by the stairs!', 'good');
+  Audio.gold();
+  haptic(40);
+  animateEntityFlash(sx, sy, '#80ffff');
+  computeFOV();
+  updateUI();
+  endTurn();
 }
 
 // === BOOT ===
