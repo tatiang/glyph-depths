@@ -198,6 +198,18 @@ const Audio = (() => {
     noise(0.3, [0.02, 0.08, 0.2, 0.15]);
   }
 
+  function danger() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Two low heartbeat-like pulses
+    osc('sine', 110, 0.12, [0.005, 0.02, 0.5, 0.07]);
+    osc('sine', 82, 0.10, [0.005, 0.02, 0.4, 0.06]);
+    setTimeout(() => {
+      osc('sine', 110, 0.10, [0.005, 0.02, 0.4, 0.06]);
+      osc('sine', 82, 0.08, [0.005, 0.02, 0.3, 0.05]);
+    }, 220);
+  }
+
   // Title / intro music — mysterious descending melody with reverb-like echoes
   function titleMusic() {
     if (!ctx || !enabled) return;
@@ -277,6 +289,6 @@ const Audio = (() => {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, miss, crit, merchant, boss, titleMusic
+    door, miss, crit, merchant, boss, danger, titleMusic
   };
 })();

@@ -5654,7 +5654,13 @@ function render() {
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
 
     ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-    ctx.fillText(e.glyph, sx, sy);
+    if (e.item?.itemType === 'arrows') {
+      ctx.fillStyle = '#ffe066'; // bright amber so arrows stand out on the floor
+      ctx.fillText(e.glyph, sx, sy);
+      ctx.fillStyle = '#ffffff';
+    } else {
+      ctx.fillText(e.glyph, sx, sy);
+    }
   }
 
   // Draw glyph runes (shimmer effect)
@@ -5810,45 +5816,49 @@ function render() {
 
   // Danger border — red glow when low HP or low food
   const hpPct = p.hp / p.maxHp;
-  const dangerHP = p.hp <= 5;
-  const dangerHunger = p.hunger <= 30;
+  const dangerHP = p.hp < 6;
+  const dangerHunger = p.hunger < 31;
   if (dangerHP || dangerHunger) {
-    const intensity = dangerHP ? Math.max(0.3, 1 - hpPct * 4) : 0.3; // stronger as HP drops
-    const pulseAlpha = intensity * (0.7 + 0.3 * Math.sin(Date.now() / 300)); // subtle pulse
-    const borderW = 3;
+    const intensity = dangerHP ? Math.max(0.55, 1 - hpPct * 2) : 0.55;
+    const pulseAlpha = intensity * (0.75 + 0.25 * Math.sin(Date.now() / 200)); // fast pulse
+    const borderW = 10;
+    const glowSize = 40;
+    const col = dangerHP ? '#ff2020' : '#ff6020';
+    const colRgb = dangerHP ? '255,32,32' : '255,96,32';
     ctx.save();
     ctx.globalAlpha = pulseAlpha;
-    ctx.strokeStyle = dangerHP ? '#ff2020' : '#ff6020'; // red for HP, orange for hunger-only
-    ctx.lineWidth = borderW * 2; // doubled because half is clipped by canvas edge
+    ctx.strokeStyle = col;
+    ctx.lineWidth = borderW * 2;
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
     // Inner glow gradient on edges
-    const glowSize = 12;
-    ctx.globalAlpha = pulseAlpha * 0.4;
-    // Top edge
+    ctx.globalAlpha = pulseAlpha * 0.6;
     const gt = ctx.createLinearGradient(0, 0, 0, glowSize);
-    gt.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gt.addColorStop(0, `rgba(${colRgb},1)`);
     gt.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gt;
     ctx.fillRect(0, 0, canvas.width, glowSize);
-    // Bottom edge
     const gb = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - glowSize);
-    gb.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gb.addColorStop(0, `rgba(${colRgb},1)`);
     gb.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gb;
     ctx.fillRect(0, canvas.height - glowSize, canvas.width, glowSize);
-    // Left edge
     const gl = ctx.createLinearGradient(0, 0, glowSize, 0);
-    gl.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gl.addColorStop(0, `rgba(${colRgb},1)`);
     gl.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gl;
     ctx.fillRect(0, 0, glowSize, canvas.height);
-    // Right edge
     const gr = ctx.createLinearGradient(canvas.width, 0, canvas.width - glowSize, 0);
-    gr.addColorStop(0, dangerHP ? 'rgba(255,32,32,1)' : 'rgba(255,96,32,1)');
+    gr.addColorStop(0, `rgba(${colRgb},1)`);
     gr.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gr;
     ctx.fillRect(canvas.width - glowSize, 0, glowSize, canvas.height);
     ctx.restore();
+    // Throttled danger sound — every 4 seconds while in danger
+    const now = Date.now();
+    if (now - (render._lastDangerBeep || 0) > 4000) {
+      render._lastDangerBeep = now;
+      Audio.danger();
+    }
   }
 
   // Vignette effect
@@ -6184,12 +6194,14 @@ function showItemMenu(item, index, event) {
   } else if (item.itemType === 'thrown') {
     actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'special_arrow') {
-    const isLoaded = state.player.loadedSpecialArrow === item;
-    actions.push({ label: isLoaded ? '✓ Loaded' : `Load (${item.ammo} left)`, fn: () => {
-      if (isLoaded) { state.player.loadedSpecialArrow = null; addMessage('Special arrow unloaded.', ''); }
-      else { useItem(item, index); }
-      closeItemMenu();
-    }});
+    if (state.player.equipped.ranged) {
+      const isLoaded = state.player.loadedSpecialArrow === item;
+      actions.push({ label: isLoaded ? '✓ Loaded' : `Load (${item.ammo} left)`, fn: () => {
+        if (isLoaded) { state.player.loadedSpecialArrow = null; addMessage('Special arrow unloaded.', ''); }
+        else { useItem(item, index); }
+        closeItemMenu();
+      }});
+    }
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
