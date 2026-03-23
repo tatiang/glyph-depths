@@ -15,7 +15,7 @@ const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13 };
 
 // === GAME STATE ===
 let state = null; // main game state object
@@ -1344,6 +1344,16 @@ function generateFloor() {
     spawnSecretWalls();
   }
 
+  // Invisible teleport tiles (floor 3+)
+  if (state.floor >= 3 && state.floor < MAX_FLOOR) {
+    spawnTeleportTiles();
+  }
+
+  // Avalanche event (25% chance on floors 4+, never boss floor)
+  if (state.floor >= 4 && state.floor < MAX_FLOOR && Math.random() < 0.25) {
+    triggerAvalanche();
+  }
+
   // Bonus wing on floors 6, 12, 18
   if ([6, 12, 18].includes(state.floor)) {
     generateBonusWing();
@@ -1643,6 +1653,7 @@ function setTile(x, y, t) {
 function isWalkable(x, y) {
   const t = getTile(x, y);
   return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
+  // TELEPORT and TELEPORT_VIS are walkable (floor-like)
 }
 
 function isTransparent(x, y) {
@@ -2244,10 +2255,16 @@ function showTavern(tavern) {
   // Hear Rumor — 3 gold
   const rumorBtn = document.createElement('button');
   rumorBtn.className = 'perk-btn';
-  rumorBtn.innerHTML = `<div class="perk-name">🗣️ Hear Rumor (3💰)</div><div class="perk-desc">Learn about what lies ahead</div>`;
+  rumorBtn.innerHTML = `<div class="perk-name">🗣️ Hear Rumor (1💰)</div><div class="perk-desc">One rumor per visit</div>`;
+  let rumorHeard = false;
   const rumorHandler = () => {
-    if (p.gold >= 3) {
-      p.gold -= 3;
+    if (rumorHeard) {
+      tavernFeedback('No more rumors this visit.', '');
+      return;
+    }
+    if (p.gold >= 1) {
+      p.gold -= 1;
+      rumorHeard = true;
       const nextFloor = state.floor + 1;
       const rumors = [
         `The barkeep leans in: "Floor ${nextFloor}? I hear the enemies grow fiercer there."`,
@@ -2261,6 +2278,8 @@ function showTavern(tavern) {
       ];
       tavernFeedback(rumors[Math.floor(Math.random() * rumors.length)], 'gold');
       Audio.gold();
+      rumorBtn.style.opacity = '0.4';
+      rumorBtn.style.pointerEvents = 'none';
       refreshGold();
     } else {
       tavernFeedback('Not enough gold.', 'damage');
@@ -2358,6 +2377,62 @@ function spawnSpecialTiles() {
   for (let i = 0; i < count; i++) {
     const pos = randomFloorTile();
     if (pos) setTile(pos.x, pos.y, T.SPECIAL);
+  }
+}
+
+// Spawn invisible teleport tiles (1-2 per floor, starting floor 3)
+function spawnTeleportTiles() {
+  const count = 1 + (Math.random() < 0.4 ? 1 : 0);
+  for (let i = 0; i < count; i++) {
+    const pos = randomRoomFloorTile();
+    if (pos) setTile(pos.x, pos.y, T.TELEPORT);
+  }
+}
+
+// Avalanche: fill part of a random room with rocks (WALL tiles)
+// Never affects the player's current tile, stairs, doors, or entities
+function triggerAvalanche() {
+  if (state.rooms.length < 3) return;
+  // Pick a room that isn't the player's current room
+  const pRoom = state.rooms.find(r =>
+    state.player.x >= r.x && state.player.x < r.x + r.w &&
+    state.player.y >= r.y && state.player.y < r.y + r.h
+  );
+  const candidates = state.rooms.filter(r => r !== pRoom && r.w >= 4 && r.h >= 4);
+  if (candidates.length === 0) return;
+  const room = candidates[Math.floor(Math.random() * candidates.length)];
+
+  // Fill 30-70% of the room tiles with WALL
+  const fillPct = 0.3 + Math.random() * 0.4;
+  let filled = 0;
+  const tiles = [];
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      tiles.push({ x, y });
+    }
+  }
+  // Shuffle
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+  const maxFill = Math.floor(tiles.length * fillPct);
+  for (const t of tiles) {
+    if (filled >= maxFill) break;
+    // Never fill player's tile
+    if (t.x === state.player.x && t.y === state.player.y) continue;
+    const tile = getTile(t.x, t.y);
+    // Only fill floor tiles — skip stairs, doors, specials
+    if (tile !== T.FLOOR) continue;
+    // Skip tiles with entities (enemies, items, NPCs, merchants)
+    if (state.entities.some(e => e.x === t.x && e.y === t.y)) continue;
+    setTile(t.x, t.y, T.WALL);
+    filled++;
+  }
+  if (filled > 0) {
+    addMessage('The earth rumbles! Rocks collapse in a nearby chamber.', 'damage');
+    haptic(60);
+    Audio.hit();
   }
 }
 
@@ -3980,6 +4055,33 @@ function playerMove(dx, dy) {
     setTile(nx, ny, T.FLOOR);
   }
 
+  // Check for teleport tile (invisible or visible — both active)
+  const tpTile = getTile(nx, ny);
+  if (tpTile === T.TELEPORT || tpTile === T.TELEPORT_VIS) {
+    // Reveal the tile if it was hidden
+    if (tpTile === T.TELEPORT) {
+      setTile(nx, ny, T.TELEPORT_VIS);
+      addMessage('A teleport glyph flares to life beneath you!', 'gold');
+    } else {
+      addMessage('The teleport glyph activates!', '');
+    }
+    // Teleport to a semi-random floor tile (not on another teleport)
+    for (let tpAttempt = 0; tpAttempt < 100; tpAttempt++) {
+      const tpPos = randomFloorTile();
+      if (tpPos) {
+        const destTile = getTile(tpPos.x, tpPos.y);
+        if (destTile !== T.TELEPORT && destTile !== T.TELEPORT_VIS) {
+          state.player.x = tpPos.x;
+          state.player.y = tpPos.y;
+          break;
+        }
+      }
+    }
+    haptic(40);
+    Audio.useItem();
+    computeFOV();
+  }
+
   // Check for hazards
   const hazard = state.entities.find(e => e.type === 'hazard' && e.x === nx && e.y === ny);
   if (hazard && hazard.hazardType === 'fire') {
@@ -4180,7 +4282,14 @@ function pickupItem(itemEntity) {
   }
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
-  addMessage(`You pick up ${itemEntity.item.name}.`, 'good');
+  let pickupMsg = `You pick up ${itemEntity.item.name}`;
+  const it = itemEntity.item;
+  if (it.itemType === 'weapon' && it.attack != null) pickupMsg += ` (+${it.attack} ATK)`;
+  else if (it.itemType === 'armor' && it.defense != null) pickupMsg += ` (+${it.defense} DEF)`;
+  else if (it.itemType === 'ranged') pickupMsg += ` (${it.damage} DMG, ${it.range} rng)`;
+  else if (it.itemType === 'ring' && it.ringEffect) pickupMsg += ` [${it.ringEffect}]`;
+  pickupMsg += '.';
+  addMessage(pickupMsg, 'good');
   // Show hint on first item pickup
   if (state.itemsFound === 1) {
     addMessage('Tip: Tap an item in the bar below to Equip, Use, or Drop it.', 'gold');
@@ -4704,7 +4813,7 @@ function showShrineChoice() {
   const container = $('perk-choices');
   container.innerHTML = '';
   $('levelup-overlay').querySelector('h1').textContent = '⛩️ SHRINE';
-  $('levelup-label').textContent = 'Make an offering?';
+  $('levelup-label').textContent = `Make an offering?  ❤️ ${state.player.hp}/${state.player.maxHp} HP  ·  💰 ${state.player.gold} Gold`;
 
   for (const sac of sacrifices) {
     const btn = document.createElement('button');
@@ -4799,6 +4908,7 @@ function renderShopItems(merchant) {
         } else {
           state.player.inventory.push({ ...shopItem.item });
           addMessage(`You buy ${shopItem.item.name}.`, 'good');
+          if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
         }
         Audio.gold();
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
@@ -5179,7 +5289,7 @@ function saveHighScore() {
 }
 
 // === SAVE / LOAD SYSTEM ===
-const SAVE_SLOTS = 3;
+const SAVE_SLOTS = 5;
 const SAVE_PREFIX = 'glyphDepths_save_';
 
 function saveGameToSlot(slot) {
@@ -5222,6 +5332,36 @@ function serializeState() {
     }
   }
   return s;
+}
+
+function loadFromRaw(raw) {
+  try {
+    const saveData = JSON.parse(raw);
+    if (!saveData || !saveData.state) return false;
+    potionNames = saveData.potionNames || [];
+    scrollNames = saveData.scrollNames || [];
+    potionIdentified = saveData.potionIdentified || {};
+    scrollIdentified = saveData.scrollIdentified || {};
+    badgesEarnedThisRun = saveData.badgesEarnedThisRun || [];
+    const s = saveData.state;
+    for (const key of Object.keys(s)) {
+      if (s[key] && s[key]._uint8) s[key] = new Uint8Array(s[key].data);
+      else if (s[key] && s[key]._set) s[key] = new Set(s[key].data);
+    }
+    state = s;
+    inputLocked = false;
+    state.throwMode = false;
+    state.throwItem = null;
+    state.minimapOpen = false;
+    document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
+    $('minimap-overlay').classList.remove('active');
+    Audio.init();
+    Audio.setEnabled(settings.sound);
+    computeFOV();
+    render();
+    updateUI();
+    return true;
+  } catch { return false; }
 }
 
 function loadGameFromSlot(slot) {
@@ -5368,6 +5508,11 @@ function showSaveOverlay() {
     slotsEl.appendChild(slotDiv);
   }
 
+  // Cloud save section (only if Firebase is configured)
+  if (isFirebaseConfigured()) {
+    showCloudSaveOverlay();
+  }
+
   inputLocked = true;
   overlay.classList.add('active');
 }
@@ -5455,6 +5600,240 @@ function hasSavedGames() {
   return false;
 }
 
+// === CLOUD SAVE (Firebase / Google Auth) ===
+// Opt-in: Firebase SDK is loaded dynamically only when the user taps "Cloud Save".
+// No external scripts are loaded until the user explicitly activates this feature.
+
+const FIREBASE_CONFIG = {
+  // Replace these with your own Firebase project config
+  apiKey: '',
+  authDomain: '',
+  projectId: '',
+  storageBucket: '',
+  messagingSenderId: '',
+  appId: ''
+};
+
+let firebaseLoaded = false;
+let firebaseUser = null;
+let firebaseDb = null;
+
+function isFirebaseConfigured() {
+  return FIREBASE_CONFIG.apiKey !== '' && FIREBASE_CONFIG.projectId !== '';
+}
+
+function loadFirebaseSDK() {
+  return new Promise((resolve, reject) => {
+    if (firebaseLoaded) { resolve(); return; }
+    const scripts = [
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
+    ];
+    let loaded = 0;
+    for (const src of scripts) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => { loaded++; if (loaded === scripts.length) { firebaseLoaded = true; resolve(); } };
+      s.onerror = () => reject(new Error('Failed to load Firebase SDK'));
+      document.head.appendChild(s);
+    }
+  });
+}
+
+function initFirebase() {
+  if (!window.firebase) return;
+  if (!firebase.apps.length) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+  }
+  firebaseDb = firebase.firestore();
+}
+
+function cloudSignIn() {
+  if (!window.firebase) return Promise.reject('Firebase not loaded');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  return firebase.auth().signInWithPopup(provider).then(result => {
+    firebaseUser = result.user;
+    addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+    return firebaseUser;
+  });
+}
+
+function cloudSignOut() {
+  if (!window.firebase) return;
+  firebase.auth().signOut();
+  firebaseUser = null;
+  addMessage('☁️ Signed out of cloud saves.', '');
+}
+
+function cloudSaveGame(slotName) {
+  if (!firebaseUser || !firebaseDb || !state) return Promise.reject('Not signed in');
+  const saveData = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    state: serializeState(),
+    potionNames, scrollNames, potionIdentified, scrollIdentified,
+    badgesEarnedThisRun,
+    uid: firebaseUser.uid,
+    displayName: firebaseUser.displayName || '',
+    slotName: slotName || 'Cloud Save',
+    playerInfo: {
+      name: state.player.name,
+      className: state.player.className,
+      classIcon: state.player.classIcon,
+      floor: state.floor,
+      level: state.player.level,
+      hp: state.player.hp,
+      maxHp: state.player.maxHp
+    }
+  };
+  const docId = `${firebaseUser.uid}_${slotName}`;
+  return firebaseDb.collection('saves').doc(docId).set(saveData).then(() => {
+    addMessage(`☁️ Saved to cloud: ${slotName}`, 'good');
+  });
+}
+
+function cloudLoadGame(slotName) {
+  if (!firebaseUser || !firebaseDb) return Promise.reject('Not signed in');
+  const docId = `${firebaseUser.uid}_${slotName}`;
+  return firebaseDb.collection('saves').doc(docId).get().then(doc => {
+    if (!doc.exists) { addMessage('No cloud save found.', 'damage'); return false; }
+    const data = doc.data();
+    // Reuse local load logic
+    const raw = JSON.stringify({ version: data.version, timestamp: data.timestamp, state: data.state, potionNames: data.potionNames, scrollNames: data.scrollNames, potionIdentified: data.potionIdentified, scrollIdentified: data.scrollIdentified, badgesEarnedThisRun: data.badgesEarnedThisRun });
+    localStorage.setItem('_cloud_load_tmp', raw);
+    const success = loadFromRaw(raw);
+    localStorage.removeItem('_cloud_load_tmp');
+    if (success) addMessage(`☁️ Loaded from cloud: ${slotName}`, 'good');
+    return success;
+  });
+}
+
+function cloudListSaves() {
+  if (!firebaseUser || !firebaseDb) return Promise.resolve([]);
+  return firebaseDb.collection('saves')
+    .where('uid', '==', firebaseUser.uid)
+    .orderBy('timestamp', 'desc')
+    .get()
+    .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+}
+
+function cloudDeleteSave(slotName) {
+  if (!firebaseUser || !firebaseDb) return Promise.reject('Not signed in');
+  const docId = `${firebaseUser.uid}_${slotName}`;
+  return firebaseDb.collection('saves').doc(docId).delete().then(() => {
+    addMessage(`☁️ Cloud save deleted: ${slotName}`, '');
+  });
+}
+
+function showCloudSaveOverlay() {
+  if (!isFirebaseConfigured()) {
+    addMessage('Cloud saves not configured. Set Firebase config in game.js.', 'damage');
+    return;
+  }
+
+  const overlay = $('save-overlay');
+  const slotsEl = $('save-slots');
+
+  // Show a loading message while Firebase loads
+  const cloudSection = document.createElement('div');
+  cloudSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--text-dim);padding-top:12px;';
+  cloudSection.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;">Loading cloud saves...</div>';
+  slotsEl.appendChild(cloudSection);
+
+  const doCloud = () => {
+    loadFirebaseSDK().then(() => {
+      initFirebase();
+      if (!firebaseUser) {
+        cloudSection.innerHTML = '';
+        const signInBtn = document.createElement('button');
+        signInBtn.className = 'save-action-btn save-new';
+        signInBtn.textContent = '🔑 Sign in with Google';
+        signInBtn.style.cssText = 'width:100%;margin:8px 0;';
+        const signInFn = () => {
+          cloudSignIn().then(() => showCloudSaveUI(cloudSection)).catch(err => {
+            cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;">Sign-in failed: ${err.message || err}</div>`;
+          });
+        };
+        signInBtn.addEventListener('click', signInFn);
+        signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
+        cloudSection.appendChild(signInBtn);
+      } else {
+        showCloudSaveUI(cloudSection);
+      }
+    }).catch(err => {
+      cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;">Could not load cloud saves: ${err.message || err}</div>`;
+    });
+  };
+
+  doCloud();
+}
+
+function showCloudSaveUI(container) {
+  container.innerHTML = '';
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  header.innerHTML = `<span style="color:var(--accent);font-size:12px;">☁️ ${firebaseUser.displayName || firebaseUser.email}</span>`;
+  const signOutBtn = document.createElement('button');
+  signOutBtn.textContent = 'Sign Out';
+  signOutBtn.style.cssText = 'font-size:10px;padding:2px 8px;background:var(--bg);color:var(--text-dim);border:1px solid var(--text-dim);border-radius:4px;';
+  const signOutFn = () => { cloudSignOut(); container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:10px;">Signed out.</div>'; };
+  signOutBtn.addEventListener('click', signOutFn);
+  signOutBtn.addEventListener('touchend', (e) => { e.preventDefault(); signOutFn(); }, { passive: false });
+  header.appendChild(signOutBtn);
+  container.appendChild(header);
+
+  // Save to cloud button
+  const saveCloudBtn = document.createElement('button');
+  saveCloudBtn.className = 'save-action-btn save-new';
+  saveCloudBtn.textContent = '☁️ Save to Cloud';
+  saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;';
+  const saveCloudFn = () => {
+    const name = 'slot_' + (Date.now() % 100000);
+    cloudSaveGame(name).then(() => { showCloudSaveUI(container); }).catch(err => {
+      addMessage(`Cloud save failed: ${err.message || err}`, 'damage');
+    });
+  };
+  saveCloudBtn.addEventListener('click', saveCloudFn);
+  saveCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveCloudFn(); }, { passive: false });
+  container.appendChild(saveCloudBtn);
+
+  // List existing cloud saves
+  cloudListSaves().then(saves => {
+    if (saves.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;color:var(--text-dim);padding:10px;font-size:11px;';
+      empty.textContent = 'No cloud saves yet.';
+      container.appendChild(empty);
+      return;
+    }
+    for (const save of saves) {
+      const info = save.playerInfo || {};
+      const div = document.createElement('div');
+      div.className = 'save-slot';
+      div.innerHTML = `<div class="save-slot-header"><span class="save-slot-name">${info.classIcon || ''} ${info.name || 'Unknown'}</span><span class="save-slot-meta">${info.className || ''}</span></div><div class="save-slot-details">Floor ${info.floor || '?'} · Lv.${info.level || '?'} · ${info.hp || '?'}/${info.maxHp || '?'} HP<span class="save-slot-time">${timeSince(save.timestamp)}</span></div>`;
+      const btnRow = document.createElement('div');
+      btnRow.className = 'save-slot-actions';
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'save-action-btn save-new';
+      loadBtn.textContent = '▶️ Load';
+      const loadFn = () => { cloudLoadGame(save.slotName).then(ok => { if (ok) closeSaveOverlay(); }); };
+      loadBtn.addEventListener('click', loadFn);
+      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+      btnRow.appendChild(loadBtn);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'save-action-btn save-delete';
+      delBtn.textContent = '🗑️';
+      const delFn = () => { cloudDeleteSave(save.slotName).then(() => showCloudSaveUI(container)); };
+      delBtn.addEventListener('click', delFn);
+      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
+      btnRow.appendChild(delBtn);
+      div.appendChild(btnRow);
+      container.appendChild(div);
+    }
+  });
+}
+
 // === SETTINGS ===
 function loadSettings() {
   try {
@@ -5520,6 +5899,10 @@ function render() {
         ctx.fillStyle = 'rgba(128, 80, 255, 0.15)';
         ctx.fillRect(vx * ts, vy * ts, ts, ts);
       }
+      if (tile === T.TELEPORT_VIS && vis) {
+        ctx.fillStyle = 'rgba(64, 224, 208, 0.12)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
 
       // Draw tile glyph
       ctx.font = `${fontSize}px monospace`;
@@ -5577,6 +5960,16 @@ function render() {
         case T.SPECIAL:
           tileGlyph = '·';
           tileColor = vis ? '#8060c0' : '#302040';
+          break;
+        case T.TELEPORT:
+          // Invisible teleport — looks like normal floor until triggered
+          tileGlyph = '·';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
+          break;
+        case T.TELEPORT_VIS:
+          // Revealed teleport — pulsing cyan
+          tileGlyph = '◊';
+          tileColor = vis ? '#40e0d0' : '#1a6060';
           break;
         default:
           tileGlyph = ' ';
@@ -5821,8 +6214,8 @@ function render() {
   if (dangerHP || dangerHunger) {
     const intensity = dangerHP ? Math.max(0.55, 1 - hpPct * 2) : 0.55;
     const pulseAlpha = intensity * (0.75 + 0.25 * Math.sin(Date.now() / 200)); // fast pulse
-    const borderW = 10;
-    const glowSize = 40;
+    const borderW = 16;
+    const glowSize = 55;
     const col = dangerHP ? '#ff2020' : '#ff6020';
     const colRgb = dangerHP ? '255,32,32' : '255,96,32';
     ctx.save();
@@ -6419,7 +6812,7 @@ function setupInput() {
       if ($('help-overlay').classList.contains('active')) { closeHelp(); return; }
       if ($('manual-overlay').classList.contains('active')) { closeManual(); return; }
       // Minimap
-      if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); return; }
+      if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); stopMinimapPulse(); inputLocked = false; return; }
       // Badge overlay
       if ($('badge-overlay').classList.contains('active')) { closeBadgeOverlay(); return; }
       // Merchant
@@ -6716,7 +7109,7 @@ function handleLongPress(clientX, clientY) {
       else if (item.item.defense) desc = `+${item.item.defense} Defense`;
     } else {
       const tile = getTile(mx, my);
-      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.DOOR_ONEWAY]: 'One-Way Door', [T.DOOR_SEALED]: 'Sealed Passage', [T.SPECIAL]: 'Mysterious Glyph' };
+      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.DOOR_ONEWAY]: 'One-Way Door', [T.DOOR_SEALED]: 'Sealed Passage', [T.SPECIAL]: 'Mysterious Glyph', [T.TELEPORT_VIS]: 'Teleport Glyph' };
       name = tileNames[tile] || 'Unknown';
     }
   }
@@ -7258,9 +7651,11 @@ function toggleMinimap() {
     renderMinimap();
     overlay.classList.add('active');
     startMinimapPulse();
+    inputLocked = true;
   } else {
     overlay.classList.remove('active');
     stopMinimapPulse();
+    inputLocked = false;
   }
 }
 
@@ -7391,6 +7786,12 @@ function renderMinimap() {
           break;
         case T.SPECIAL:
           ctx.fillStyle = '#8060c0';
+          break;
+        case T.TELEPORT:
+          // Hidden teleport — don't show on minimap
+          continue;
+        case T.TELEPORT_VIS:
+          ctx.fillStyle = '#40e0d0';
           break;
         default:
           continue;
