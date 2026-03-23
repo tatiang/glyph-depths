@@ -992,7 +992,7 @@
   </div>
 
   <!-- Overlays -->
-  <div class="overlay" id="title-screen" style="justify-content:flex-start;padding-top:24px;overflow-y:auto;">
+  <div class="overlay" id="title-screen" style="justify-content:flex-start;overflow-y:auto;">
     <!-- Step 1: Title -->
     <div id="title-section" style="display:flex;flex-direction:column;align-items:center;width:100%;">
       <div class="title-particles" id="title-particles"></div>
@@ -1073,7 +1073,7 @@
     <button class="big-btn" id="btn-leave-sage">Leave</button>
   </div>
 
-  <div class="overlay" id="settings-overlay" style="justify-content: flex-start; padding-top: 40px; overflow-y: auto;">
+  <div class="overlay" id="settings-overlay" style="justify-content: flex-start; padding-top: calc(24px + var(--safe-top)); overflow-y: auto;">
     <h1 style="margin-bottom: 16px;">📊 Stats &amp; Settings</h1>
 
     <div id="stats-section" style="width:100%;max-width:280px;margin-bottom:16px;">
@@ -1114,6 +1114,7 @@
       <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
       <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
       <div class="setting-row"><span>Auto-Pick Up</span><div class="toggle on" id="toggle-autopickup"></div></div>
+      <div class="setting-row"><span>Auto-Equip Better Gear</span><div class="toggle" id="toggle-autoequip"></div></div>
     </div>
 
     <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;">
@@ -1273,13 +1274,13 @@
     </div>
   </div>
 
-  <div class="overlay" id="save-overlay" style="justify-content:center;padding:24px;">
+  <div class="overlay" id="save-overlay" style="justify-content:center;">
     <h1 style="margin-bottom:16px;">💾 Save Game</h1>
     <div id="save-slots" style="width:100%;max-width:300px;"></div>
     <button class="big-btn" id="btn-close-save" style="margin-top:16px;">Cancel</button>
   </div>
 
-  <div class="overlay" id="load-overlay" style="justify-content:center;padding:24px;">
+  <div class="overlay" id="load-overlay" style="justify-content:center;">
     <h1 style="margin-bottom:16px;">📂 Load Game</h1>
     <div id="load-slots" style="width:100%;max-width:300px;"></div>
     <button class="big-btn" id="btn-close-load" style="margin-top:16px;">Cancel</button>
@@ -1303,7 +1304,7 @@
   <div id="badge-toast"></div>
 
   <!-- Badge Overlay -->
-  <div class="overlay" id="badge-overlay" style="overflow-y:auto;">
+  <div class="overlay" id="badge-overlay" style="overflow-y:auto;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));">
     <h1 style="color:var(--gold);">🏆 BADGES</h1>
     <div id="badge-count-display" style="font-size:12px;color:var(--text-dim);margin-bottom:10px;"></div>
     <div id="badge-tip" style="font-size:11px;color:var(--gold);min-height:16px;margin-bottom:8px;transition:opacity 0.3s;opacity:0;"></div>

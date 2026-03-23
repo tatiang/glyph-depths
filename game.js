@@ -21,10 +21,10 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, autopickup: true, heroIcon: '🧝' };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'UI polish + danger border'; // updated each push
-const LAST_UPDATED = '2026-03-22 21:00';
+const GAME_VERSION = 'Auto-equip, Rogue doors, ability safety'; // updated each push
+const LAST_UPDATED = '2026-03-22 22:00';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -778,19 +778,20 @@ function applyClassStartingItems(classId) {
     const armor = ARMORS.find(a => a.name === 'Leather Vest');
     if (armor) p.equipped.armor = { ...armor };
     const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) p.inventory.push({ ...healPotion, glyph: '🧪', itemType: 'potion' });
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   } else if (classId === 'berserker') {
     const sword = WEAPONS.find(w => w.name === 'Short Sword');
     if (sword) p.equipped.weapon = { ...sword };
     const strPotion = potionNames.find(n => n.id === 'strength');
     if (strPotion) {
-      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
-      p.inventory.push({ ...strPotion, glyph: '🧪', itemType: 'potion' });
+      potionIdentified[strPotion.id] = true;
+      p.inventory.push(makePotion(strPotion));
+      p.inventory.push(makePotion(strPotion));
     }
   } else if (classId === 'rogue') {
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 6 });
     const invisPotion = potionNames.find(n => n.id === 'invisibility');
-    if (invisPotion) p.inventory.push({ ...invisPotion, glyph: '🧪', itemType: 'potion' });
+    if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
   } else if (classId === 'wizard') {
     p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
     const usedIds = new Set();
@@ -814,7 +815,7 @@ function applyClassStartingItems(classId) {
   } else if (classId === 'cleric') {
     p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
     const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) p.inventory.push({ ...healPotion, glyph: '🧪', itemType: 'potion' });
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
     const identifyScroll = scrollNames.find(n => n.id === 'identify');
     if (identifyScroll) {
       scrollIdentified[identifyScroll.id] = true;
@@ -2366,6 +2367,12 @@ function playerDeath(killerName, killerGlyph) {
   Audio.death();
   haptic(100);
 
+  // Auto-delete save slot if this run was loaded from a save
+  if (state._loadedFromSlot != null) {
+    deleteSaveSlot(state._loadedFromSlot);
+    state._loadedFromSlot = null;
+  }
+
   const tk = state.toughestKill;
   const kg = killerGlyph || '';
   const deathClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
@@ -2453,6 +2460,12 @@ function showVictory() {
   Audio.victory();
   haptic(100);
 
+  // Auto-delete save slot if this run was loaded from a save
+  if (state._loadedFromSlot != null) {
+    deleteSaveSlot(state._loadedFromSlot);
+    state._loadedFromSlot = null;
+  }
+
   const tk = state.toughestKill;
   const victoryClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
   $('victory-overlay').querySelector('h2').textContent = `${state.playerName} ${state.playerEpithet} ${victoryClassName} is victorious!`;
@@ -2491,7 +2504,7 @@ function showLevelUp() {
     { name: '+1 Defense',  desc: 'Increase base defense by 1',            apply: () => { state.player.defense += 1; } },
     { name: 'Rapid Regeneration', desc: 'Heal 1 HP every 15 turns',      apply: () => { state.player.hasRegen = true; }, rare: true, unique: true, flag: 'hasRegen' },
     { name: '+5 Max HP',   desc: 'Increase max HP by 5 and full heal',    apply: () => { state.player.maxHp += 5; state.player.hp = state.player.maxHp; }, rare: true },
-    { name: 'Glass Cannon', desc: 'Double your attack — but halve max HP', apply: () => { state.player.attack *= 2; state.player.glassCannon = true; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp / 2)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
+    { name: 'Glass Cannon', desc: 'Double your attack — but lose 30% max HP', apply: () => { state.player.attack *= 2; state.player.glassCannon = true; state.player.maxHp = Math.max(5, Math.floor(state.player.maxHp * 0.7)); state.player.hp = Math.min(state.player.hp, state.player.maxHp); }, rare: true },
     { name: 'Vampiric Strikes', desc: 'Heal 20% of all damage you deal',  apply: () => { state.player.hasVampire = true; }, rare: true, unique: true, flag: 'hasVampire' },
     { name: 'Iron Skin',   desc: 'Reduce all incoming damage by 1',       apply: () => { state.player.ironSkin = true; }, rare: true, unique: true, flag: 'ironSkin' },
     { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' },
@@ -2915,6 +2928,13 @@ function tryMoveEnemy(enemy, nx, ny) {
   if (phaseThrough) {
     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
   } else {
+    // Enemies on floor 5+ can bash open closed doors while chasing
+    if (getTile(nx, ny) === T.DOOR_CLOSED && enemy.alertness >= 2 && state.floor >= 5) {
+      setTile(nx, ny, T.DOOR_OPEN);
+      addMessage(`${enemy.name} smashes the door open!`, 'damage');
+      Audio.door();
+      return; // uses their move for this turn
+    }
     if (!isWalkable(nx, ny)) return;
   }
 
@@ -3115,7 +3135,10 @@ function playerMove(dx, dy) {
 
   // Ring of haste: 30% chance for free extra move
   if (hasRingEffect('haste') && Math.random() < 0.3) {
-    addMessage('You move with haste!', 'good');
+    if (!state._hasteShown) {
+      addMessage('⚡ Haste active! You sometimes move for free.', 'good');
+      state._hasteShown = true;
+    }
     computeFOV();
     updateUI();
     render();
@@ -3130,6 +3153,39 @@ function playerMove(dx, dy) {
     }
   }
 
+  endTurn();
+}
+
+function closeDoor() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  if (state.player.classId !== 'rogue') {
+    addMessage('Only Rogues can close doors.', '');
+    return;
+  }
+  // Find adjacent open door
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  let closed = false;
+  for (const [dx, dy] of dirs) {
+    const nx = state.player.x + dx, ny = state.player.y + dy;
+    if (getTile(nx, ny) === T.DOOR_OPEN) {
+      // Check no entity is standing in the doorway
+      const blocked = state.entities.some(e => e.x === nx && e.y === ny && (e.type === 'enemy' || e.type === 'npc' || e.type === 'merchant'));
+      if (blocked) {
+        addMessage('Something is in the doorway.', '');
+        continue;
+      }
+      setTile(nx, ny, T.DOOR_CLOSED);
+      closed = true;
+      addMessage('You quietly close the door.', 'good');
+      Audio.door();
+      break;
+    }
+  }
+  if (!closed) {
+    addMessage('No open door nearby to close.', '');
+    return;
+  }
+  computeFOV();
   endTurn();
 }
 
@@ -3213,6 +3269,45 @@ function pickupItem(itemEntity) {
   }
   Audio.pickup();
   removeEntity(itemEntity);
+  // Auto-equip if enabled
+  if (settings.autoEquip) tryAutoEquip(itemEntity.item);
+}
+
+function tryAutoEquip(item) {
+  const p = state.player;
+  const slot = item.itemType === 'weapon' ? 'weapon'
+    : item.itemType === 'armor' ? 'armor'
+    : item.itemType === 'ring' ? 'ring'
+    : item.itemType === 'ranged' ? 'ranged'
+    : null;
+  if (!slot) return;
+
+  const current = p.equipped[slot];
+  let isBetter = false;
+
+  if (!current) {
+    isBetter = true; // empty slot — always equip
+  } else if (slot === 'weapon' && item.attack > current.attack) {
+    isBetter = true;
+  } else if (slot === 'armor' && item.defense > current.defense) {
+    isBetter = true;
+  } else if (slot === 'ranged' && item.damage > current.damage) {
+    isBetter = true;
+  }
+  // Rings: don't auto-swap (subjective which is "better")
+
+  if (isBetter) {
+    // Unequip current into inventory
+    if (current) {
+      p.inventory.push(current);
+    }
+    p.equipped[slot] = item;
+    // Remove from inventory
+    const idx = p.inventory.indexOf(item);
+    if (idx >= 0) p.inventory.splice(idx, 1);
+    addMessage(`⚔️ Auto-equipped ${item.name}!`, 'good');
+    updateUI();
+  }
 }
 
 function playerDescend() {
@@ -4146,6 +4241,9 @@ function loadGameFromSlot(slot) {
     Audio.init();
     Audio.setEnabled(settings.sound);
 
+    // Track which save slot was loaded (for auto-delete on death)
+    state._loadedFromSlot = slot;
+
     // Recompute FOV and render
     computeFOV();
     render();
@@ -4699,7 +4797,7 @@ function updateUI() {
   if (runeBar) {
     if (p.runes && p.runes.length > 0) {
       runeBar.style.display = '';
-      runeBar.textContent = p.runes.map(r => r.symbol).join(' ');
+      runeBar.textContent = '✦ Runes: ' + p.runes.map(r => r.symbol).join(' ');
       runeBar.title = p.runes.map(r => r.name).join(', ');
     } else {
       runeBar.style.display = 'none';
@@ -4752,9 +4850,10 @@ function updateUI() {
       }
     } else if (cls === 'ranger') {
       spRow.style.display = '';
+      const aimMax = p.quickDraw ? 5 : 8;
       if (p.aimedShotCooldown > 0) {
         setBtn(`🏹 AIM ${p.aimedShotCooldown}t`, false);
-        setBar(((8 - p.aimedShotCooldown) / 8) * 100, '#4a9');
+        setBar(((aimMax - p.aimedShotCooldown) / aimMax) * 100, '#4a9');
       } else {
         setBtn('🏹 AIMED SHOT', true);
         setBar(100, 'var(--gold)');
@@ -4762,7 +4861,7 @@ function updateUI() {
     } else if (cls === 'cleric') {
       spRow.style.display = '';
       if (p.divineHealUsed) {
-        setBtn('✝ DIVINE HEAL ✓', false);
+        setBtn('✝ HEAL ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
         setBtn('✝ DIVINE HEAL', true);
@@ -5119,6 +5218,7 @@ function setupInput() {
       case 'e': showQuickEquip(); break;
       case 't': showQuickThrow(); break;
       case 'f': fireRangedWeapon(); break;
+      case 'c': closeDoor(); break;
       case 'b': if (state && !state.gameOver) showBadgeOverlay(); break;
       case 'h': case '?': showHelp(); break;
     }
@@ -5184,18 +5284,54 @@ function setupInput() {
   fireBtn.addEventListener('click', handleFire);
   fireBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleFire(); }, { passive: false });
 
-  // Special class ability button (Berserker / Wizard)
+  // Special class ability button — requires double-tap or tap-and-hold (300ms)
+  // to prevent accidental activation
   const spBtn = $('btn-special');
-  const handleSpecial = () => {
+  let spLastTap = 0;
+  let spHoldTimer = null;
+  let spArmed = false;
+  const doSpecial = () => {
     Audio.resume();
     if (!state) return;
     if (state.player.classId === 'berserker') activateEnrage();
     else if (state.player.classId === 'wizard') castAoeSpell();
     else if (state.player.classId === 'ranger') activateAimedShot();
     else if (state.player.classId === 'cleric') activateDivineHeal();
+    spArmed = false;
   };
-  spBtn.addEventListener('click', handleSpecial);
-  spBtn.addEventListener('touchend', (e) => { e.preventDefault(); handleSpecial(); }, { passive: false });
+  spBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    // Hold-to-activate: hold 300ms
+    spHoldTimer = setTimeout(() => {
+      spHoldTimer = null;
+      doSpecial();
+    }, 300);
+  }, { passive: false });
+  spBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (spHoldTimer) {
+      clearTimeout(spHoldTimer);
+      spHoldTimer = null;
+      // Double-tap check: two taps within 400ms
+      const now = Date.now();
+      if (now - spLastTap < 400) {
+        doSpecial();
+        spLastTap = 0;
+      } else {
+        spLastTap = now;
+      }
+    }
+  }, { passive: false });
+  spBtn.addEventListener('touchcancel', () => {
+    if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
+  });
+  // Keyboard / mouse click (desktop) — works immediately
+  spBtn.addEventListener('click', (e) => {
+    // Ignore if touch event handled it
+    if (e.sourceCapabilities?.firesTouchEvents) return;
+    Audio.resume();
+    doSpecial();
+  });
 
   // Prevent default touch behaviors on body
   document.body.addEventListener('touchmove', (e) => {
@@ -5500,7 +5636,7 @@ function showSettings() {
         case 'cleric':
           abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead enemies' });
           abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
-          abilities.push({ icon: '💛', name: 'Divine Heal', desc: `Full HP heal (1/run)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
+          abilities.push({ icon: '💛', name: 'Divine Heal', desc: `40% HP heal + cure (1/floor)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
       }
       // Add unlocked class-specific perks
@@ -5660,6 +5796,7 @@ function showSettings() {
   $('toggle-haptics').classList.toggle('on', settings.haptics);
   $('toggle-dpad').classList.toggle('on', settings.dpad);
   $('toggle-autopickup').classList.toggle('on', settings.autopickup);
+  $('toggle-autoequip').classList.toggle('on', settings.autoEquip);
 
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
@@ -5684,6 +5821,12 @@ function showSettings() {
   $('toggle-autopickup').onclick = () => {
     settings.autopickup = !settings.autopickup;
     $('toggle-autopickup').classList.toggle('on', settings.autopickup);
+    saveSettings();
+  };
+
+  $('toggle-autoequip').onclick = () => {
+    settings.autoEquip = !settings.autoEquip;
+    $('toggle-autoequip').classList.toggle('on', settings.autoEquip);
     saveSettings();
   };
 
@@ -6083,7 +6226,8 @@ function renderStatusFX() {
   const bar = $('fx-bar');
   if (!state || !bar) return;
   const effects = state.player.statusEffects || [];
-  if (effects.length === 0 && !state.throwMode) { bar.innerHTML = ''; return; }
+  const hasHaste = hasRingEffect('haste');
+  if (effects.length === 0 && !state.throwMode && !hasHaste) { bar.innerHTML = ''; return; }
 
   const labels = {
     burning:      { icon: '🔥', text: 'Burn',   cls: 'fx-burning' },
@@ -6102,6 +6246,10 @@ function renderStatusFX() {
     const cfg = labels[eff.type];
     if (!cfg) continue;
     html += `<div class="fx-pill ${cfg.cls}">${cfg.icon} ${cfg.text} ${eff.turns}</div>`;
+  }
+  // Passive ring indicators
+  if (hasHaste) {
+    html += '<div class="fx-pill" style="background:rgba(255,180,0,0.2);border-color:#ffa000;color:#ffa000;">⚡ Haste</div>';
   }
   bar.innerHTML = html;
 }
