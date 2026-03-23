@@ -206,14 +206,15 @@
       bottom: 0;
       left: 0;
       right: 0;
-      height: 20px;
+      height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: linear-gradient(transparent, var(--bg-dark) 40%);
       color: var(--text-dim);
-      font-size: 12px;
-      opacity: 0.6;
+      font-size: 20px;
+      font-weight: bold;
+      opacity: 0.7;
       cursor: pointer;
       z-index: 1;
       -webkit-tap-highlight-color: transparent;
@@ -749,6 +750,48 @@
     .shop-item:active { background: var(--btn-active); }
     .shop-item .price { color: var(--gold); }
 
+    /* Config pager */
+    .config-pager {
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+      flex: 1;
+    }
+    .config-track {
+      display: flex;
+      transition: transform 0.3s ease;
+      will-change: transform;
+    }
+    .config-page {
+      min-width: 100%;
+      box-sizing: border-box;
+      padding: 0 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .config-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 0 6px;
+    }
+    .config-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      opacity: 0.35;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .config-dot.active {
+      opacity: 1;
+      background: var(--gold);
+    }
+
     /* Stats section */
     .stats-heading {
       font-size: 10px;
@@ -984,7 +1027,7 @@
           <div class="act-btn" id="btn-closedoor" style="display:none;border-color:#a08030;color:#a08030;"><span class="icon">🚪</span>Close</div>
           <div class="act-btn" id="btn-minimap"><span class="icon">🗺️</span>Map</div>
           <div class="act-btn" id="btn-quickuse"><span class="icon">🧪</span>Use</div>
-          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Stats</div>
+          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Config</div>
         </div>
         <div class="action-row" id="special-row" style="display:none;">
           <div class="act-btn" id="btn-special" style="flex:1;min-width:0;border-color:var(--gold);color:var(--gold);font-size:12px;letter-spacing:0.04em;font-weight:700;position:relative;overflow:hidden;"><span id="btn-special-text"></span><div id="cd-bar"></div></div>
@@ -1072,76 +1115,99 @@
     <div class="perk-choices" id="perk-choices"></div>
   </div>
 
-  <div class="overlay" id="merchant-overlay">
+  <div class="overlay" id="merchant-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
     <h1>🧙 MERCHANT</h1>
     <h2 id="merchant-gold"></h2>
     <div class="shop-items" id="shop-items"></div>
-    <button class="big-btn" id="btn-leave-shop">Leave</button>
+    <button class="big-btn" id="btn-leave-shop" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
   </div>
 
-  <div class="overlay" id="sage-overlay">
+  <div class="overlay" id="sage-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
     <h1>🔮 WANDERING SAGE</h1>
     <p style="color:var(--text-dim);font-size:13px;margin:-8px 0 12px;">Wisdom, purification, and healing — for a price.</p>
     <h2 id="sage-gold"></h2>
     <div class="shop-items" id="sage-services"></div>
-    <button class="big-btn" id="btn-leave-sage">Leave</button>
+    <button class="big-btn" id="btn-leave-sage" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
   </div>
 
-  <div class="overlay" id="settings-overlay" style="justify-content: flex-start; padding-top: calc(24px + var(--safe-top)); overflow-y: auto;">
-    <h1 style="margin-bottom: 16px;">📊 Stats &amp; Settings</h1>
-
-    <div id="stats-section" style="width:100%;max-width:280px;margin-bottom:16px;">
-      <div class="stats-heading">CHARACTER</div>
-      <div id="char-name" style="font-size:15px;color:var(--gold);font-weight:600;margin-bottom:8px;text-align:center;padding:4px 0;"></div>
-      <div id="char-stats" class="stats-grid"></div>
-      <div id="class-abilities" style="display:none;margin-top:12px;">
-        <div class="stats-heading">CLASS ABILITIES</div>
-        <div id="class-ability-list" style="margin-top:6px;"></div>
-      </div>
-      <div class="stats-heading" style="margin-top:12px;">THIS RUN</div>
-      <div id="run-stats" class="stats-grid"></div>
-      <div class="stats-heading" style="margin-top:12px;">EQUIPPED</div>
-      <div id="equip-stats" class="stats-grid"></div>
-      <div id="rune-section" style="display:none;margin-top:12px;">
-        <div class="stats-heading">GLYPH RUNES ✦</div>
-        <div id="rune-list" style="margin-top:6px;"></div>
-      </div>
-      <div id="synergy-section" style="display:none;margin-top:12px;">
-        <div class="stats-heading">PERK SYNERGIES ⚡</div>
-        <div id="synergy-list" style="margin-top:6px;"></div>
-      </div>
-      <div id="mastery-section" style="display:none;margin-top:12px;">
-        <div class="stats-heading">MASTERY ⭐</div>
-        <div id="mastery-list" style="margin-top:6px;"></div>
-      </div>
-      <div id="status-effects-section" style="display:none;margin-top:12px;">
-        <div class="stats-heading">STATUS EFFECTS</div>
-        <div id="status-effects-list" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
-      </div>
+  <div class="overlay" id="settings-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(8px + var(--safe-bottom));overflow:hidden;display:flex;flex-direction:column;">
+    <h1 style="margin-bottom:4px;flex-shrink:0;">⚙️ Config</h1>
+    <div class="config-dots" id="config-dots">
+      <div class="config-dot active" data-page="0"></div>
+      <div class="config-dot" data-page="1"></div>
+      <div class="config-dot" data-page="2"></div>
     </div>
 
-    <div style="width:100%;max-width:280px;border-top:1px solid var(--panel-border);padding-top:12px;">
-      <div class="stats-heading" style="margin-bottom:8px;">HERO ICON</div>
-      <div class="hero-picker" id="hero-picker"></div>
-      <div class="stats-heading" style="margin-top:12px; margin-bottom:8px;">SETTINGS</div>
-      <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
-      <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
-      <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
-      <div class="setting-row"><span>Auto-Pick Up</span><div class="toggle on" id="toggle-autopickup"></div></div>
-      <div class="setting-row"><span>Auto-Equip Better Gear</span><div class="toggle" id="toggle-autoequip"></div></div>
+    <div class="config-pager" id="config-pager">
+      <div class="config-track" id="config-track">
+
+        <!-- Page 1: Character Stats -->
+        <div class="config-page">
+          <div id="stats-section" style="width:100%;max-width:280px;margin-bottom:16px;">
+            <div class="stats-heading">CHARACTER</div>
+            <div id="char-name" style="font-size:15px;color:var(--gold);font-weight:600;margin-bottom:8px;text-align:center;padding:4px 0;"></div>
+            <div id="char-stats" class="stats-grid"></div>
+            <div id="class-abilities" style="display:none;margin-top:12px;">
+              <div class="stats-heading">CLASS ABILITIES</div>
+              <div id="class-ability-list" style="margin-top:6px;"></div>
+            </div>
+            <div class="stats-heading" style="margin-top:12px;">THIS RUN</div>
+            <div id="run-stats" class="stats-grid"></div>
+            <div class="stats-heading" style="margin-top:12px;">EQUIPPED</div>
+            <div id="equip-stats" class="stats-grid"></div>
+            <div id="rune-section" style="display:none;margin-top:12px;">
+              <div class="stats-heading">GLYPH RUNES ✦</div>
+              <div id="rune-list" style="margin-top:6px;"></div>
+            </div>
+            <div id="synergy-section" style="display:none;margin-top:12px;">
+              <div class="stats-heading">PERK SYNERGIES ⚡</div>
+              <div id="synergy-list" style="margin-top:6px;"></div>
+            </div>
+            <div id="mastery-section" style="display:none;margin-top:12px;">
+              <div class="stats-heading">MASTERY ⭐</div>
+              <div id="mastery-list" style="margin-top:6px;"></div>
+            </div>
+            <div id="status-effects-section" style="display:none;margin-top:12px;">
+              <div class="stats-heading">STATUS EFFECTS</div>
+              <div id="status-effects-list" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page 2: Settings & Hero Icon -->
+        <div class="config-page">
+          <div style="width:100%;max-width:280px;">
+            <div class="stats-heading" style="margin-bottom:8px;">HERO ICON</div>
+            <div class="hero-picker" id="hero-picker"></div>
+            <div class="stats-heading" style="margin-top:16px; margin-bottom:8px;">SETTINGS</div>
+            <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
+            <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
+            <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
+            <div class="setting-row"><span>Auto-Pick Up</span><div class="toggle on" id="toggle-autopickup"></div></div>
+            <div class="setting-row"><span>Auto-Equip Better Gear</span><div class="toggle" id="toggle-autoequip"></div></div>
+          </div>
+        </div>
+
+        <!-- Page 3: Save/Load & Links -->
+        <div class="config-page">
+          <div style="width:100%;max-width:280px;">
+            <div style="margin-top:8px;display:flex;gap:10px;justify-content:center;">
+              <button class="big-btn" id="btn-save-game" style="background:var(--panel-bg);border-color:#4a9;color:#4a9;">💾 Save</button>
+              <button class="big-btn" id="btn-load-game" style="background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Load</button>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+              <button class="big-btn" id="btn-badges-from-settings" style="background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
+              <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">📖 How to Play</button>
+              <button class="big-btn" id="btn-manual-from-settings" style="background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
+            </div>
+            <div id="game-version" style="margin-top:16px;font-size:10px;color:var(--text-dim);text-align:center;opacity:0.6;font-family:monospace;"></div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
-    <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;">
-      <button class="big-btn" id="btn-save-game" style="background:var(--panel-bg);border-color:#4a9;color:#4a9;">💾 Save</button>
-      <button class="big-btn" id="btn-load-game" style="background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Load</button>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
-      <button class="big-btn" id="btn-close-settings">Close</button>
-      <button class="big-btn" id="btn-badges-from-settings" style="background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
-      <button class="big-btn" id="btn-help-from-settings" style="background:var(--panel-bg);border-color:var(--panel-border);">📖 How to Play</button>
-      <button class="big-btn" id="btn-manual-from-settings" style="background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
-    </div>
-    <div id="game-version" style="margin-top:12px;font-size:10px;color:var(--text-dim);text-align:center;opacity:0.6;font-family:monospace;"></div>
+    <button class="big-btn" id="btn-close-settings" style="margin-top:8px;flex-shrink:0;">Close</button>
   </div>
 
   <div class="overlay" id="manual-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
@@ -1294,16 +1360,18 @@
       <div class="help-section">
         <div class="help-heading">Tips</div>
         <p class="help-note">• Rations stack up to 5 per inventory slot — hoard wisely, but food is still scarce.<br>
+        • Equipment found on deeper floors is stronger (+1 ATK/DEF from floor 9, +2 from floor 16).<br>
         • One-way doors seal behind you. The depths always offer a way forward, never back.<br>
         • Sealed doors are bound by minor glyphs. Bash them open — the blood price is steep but survivable.<br>
         • The ghost of your previous run haunts the floor where you fell. Defeat it for its treasure.<br>
         • Identify potions carefully — some were left as traps by the King's alchemists.<br>
         • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
         • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. Drop items while shopping to make room.<br>
-        • Rogues can close doors behind them (🚪 Close button or C key) to break enemy pursuit.<br>
+        • Rogues can close doors behind them (🚪 or <kbd>C</kbd>) — closed doors appear teal on the map.<br>
         • Adventurers always see stairs on the minimap — the pathfinder's instinct.<br>
-        • Shrines offer random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify your soul against life-drain.<br>
-        • Auto-equip prefers specialty weapons (burn, freeze) over plain ones at the same stats.</p>
+        • Shrines offer random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.<br>
+        • Auto-equip prefers specialty weapons (burn, freeze) over plain ones at the same stats.<br>
+        • Swipe the ⚙️ Config screen to browse Stats, Settings, and Save/Load pages.</p>
       </div>
 
       <div style="text-align:center;margin-top:8px;">
@@ -1523,7 +1591,9 @@
           • Rogues can close doors (🚪 or <kbd>C</kbd>) to block enemies and create safe rooms.<br>
           • On floor 5+ enemies can bash open closed doors while chasing you.<br>
           • Wraiths drain max HP — Clerics are immune; Warding rune gives 50% resist; shrines can grant full immunity.<br>
-          • Auto-equip (Settings) prefers specialty weapons over plain ones at same stats.<br>
+          • Auto-equip (⚙️ Config) prefers specialty weapons over plain ones at same stats.<br>
+          • Equipment gets stronger on deeper floors — explore further for better loot.<br>
+          • Rogue-closed doors appear teal so you can spot your barricades at a glance.<br>
           • Your ghost from a previous death haunts the floor where you died.<br>
           • Mastery bonuses from prior wins make future runs easier.
         </p>

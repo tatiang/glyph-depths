@@ -1016,6 +1016,7 @@ function generateFloor() {
   state.visible = new Uint8Array(MAP_W * MAP_H);
   state.explored = new Uint8Array(MAP_W * MAP_H);
   state.entities = [];
+  state.rogueClosedDoors = new Set(); // Track doors closed by Rogue for distinct rendering
   // Reset per-floor abilities
   p.enrageFloorUsed = false;
   p.undyingFuryUsed = false;
@@ -1772,14 +1773,14 @@ function generateShopItems(floor) {
   if (Math.random() < 0.5) {
     const weaponPool = WEAPONS.filter(w => w.tier <= tier);
     if (weaponPool.length > 0) {
-      const w = weaponPool[Math.floor(Math.random() * weaponPool.length)];
-      items.push({ item: { ...w }, price: w.value });
+      const w = applyFloorBonus({ ...weaponPool[Math.floor(Math.random() * weaponPool.length)] }, floor);
+      items.push({ item: w, price: w.value + (floor >= 9 ? 10 : 0) });
     }
   } else {
     const rangedPool = RANGED_WEAPONS.filter(r => r.tier <= tier);
     if (rangedPool.length > 0) {
-      const r = rangedPool[Math.floor(Math.random() * rangedPool.length)];
-      items.push({ item: { ...r }, price: r.value });
+      const r = applyFloorBonus({ ...rangedPool[Math.floor(Math.random() * rangedPool.length)] }, floor);
+      items.push({ item: r, price: r.value + (floor >= 9 ? 10 : 0) });
     }
   }
   // Arrow bundle
@@ -1908,17 +1909,34 @@ function getFloorConfig(floor) {
   return configs[floor] || configs[1];
 }
 
+// Add floor-scaling bonus to equipment: deeper floors grant +1 ATK/DEF/DMG at certain thresholds
+function applyFloorBonus(item, floor) {
+  const bonus = floor >= 16 ? 2 : floor >= 9 ? 1 : 0;
+  if (bonus === 0) return item;
+  if (item.itemType === 'weapon' && item.attack != null) {
+    item.attack += bonus;
+    item.name += ` +${bonus}`;
+  } else if (item.itemType === 'armor' && item.defense != null) {
+    item.defense += bonus;
+    item.name += ` +${bonus}`;
+  } else if (item.itemType === 'ranged' && item.damage != null) {
+    item.damage += bonus;
+    item.name += ` +${bonus}`;
+  }
+  return item;
+}
+
 function generateRandomItem(floor) {
   const roll = Math.random();
   const tier = Math.ceil(floor / 3);
   if (roll < 0.25) {
     // Weapon
     const pool = WEAPONS.filter(w => w.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
+    return maybeCurse(applyFloorBonus({ ...pool[Math.floor(Math.random() * pool.length)] }, floor), floor);
   } else if (roll < 0.4) {
     // Armor
     const pool = ARMORS.filter(a => a.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, floor);
+    return maybeCurse(applyFloorBonus({ ...pool[Math.floor(Math.random() * pool.length)] }, floor), floor);
   } else if (roll < 0.6) {
     // Potion
     const p = potionNames[Math.floor(Math.random() * potionNames.length)];
@@ -1936,7 +1954,7 @@ function generateRandomItem(floor) {
   } else if (roll < 0.93) {
     // Ranged weapon
     const rPool = RANGED_WEAPONS.filter(r => r.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
-    if (rPool.length > 0) return { ...rPool[Math.floor(Math.random() * rPool.length)] };
+    if (rPool.length > 0) return applyFloorBonus({ ...rPool[Math.floor(Math.random() * rPool.length)] }, floor);
     return { ...FOOD };
   } else if (roll < 0.96) {
     // Special arrows
@@ -1969,7 +1987,7 @@ function generateMonsterDrop(floor, enemyXp) {
   } else {
     // Equipment appropriate to floor
     const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier), ...RANGED_WEAPONS.filter(r => r.tier <= tier)];
-    if (pool.length > 0) return maybeCurse({ ...pool[Math.floor(Math.random() * pool.length)] }, state.floor);
+    if (pool.length > 0) return maybeCurse(applyFloorBonus({ ...pool[Math.floor(Math.random() * pool.length)] }, floor), state.floor);
     return { ...FOOD };
   }
 }
@@ -3316,6 +3334,7 @@ function closeDoor() {
         continue;
       }
       setTile(nx, ny, T.DOOR_CLOSED);
+      state.rogueClosedDoors.add(ny * MAP_W + nx); // Track for distinct rendering
       closed = true;
       addMessage('You quietly close the door.', 'good');
       Audio.door();
@@ -4425,6 +4444,8 @@ function serializeState() {
     const val = state[key];
     if (val instanceof Uint8Array) {
       s[key] = { _uint8: true, data: Array.from(val) };
+    } else if (val instanceof Set) {
+      s[key] = { _set: true, data: Array.from(val) };
     } else if (key === 'ghost') {
       s[key] = val; // ghost is already a simple object
     } else {
@@ -4453,6 +4474,8 @@ function loadGameFromSlot(slot) {
     for (const key of Object.keys(s)) {
       if (s[key] && s[key]._uint8) {
         s[key] = new Uint8Array(s[key].data);
+      } else if (s[key] && s[key]._set) {
+        s[key] = new Set(s[key].data);
       }
     }
     state = s;
@@ -4755,7 +4778,7 @@ function render() {
           break;
         case T.DOOR_CLOSED:
           tileGlyph = '+';
-          tileColor = '#8B6914';
+          tileColor = (state.rogueClosedDoors && state.rogueClosedDoors.has(ty * MAP_W + tx)) ? '#40a0a0' : '#8B6914';
           break;
         case T.DOOR_OPEN:
           tileGlyph = '/';
@@ -5220,34 +5243,36 @@ function showItemMenu(item, index, event) {
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
-    // Replace menu content with an inline confirmation
-    menu.innerHTML = '';
-    const warn = document.createElement('div');
-    warn.className = 'item-name';
-    warn.style.color = '#ff6040';
-    warn.textContent = `Destroy ${item.glyph} ${item.name}?`;
-    menu.appendChild(warn);
-    const note = document.createElement('div');
-    note.style.cssText = 'font-size:10px;color:var(--text-dim);margin-bottom:6px;';
-    note.textContent = 'This cannot be undone.';
-    menu.appendChild(note);
-    const yesBtn = document.createElement('button');
-    yesBtn.textContent = '🗑 Yes, Destroy';
-    yesBtn.style.color = '#ff6040';
-    const doDestroy = () => {
-      state.player.inventory.splice(index, 1);
-      addMessage(`You destroy the ${item.name}.`, 'damage');
-      updateUI();
-      closeItemMenu();
-    };
-    yesBtn.addEventListener('click', (e) => { e.stopPropagation(); doDestroy(); });
-    yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); doDestroy(); }, { passive: false });
-    menu.appendChild(yesBtn);
-    const noBtn = document.createElement('button');
-    noBtn.textContent = 'Cancel';
-    noBtn.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
-    noBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
-    menu.appendChild(noBtn);
+    // Replace menu content with an inline confirmation — stop outside-close from firing during transition
+    setTimeout(() => {
+      menu.innerHTML = '';
+      const warn = document.createElement('div');
+      warn.className = 'item-name';
+      warn.style.color = '#ff6040';
+      warn.textContent = `Destroy ${item.glyph} ${item.name}?`;
+      menu.appendChild(warn);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:10px;color:var(--text-dim);margin-bottom:6px;';
+      note.textContent = 'This cannot be undone.';
+      menu.appendChild(note);
+      const yesBtn = document.createElement('button');
+      yesBtn.textContent = '🗑 Yes, Destroy';
+      yesBtn.style.color = '#ff6040';
+      const doDestroy = () => {
+        state.player.inventory.splice(index, 1);
+        addMessage(`You destroy the ${item.name}.`, 'damage');
+        updateUI();
+        closeItemMenu();
+      };
+      yesBtn.addEventListener('click', (e) => { e.stopPropagation(); doDestroy(); });
+      yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); doDestroy(); }, { passive: false });
+      menu.appendChild(yesBtn);
+      const noBtn = document.createElement('button');
+      noBtn.textContent = 'Cancel';
+      noBtn.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
+      noBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+      menu.appendChild(noBtn);
+    }, 50);
   }});
   actions.push({ label: 'Cancel', fn: () => closeItemMenu() });
 
@@ -5311,6 +5336,8 @@ function showEquippedMenu(eq, event) {
     else if (eq.slot === 'ranged') state.player.equipped.ranged = null;
     else state.player.equipped.ring = null;
     addMessage(`You unequip the ${item.name}.`, '');
+    // Recalculate FOV in case ring of sight was removed
+    if (item.special === 'sight') computeFOV();
     updateUI();
     render();
     closeItemMenu();
@@ -5515,6 +5542,68 @@ function setupInput() {
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
   $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
+
+  // Config pager: swipe navigation and dot indicators
+  (function initConfigPager() {
+    const pager = $('config-pager');
+    const track = $('config-track');
+    const dots = $('config-dots');
+    const pages = track.querySelectorAll('.config-page');
+    const totalPages = pages.length;
+    let currentPage = 0;
+    let startX = 0, startY = 0, deltaX = 0, swiping = false;
+
+    function goToPage(idx) {
+      currentPage = Math.max(0, Math.min(totalPages - 1, idx));
+      track.style.transform = `translateX(-${currentPage * 100}%)`;
+      dots.querySelectorAll('.config-dot').forEach((d, i) => {
+        d.classList.toggle('active', i === currentPage);
+      });
+    }
+
+    // Dot clicks
+    dots.querySelectorAll('.config-dot').forEach(dot => {
+      dot.addEventListener('click', () => goToPage(parseInt(dot.dataset.page)));
+      dot.addEventListener('touchend', (e) => { e.preventDefault(); goToPage(parseInt(dot.dataset.page)); }, { passive: false });
+    });
+
+    // Swipe on pager
+    pager.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      deltaX = 0;
+      swiping = false;
+      track.style.transition = 'none';
+    }, { passive: true });
+
+    pager.addEventListener('touchmove', (e) => {
+      deltaX = e.touches[0].clientX - startX;
+      const deltaY = e.touches[0].clientY - startY;
+      // Only swipe if horizontal motion > vertical
+      if (!swiping && Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        swiping = true;
+      }
+      if (swiping) {
+        e.preventDefault();
+        const offset = -currentPage * 100 + (deltaX / pager.offsetWidth) * 100;
+        track.style.transform = `translateX(${offset}%)`;
+      }
+    }, { passive: false });
+
+    pager.addEventListener('touchend', () => {
+      track.style.transition = 'transform 0.3s ease';
+      if (swiping) {
+        const threshold = pager.offsetWidth * 0.2;
+        if (deltaX < -threshold) goToPage(currentPage + 1);
+        else if (deltaX > threshold) goToPage(currentPage - 1);
+        else goToPage(currentPage);
+      }
+      swiping = false;
+    }, { passive: true });
+
+    // Expose goToPage for resetting on overlay open
+    window._configGoToPage = goToPage;
+  })();
 
   // Fire ranged weapon button
   const fireBtn = $('btn-fire');
@@ -5827,6 +5916,8 @@ function setupUI() {
 
 function showSettings() {
   inputLocked = true;
+  // Reset config pager to first page
+  if (window._configGoToPage) window._configGoToPage(0);
 
   // Populate stats if game is in progress
   const p = state ? state.player : null;
@@ -6157,7 +6248,7 @@ function startMinimapPulse() {
           case T.CORRIDOR: ctx.fillStyle = vis ? biome.corrVis : biome.corrDim; break;
           case T.STAIRS_DOWN: ctx.fillStyle = '#00e060'; break;
           case T.STAIRS_UP: ctx.fillStyle = '#60c0ff'; break;
-          case T.DOOR_CLOSED: ctx.fillStyle = '#8B6914'; break;
+          case T.DOOR_CLOSED: ctx.fillStyle = (state.rogueClosedDoors && state.rogueClosedDoors.has(idx)) ? '#40a0a0' : '#8B6914'; break;
           case T.DOOR_OPEN: ctx.fillStyle = vis ? '#a08030' : '#504020'; break;
           case T.DOOR_ONEWAY: ctx.fillStyle = '#c06030'; break;
           case T.DOOR_SEALED: ctx.fillStyle = '#6a2020'; break;
@@ -6229,7 +6320,7 @@ function renderMinimap() {
           ctx.fillStyle = '#60c0ff';
           break;
         case T.DOOR_CLOSED:
-          ctx.fillStyle = '#8B6914';
+          ctx.fillStyle = (state.rogueClosedDoors && state.rogueClosedDoors.has(idx)) ? '#40a0a0' : '#8B6914';
           break;
         case T.DOOR_OPEN:
           ctx.fillStyle = vis ? '#a08030' : '#504020';
