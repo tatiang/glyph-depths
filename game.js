@@ -529,10 +529,10 @@ const CLASS_DEFS = [
     flavor: 'Master of metal and machinery. Upgrades gear on the fly.',
     hp: 14, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🔧 Tinker: upgrade weapon/armor once per floor (15g)',
+    passive: '🔧 Tinker: upgrade weapon/armor once per floor (15g) · Exclusive pre-forged item at merchants',
     startItems: 'Short Sword · Leather Vest',
     statBadges: [{ label: '14 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Forge 1/floor', cls: 'pos' }, { label: '🔧 Tinker', cls: 'pos' }]
+    passBadges: [{ label: 'Forge 1/floor', cls: 'pos' }, { label: '⚒️ Forged Loot', cls: 'pos' }]
   },
   {
     id: 'ninja', name: 'Ninja', icon: '🌟',
@@ -559,10 +559,10 @@ const CLASS_DEFS = [
     flavor: 'Walls are not obstacles — they are options.',
     hp: 16, attack: 2, defense: 3,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🚪 Can close doors · 🧱 Fortify: build a wall',
+    passive: '🚪 Can close doors · 🧱 Fortify ×2/floor: build or demolish walls',
     startItems: 'Mace · Chain Mail',
     statBadges: [{ label: '16 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+3 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Close Doors', cls: 'pos' }, { label: '🧱 Fortify/floor', cls: 'pos' }]
+    passBadges: [{ label: 'Close Doors', cls: 'pos' }, { label: '🧱 Fortify ×2', cls: 'pos' }]
   },
   {
     id: 'daredevil', name: 'Daredevil', icon: '🤸',
@@ -828,6 +828,7 @@ function newRun(classId = 'adventurer') {
     throwItem: null,
     fortifyMode: false,
     fortifyCandidates: null,
+    masonWalls: new Set(),
     floorData: Array.from({length: MAX_FLOOR + 1}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
     peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
     doorBashes: {},
@@ -928,7 +929,7 @@ function createPlayer(classId = 'adventurer') {
     necromancer: classId === 'darkwizard',
     acidBoltCooldown: 0,
     // Brick Mason
-    fortifyFloorUsed: false,
+    fortifyCharges: 2,
     // Daredevil
     ricochetMelee: classId === 'daredevil',
     flipCooldown: 0,
@@ -1293,6 +1294,7 @@ function generateFloor() {
   // Merchant on floors 3, 6, 9
   if ([3, 7, 11, 15, 19].includes(state.floor)) {
     spawnMerchant();
+    addMessage("There's a merchant somewhere around here...", 'good');
   }
 
   // Sage on floors 2, 5, 8 (uncurse, identify, heal)
@@ -1331,8 +1333,9 @@ function generateFloor() {
   if (state.player.classId === 'artificer') {
     state.player.tinkerFloorUsed = false;
   }
-  // Brick Mason: reset fortify each floor
-  state.player.fortifyFloorUsed = false;
+  // Brick Mason: reset fortify charges each floor
+  state.player.fortifyCharges = 2;
+  state.masonWalls = new Set();
   // Escape Artist: reset escape route each floor
   state.player.stairsTeleportFloorUsed = false;
 
@@ -2371,6 +2374,29 @@ function generateShopItems(floor) {
   items.push({ item: { name: '5 Arrows', glyph: '➶', itemType: 'arrows', count: 5, value: 0 }, price: 8 });
   // Food
   items.push({ item: { ...FOOD }, price: 8 });
+  // Artificer exclusive: a pre-forged item one tier above current stock
+  if (state.player && state.player.classId === 'artificer') {
+    const bonusTier = Math.min(tier + 1, 3);
+    let exclusiveItem = null;
+    if (Math.random() < 0.5) {
+      const wPool = WEAPONS.filter(w => w.tier === bonusTier);
+      if (wPool.length > 0) {
+        exclusiveItem = { ...wPool[Math.floor(Math.random() * wPool.length)] };
+        exclusiveItem.attack = (exclusiveItem.attack || 0) + 1;
+        exclusiveItem.name = exclusiveItem.name + ' +1';
+      }
+    } else {
+      const aPool = ARMORS.filter(a => a.tier === bonusTier);
+      if (aPool.length > 0) {
+        exclusiveItem = { ...aPool[Math.floor(Math.random() * aPool.length)] };
+        exclusiveItem.defense = (exclusiveItem.defense || 0) + 1;
+        exclusiveItem.name = exclusiveItem.name + ' +1';
+      }
+    }
+    if (exclusiveItem) {
+      items.push({ item: exclusiveItem, price: exclusiveItem.value + 20, artificerOnly: true });
+    }
+  }
   return items;
 }
 
@@ -3799,6 +3825,16 @@ function tryMoveEnemy(enemy, nx, ny) {
       Audio.door();
       return; // uses their move for this turn
     }
+    // Strong enemies (attack >= 5) can bash through Mason-built walls
+    if (getTile(nx, ny) === T.WALL && enemy.attack >= 5 && enemy.alertness >= 2 &&
+        state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
+      setTile(nx, ny, T.FLOOR);
+      state.masonWalls.delete(ny * MAP_W + nx);
+      addMessage(`${enemy.name} smashes through your wall!`, 'damage');
+      Audio.door();
+      computeFOV();
+      return; // uses their move for this turn
+    }
     if (!isWalkable(nx, ny)) return;
   }
 
@@ -3970,6 +4006,20 @@ function playerMove(dx, dy) {
       if (state.runStats.oneWayDoorsUsed >= 5) unlockBadge('no_turning_back');
     }
     autoPickup();
+    endTurn();
+    return;
+  }
+
+  // Bash Mason-built walls — costs 1 HP, breaks in a single hit
+  if (getTile(nx, ny) === T.WALL && state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
+    const key = ny * MAP_W + nx;
+    state.player.hp = Math.max(1, state.player.hp - 1);
+    setTile(nx, ny, T.FLOOR);
+    state.masonWalls.delete(key);
+    addMessage('You bash through the mason wall! (-1 HP)', 'good');
+    Audio.door();
+    haptic(40);
+    computeFOV();
     endTurn();
     return;
   }
@@ -4930,7 +4980,8 @@ function renderShopItems(merchant) {
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
     const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(shopItem.price * 0.75)) : shopItem.price;
-    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}</span><span class="price">${effectivePrice}💰</span>`;
+    const exclusiveTag = shopItem.artificerOnly ? ` <span style="color:#f0a030;font-size:11px;">[⚒️ Forged]</span>` : '';
+    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
     const buyHandler = () => {
       if (div.style.pointerEvents === 'none') return;
       if (state.player.gold >= effectivePrice) {
@@ -6527,12 +6578,12 @@ function updateUI() {
       }
     } else if (cls === 'mason') {
       spRow.style.display = '';
-      if (p.fortifyFloorUsed) {
+      if (p.fortifyCharges <= 0) {
         setBtn('🧱 FORTIFY ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('🧱 FORTIFY', true);
-        setBar(100, 'var(--gold)');
+        setBtn(`🧱 FORTIFY ×${p.fortifyCharges}`, true);
+        setBar((p.fortifyCharges / 2) * 100, 'var(--gold)');
       }
     } else if (cls === 'daredevil') {
       spRow.style.display = '';
@@ -8932,8 +8983,8 @@ function activateAcidBolt() {
 function activateFortify() {
   if (inputLocked || state.gameOver || state.victory) return;
   const p = state.player;
-  if (p.fortifyFloorUsed) {
-    addMessage('Fortify already used this floor.', '');
+  if (p.fortifyCharges <= 0) {
+    addMessage('No fortify charges left this floor.', '');
     return;
   }
   // If already in fortify mode, cancel
@@ -8945,31 +8996,39 @@ function activateFortify() {
     render();
     return;
   }
-  // Find valid adjacent FLOOR tiles (not corridor, not adjacent to door)
+  // Find valid adjacent tiles: FLOOR/CORRIDOR to build, WALL (non-border) to demolish
   const candidates = [];
   for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
     const nx = p.x + dx, ny = p.y + dy;
     const t = getTile(nx, ny);
-    if (t !== T.FLOOR) continue;
-    if (enemyAt(nx, ny)) continue;
-    let nearDoor = false;
-    for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-      const nt = getTile(nx + ddx, ny + ddy);
-      if (nt === T.DOOR_CLOSED || nt === T.DOOR_OPEN || nt === T.DOOR_ONEWAY || nt === T.DOOR_SEALED || nt === T.DOOR_LOCKED) {
-        nearDoor = true; break;
+    if (t === T.FLOOR || t === T.CORRIDOR) {
+      // Build candidate — not occupied by enemy, not adjacent to a door
+      if (enemyAt(nx, ny)) continue;
+      let nearDoor = false;
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nt = getTile(nx + ddx, ny + ddy);
+        if (nt === T.DOOR_CLOSED || nt === T.DOOR_OPEN || nt === T.DOOR_ONEWAY || nt === T.DOOR_SEALED || nt === T.DOOR_LOCKED) {
+          nearDoor = true; break;
+        }
       }
+      if (!nearDoor) candidates.push({ nx, ny, dx, dy, action: 'build' });
+    } else if (t === T.WALL && nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
+      // Demolish candidate — non-border wall
+      candidates.push({ nx, ny, dx, dy, action: 'demolish' });
     }
-    if (!nearDoor) candidates.push({ nx, ny, dx, dy });
   }
   if (candidates.length === 0) {
-    addMessage('No room to build here.', '');
+    addMessage('No room to build or demolish here.', '');
     return;
   }
   Audio.resume();
   // Enter fortify targeting mode — player sees the map and picks a direction
   state.fortifyMode = true;
   state.fortifyCandidates = candidates;
-  addMessage('🧱 Fortify — choose direction to build! (Q to cancel)', 'good');
+  const hasBuild = candidates.some(c => c.action === 'build');
+  const hasDemo = candidates.some(c => c.action === 'demolish');
+  const modeDesc = hasBuild && hasDemo ? 'build or demolish' : hasBuild ? 'build' : 'demolish';
+  addMessage(`🧱 Fortify (${p.fortifyCharges} left) — ${modeDesc}! (Q to cancel)`, 'good');
   updateUI();
   render();
 }
@@ -8982,12 +9041,21 @@ function executeFortify(dx, dy) {
     addMessage('Cannot build there.', '');
     return false;
   }
-  setTile(cand.nx, cand.ny, T.WALL);
-  p.fortifyFloorUsed = true;
+  const key = cand.ny * MAP_W + cand.nx;
+  if (cand.action === 'build') {
+    setTile(cand.nx, cand.ny, T.WALL);
+    state.masonWalls.add(key);
+    animateEntityFlash(p.x, p.y, '#a0a0a0');
+    addMessage('🧱 You build a wall!', 'good');
+  } else {
+    setTile(cand.nx, cand.ny, T.FLOOR);
+    state.masonWalls.delete(key);
+    animateEntityFlash(p.x, p.y, '#c08040');
+    addMessage('🧱 You break through the wall!', 'good');
+  }
+  p.fortifyCharges--;
   state.fortifyMode = false;
   state.fortifyCandidates = null;
-  animateEntityFlash(p.x, p.y, '#a0a0a0');
-  addMessage('🧱 You build a wall!', 'good');
   Audio.door();
   haptic(50);
   computeFOV();
