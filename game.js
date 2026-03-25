@@ -949,6 +949,12 @@ function createPlayer(classId = 'adventurer') {
     quickDraw: false,     // Ranger: -3 aimed shot cooldown
     sanctifiedGround: false, // Cleric: heal when standing still
     survivorInstinct: false, // Adventurer: auto-eat food at 0 hunger
+    silentKill: false,    // Ninja: kills refresh/grant invisibility
+    necroticSurge: false, // Dark Wizard: acid bolt poisons adjacent foes
+    recklessCharge: false, // Daredevil: flip damages healthy enemies
+    smokeScreen: false,   // Escape Artist: teleport leaves smoke hazard
+    sharpDealer: false,   // Barterer: every 3rd purchase is free
+    merchantPurchaseCount: 0, // Barterer: tracks Sharp Dealer progress
     arcaneAffinity: classId === 'wizard',
     dodgeBonus: cls.dodgeBonus,
     critChance: cls.critChance,
@@ -3076,6 +3082,17 @@ function attackEntity(attacker, defender) {
         addStatusEffect(state.player, 'invisibility', 2);
         addMessage('💨 Shadow Step! You vanish into darkness.', 'good');
       }
+      // Silent Kill (Ninja perk): grants invisibility on kill; refreshes timer if already invisible
+      if (isPlayer && state.player.silentKill) {
+        const existingInvis = state.player.statusEffects.find(e => e.type === 'invisibility');
+        if (existingInvis) {
+          existingInvis.turns = 2;
+          addMessage('💨 Silent Kill! Stealth extended.', 'good');
+        } else {
+          addStatusEffect(state.player, 'invisibility', 2);
+          addMessage('💨 Silent Kill! You melt into shadow.', 'good');
+        }
+      }
     }
   }
 }
@@ -3388,6 +3405,11 @@ function showLevelUp() {
     { name: 'Mirror Image', desc: 'Can place 2 illusions at once', apply: () => { state.player.mirrorImage = true; }, rare: false, unique: true, flag: 'mirrorImage', classOnly: 'conjurer' },
     { name: 'Fire Ward', desc: 'Cast fire spheres around you (8-turn CD)', apply: () => { state.player.fireWard = true; state.player.fireWardCooldown = 0; }, rare: false, unique: true, flag: 'fireWard', classOnly: 'wizard' },
     { name: 'Double Shot', desc: 'Fire 2 arrows in one turn', apply: () => { state.player.doubleShot = true; }, rare: false, unique: true, flag: 'doubleShot', classOnly: 'ranger' },
+    { name: 'Silent Kill', desc: 'Kills grant invisibility; kills while invisible refresh it', apply: () => { state.player.silentKill = true; }, rare: false, unique: true, flag: 'silentKill', classOnly: 'ninja' },
+    { name: 'Necrotic Surge', desc: 'Acid bolt splashes poison to adjacent foes', apply: () => { state.player.necroticSurge = true; }, rare: false, unique: true, flag: 'necroticSurge', classOnly: 'darkwizard' },
+    { name: 'Reckless Charge', desc: 'Flip deals full ATK to enemies above 75% HP', apply: () => { state.player.recklessCharge = true; }, rare: false, unique: true, flag: 'recklessCharge', classOnly: 'daredevil' },
+    { name: 'Smoke Screen', desc: 'Teleport leaves a 3-turn smoke cloud behind', apply: () => { state.player.smokeScreen = true; }, rare: false, unique: true, flag: 'smokeScreen', classOnly: 'escapeartist' },
+    { name: 'Sharp Dealer', desc: 'Every 3rd merchant purchase grants a free item', apply: () => { state.player.sharpDealer = true; }, rare: false, unique: true, flag: 'sharpDealer', classOnly: 'barterer' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -3938,6 +3960,14 @@ function tryMoveEnemy(enemy, nx, ny) {
     addMessage(`🔥 ${enemy.name} walks into a fire sphere! (-${dmg})`, 'good');
     if (enemy.hp <= 0) killEnemy(enemy);
   }
+
+  // Smoke Screen hazard: enemies that step in smoke lose the player
+  const smoke = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'smoke' && e.x === nx && e.y === ny);
+  if (smoke && !enemy.isAlly) {
+    enemy.alertness = 0;
+    addMessage(`💨 ${enemy.name} stumbles through the smoke!`, 'good');
+    removeEntity(smoke);
+  }
 }
 
 function hasLOS(x1, y1, x2, y2) {
@@ -3971,6 +4001,14 @@ function playerMove(dx, dy) {
       p.x = nx2;
       p.y = ny2;
       p.flipCooldown = getMasteryBonuses(p.classId).fastFlip ? 3 : 4;
+      // Reckless Charge: deal bonus damage when flipping over a healthy enemy
+      if (p.recklessCharge && foe.hp > (foe.maxHp || foe.hp) * 0.75) {
+        const chargeDmg = getEffectiveAttack(p);
+        foe.hp -= chargeDmg;
+        addMessage(`🤸 Reckless Charge! ${foe.name} takes ${chargeDmg} damage!`, 'good');
+        haptic(40);
+        if (foe.hp <= 0) killEnemy(foe);
+      }
       addMessage(`🤸 You flip over the ${foe.name}!`, 'good');
       Audio.step();
       haptic(30);
@@ -5097,6 +5135,23 @@ function renderShopItems(merchant) {
           if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
         }
         Audio.gold();
+        // Sharp Dealer: every 3rd purchase grants a free item
+        if (state.player.sharpDealer) {
+          state.player.merchantPurchaseCount = (state.player.merchantPurchaseCount || 0) + 1;
+          if (state.player.merchantPurchaseCount >= 3) {
+            state.player.merchantPurchaseCount = 0;
+            const freeItem = generateMonsterDrop(state.floor, 20);
+            if (freeItem && freeItem.itemType !== 'gold') {
+              if (state.player.inventory.length < MAX_INVENTORY) {
+                state.player.inventory.push(freeItem);
+                addMessage(`🎁 Sharp Dealer! Free ${freeItem.name}!`, 'gold');
+              } else {
+                state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: freeItem.glyph || '?', item: freeItem });
+                addMessage(`🎁 Sharp Dealer! ${freeItem.name} dropped at your feet!`, 'gold');
+              }
+            }
+          }
+        }
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
         div.style.opacity = '0.3';
         div.style.pointerEvents = 'none';
@@ -7784,6 +7839,11 @@ function showSettings() {
         { flag: 'mirrorImage', icon: '🎭', name: 'Mirror Image', desc: 'Place 2 illusions at once' },
         { flag: 'fireWard', icon: '🔥', name: 'Fire Ward', desc: 'Cast fire spheres around you' },
         { flag: 'doubleShot', icon: '🏹', name: 'Double Shot', desc: 'Fire 2 arrows in one turn' },
+        { flag: 'silentKill', icon: '💨', name: 'Silent Kill', desc: 'Kills grant/refresh stealth (2 turns)' },
+        { flag: 'necroticSurge', icon: '🟢', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
+        { flag: 'recklessCharge', icon: '🤸', name: 'Reckless Charge', desc: 'Flip strikes healthy enemies (>75% HP)' },
+        { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
+        { flag: 'sharpDealer', icon: '🎁', name: 'Sharp Dealer', desc: 'Every 3rd purchase grants a free item' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -8897,6 +8957,19 @@ function throwProjectile(dx, dy, isSecondShot) {
       addStatusEffect(hitTarget, 'poison', 5);
       addMessage(`🟢 ${hitTarget.name} is coated in acid! (poison)`, 'good');
     }
+    // Necrotic Surge: splash poison to adjacent enemies on hit
+    if (p.necroticSurge && hit && hitTarget) {
+      for (let ax = landX - 1; ax <= landX + 1; ax++) {
+        for (let ay = landY - 1; ay <= landY + 1; ay++) {
+          if (ax === landX && ay === landY) continue;
+          const adj = enemyAt(ax, ay);
+          if (adj && adj.hp > 0 && !adj.isAlly) {
+            addStatusEffect(adj, 'poison', 3);
+            addMessage(`🟢 Necrotic Surge poisons ${adj.name}!`, 'good');
+          }
+        }
+      }
+    }
     state.player.acidBoltCooldown = 7;
   }
 
@@ -9467,6 +9540,7 @@ function activateTeleportStairs() {
     addMessage('Escape Route already used this floor.', '');
     return;
   }
+  const oldX = p.x, oldY = p.y;
   // Find T.STAIRS_DOWN tile
   let sx = -1, sy = -1;
   for (let i = 0; i < MAP_W * MAP_H; i++) {
@@ -9475,6 +9549,11 @@ function activateTeleportStairs() {
   if (sx < 0) { addMessage('No stairs found!', 'damage'); return; }
   p.x = sx;
   p.y = sy;
+  // Smoke Screen: leave a smoke hazard at the origin tile
+  if (p.smokeScreen) {
+    state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '💨', name: 'Smoke', hazardType: 'smoke', turns: 3 });
+    addMessage('💨 A smoke cloud billows where you stood!', 'good');
+  }
   p.stairsTeleportFloorUsed = true;
   addMessage('💨 You vanish and reappear by the stairs!', 'good');
   Audio.gold();
