@@ -580,7 +580,7 @@ const CLASS_DEFS = [
     hp: 12, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.15, critChance: 0.10,
     passive: '❄️ Ice Traps on retreat · 💨 Escape Route',
-    startItems: 'Leather Vest · Invis Potion · 4 Throwing Daggers',
+    startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: 'Ice Traps', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '💨 Escape/floor', cls: 'pos' }]
   },
@@ -992,8 +992,14 @@ function createPlayer(classId = 'adventurer') {
     iceTrapPassive: classId === 'escapeartist',
     // Conjurer
     illusionCooldown: 0,
+    mirrorImage: false,
     // Barterer
-    bartererDiscount: classId === 'barterer'
+    bartererDiscount: classId === 'barterer',
+    // Wizard fire ward perk
+    fireWard: false,
+    fireWardCooldown: 0,
+    // Ranger double shot perk
+    doubleShot: false
   };
 }
 
@@ -1100,7 +1106,7 @@ function applyClassStartingItems(classId) {
   } else if (classId === 'escapeartist') {
     const armor = ARMORS.find(a => a.name === 'Leather Vest');
     if (armor) p.equipped.armor = { ...armor };
-    p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
+    p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 6 });
     const invisPotion = potionNames.find(n => n.id === 'invisibility');
     if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
   } else if (classId === 'conjurer') {
@@ -3379,6 +3385,9 @@ function showLevelUp() {
     { name: 'Encore', desc: 'Charmed enemies have 30% chance to fight for you', apply: () => { state.player.encore = true; }, rare: true, unique: true, flag: 'encore', classOnly: 'bard' },
     { name: 'Master Smith', desc: 'Forge upgrades give +2 instead of +1', apply: () => { state.player.masterSmith = true; }, rare: false, unique: true, flag: 'masterSmith', classOnly: 'artificer' },
     { name: 'Rampart', desc: '+1 fortify charge per floor (max 3)', apply: () => { state.player.fortifyMaxCharges = Math.min(3, (state.player.fortifyMaxCharges || 2) + 1); state.player.fortifyCharges = Math.min(state.player.fortifyMaxCharges, state.player.fortifyCharges + 1); }, rare: false, unique: true, flag: 'rampart', classOnly: 'mason' },
+    { name: 'Mirror Image', desc: 'Can place 2 illusions at once', apply: () => { state.player.mirrorImage = true; }, rare: false, unique: true, flag: 'mirrorImage', classOnly: 'conjurer' },
+    { name: 'Fire Ward', desc: 'Cast fire spheres around you (8-turn CD)', apply: () => { state.player.fireWard = true; state.player.fireWardCooldown = 0; }, rare: false, unique: true, flag: 'fireWard', classOnly: 'wizard' },
+    { name: 'Double Shot', desc: 'Fire 2 arrows in one turn', apply: () => { state.player.doubleShot = true; }, rare: false, unique: true, flag: 'doubleShot', classOnly: 'ranger' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -3553,6 +3562,10 @@ function processEnemies() {
     const canDetect = dist <= enemy.detect - stealthBonus - rogueBonus && !playerInvis;
 
     if (canDetect && hasLOS(enemy.x, enemy.y, state.player.x, state.player.y)) {
+      // Ninja/Rogue sense approaching enemies
+      if (enemy.alertness < 2 && (state.player.classId === 'rogue' || state.player.classId === 'ninja')) {
+        addMessage(`You sense a ${enemy.name} approaching!`, 'damage');
+      }
       enemy.alertness = 2;
     } else if (enemy.alertness > 0 && dist > enemy.detect + 3) {
       enemy.alertness = Math.max(0, enemy.alertness - 1);
@@ -3915,6 +3928,15 @@ function tryMoveEnemy(enemy, nx, ny) {
     addStatusEffect(enemy, 'frozen', 2);
     addMessage(`❄️ ${enemy.name} hits an ice trap!`, 'good');
     removeEntity(iceTrap);
+  }
+
+  // Fire ward hazard: damage enemies that walk into fire spheres
+  const fireWard = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'fireward' && e.x === nx && e.y === ny);
+  if (fireWard && !enemy.isAlly && enemy.hp > 0) {
+    const dmg = Math.max(1, 2 + Math.floor((state.player?.level || 1) / 3));
+    enemy.hp -= dmg;
+    addMessage(`🔥 ${enemy.name} walks into a fire sphere! (-${dmg})`, 'good');
+    if (enemy.hp <= 0) killEnemy(enemy);
   }
 }
 
@@ -5052,18 +5074,23 @@ function renderShopItems(merchant) {
     const buyHandler = () => {
       if (div.style.pointerEvents === 'none') return;
       if (state.player.gold >= effectivePrice) {
-        if (state.player.inventory.length >= MAX_INVENTORY && shopItem.item.itemType !== 'food' && shopItem.item.itemType !== 'arrows') {
-          addMessage('Inventory full!', 'damage');
-          showPopupNotice('Inventory Full — Drop or Destroy an item first');
-          return;
-        }
         state.player.gold -= effectivePrice;
         if (shopItem.item.itemType === 'food') {
-          state.player.hunger = Math.min(100, state.player.hunger + 30);
-          addMessage('You eat a ration. (+30 hunger)', 'good');
+          if (state.player.inventory.length < MAX_INVENTORY) {
+            addFoodToInventory();
+            addMessage('You buy a ration.', 'good');
+          } else {
+            state.player.hunger = Math.min(100, state.player.hunger + 30);
+            addMessage('Inventory full — you eat the ration. (+30 hunger)', 'good');
+          }
         } else if (shopItem.item.itemType === 'arrows') {
           state.player.arrows += shopItem.item.count;
           addMessage(`You buy ${shopItem.item.count} arrows! (${state.player.arrows} total)`, 'good');
+        } else if (state.player.inventory.length >= MAX_INVENTORY) {
+          // Drop purchased item on the ground at player's feet
+          const bought = { ...shopItem.item };
+          state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: bought.glyph, item: bought });
+          addMessage(`Inventory full — ${bought.name} dropped at your feet.`, 'damage');
         } else {
           state.player.inventory.push({ ...shopItem.item });
           addMessage(`You buy ${shopItem.item.name}.`, 'good');
@@ -5181,6 +5208,7 @@ function endTurn() {
   if (state.player.acidBoltCooldown > 0) state.player.acidBoltCooldown--;
   if (state.player.flipCooldown > 0) state.player.flipCooldown--;
   if (state.player.illusionCooldown > 0) state.player.illusionCooldown--;
+  if (state.player.fireWardCooldown > 0) state.player.fireWardCooldown--;
 
   // Expire illusion entities
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -7269,7 +7297,7 @@ function setupInput() {
     Audio.resume();
     if (!state) return;
     if (state.player.classId === 'berserker') activateEnrage();
-    else if (state.player.classId === 'wizard') castAoeSpell();
+    else if (state.player.classId === 'wizard') { if (state.player.fireWard) activateWizardMenu(); else castAoeSpell(); }
     else if (state.player.classId === 'ranger') activateAimedShot();
     else if (state.player.classId === 'cleric') activateDivineHeal();
     else if (state.player.classId === 'bard') activateSongOfRest();
@@ -7583,6 +7611,54 @@ function setupUI() {
     loadFromTitle.addEventListener('click', loadTitleFn);
     loadFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); loadTitleFn(); }, { passive: false });
   }
+
+  // Give Up button
+  const giveUpBtn = $('btn-give-up');
+  if (giveUpBtn) {
+    const giveUpFn = () => {
+      // Replace button with confirmation
+      const section = $('give-up-section');
+      section.innerHTML = '';
+      const warn = document.createElement('div');
+      warn.style.cssText = 'color:#e05050;font-size:13px;font-weight:700;margin-bottom:8px;';
+      warn.textContent = 'Are you sure? This run will end.';
+      section.appendChild(warn);
+      const yesBtn = document.createElement('button');
+      yesBtn.className = 'big-btn';
+      yesBtn.style.cssText = 'padding:10px 24px;background:#401515;border:1px solid #a03030;color:#ff4040;font-size:14px;margin-right:8px;';
+      yesBtn.textContent = '☠️ Yes, Give Up';
+      const confirmFn = () => {
+        $('settings-overlay').classList.remove('active');
+        inputLocked = false;
+        state.gameOver = true;
+        state.player.hp = 0;
+        showDeath('Gave up the run');
+      };
+      yesBtn.addEventListener('click', confirmFn);
+      yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); confirmFn(); }, { passive: false });
+      section.appendChild(yesBtn);
+      const noBtn = document.createElement('button');
+      noBtn.className = 'big-btn';
+      noBtn.style.cssText = 'padding:10px 24px;background:var(--panel-bg);border:1px solid var(--panel-border);font-size:14px;';
+      noBtn.textContent = 'Cancel';
+      const cancelFn = () => {
+        section.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.className = 'big-btn';
+        btn.id = 'btn-give-up';
+        btn.style.cssText = 'padding:10px 24px;background:#2a1515;border:1px solid #803030;color:#e05050;font-size:14px;';
+        btn.textContent = '☠️ Give Up Run';
+        btn.addEventListener('click', giveUpFn);
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); giveUpFn(); }, { passive: false });
+        section.appendChild(btn);
+      };
+      noBtn.addEventListener('click', cancelFn);
+      noBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelFn(); }, { passive: false });
+      section.appendChild(noBtn);
+    };
+    giveUpBtn.addEventListener('click', giveUpFn);
+    giveUpBtn.addEventListener('touchend', (e) => { e.preventDefault(); giveUpFn(); }, { passive: false });
+  }
 }
 
 function showSettings() {
@@ -7656,7 +7732,42 @@ function showSettings() {
           break;
         case 'artificer':
           abilities.push({ icon: '🔧', name: 'Forge', desc: `Upgrade weapon/armor +${p.masterSmith ? 2 : 1} (15g, 1/floor)${p.tinkerFloorUsed ? ' — USED' : ' — Ready'}` });
-          abilities.push({ icon: '⚒️', name: 'Tinker', desc: 'Practical combat instincts' });
+          abilities.push({ icon: '⚒️', name: 'Forged Loot', desc: 'Exclusive +1 gear at merchants' });
+          break;
+        case 'ninja':
+          abilities.push({ icon: '🗡️', name: 'Backstab', desc: 'Hit enemy behind target when attacking' });
+          abilities.push({ icon: '🌟', name: 'Star Throw', desc: `Throw 4 stars in all directions (${p.starThrowCooldown > 0 ? p.starThrowCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '👁', name: 'Danger Sense', desc: 'Detect enemy type when alerted' });
+          abilities.push({ icon: '💨', name: '15% Dodge', desc: 'Natural agility' });
+          break;
+        case 'darkwizard':
+          abilities.push({ icon: '💀', name: 'Necromancy', desc: `${Math.min(30, 8 + 2 * (p.level || 1))}% chance slain foes rise as allies` });
+          abilities.push({ icon: '🟢', name: 'Acid Bolt', desc: `Ranged poison attack (${p.acidBoltCooldown > 0 ? p.acidBoltCooldown + 't CD' : 'Ready'})` });
+          break;
+        case 'mason':
+          abilities.push({ icon: '🧱', name: 'Fortify', desc: `Build/demolish walls (${p.fortifyCharges}/${p.fortifyMaxCharges || 2} charges)` });
+          abilities.push({ icon: '🚪', name: 'Close Doors', desc: 'Can close open doors' });
+          break;
+        case 'daredevil':
+          abilities.push({ icon: '🤸', name: 'Flip', desc: `Leap over enemy (${p.flipCooldown > 0 ? p.flipCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '⚡', name: 'Ricochet', desc: '50%/25% chain hit to adjacent enemies' });
+          abilities.push({ icon: '💨', name: '10% Dodge', desc: 'Natural agility' });
+          break;
+        case 'escapeartist':
+          abilities.push({ icon: '❄️', name: 'Ice Traps', desc: 'Drop ice traps when retreating from enemies' });
+          abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to stairs (1/floor)${p.stairsTeleportFloorUsed ? ' — USED' : ' — Ready'}` });
+          abilities.push({ icon: '👁', name: '15% Dodge', desc: 'Natural agility' });
+          break;
+        case 'conjurer':
+          abilities.push({ icon: '👤', name: 'Illusory Double', desc: `Place a decoy (${p.illusionCooldown > 0 ? p.illusionCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🍖', name: 'Conjure Ration', desc: 'Create food for −5 HP' });
+          abilities.push({ icon: '💨', name: '5% Dodge', desc: 'Natural agility' });
+          break;
+        case 'barterer':
+          abilities.push({ icon: '💸', name: '25% Discount', desc: 'All merchant prices reduced' });
+          abilities.push({ icon: '💰', name: 'Gold Sense', desc: '+50% gold from pickups' });
+          abilities.push({ icon: '🗺️', name: 'Merchant Compass', desc: 'Merchants always visible on minimap' });
+          abilities.push({ icon: '🔍', name: 'Appraise', desc: `Identify potion/scroll (${p.appraiseCooldown > 0 ? p.appraiseCooldown + 't CD' : 'Ready'})` });
           break;
       }
       // Add unlocked class-specific perks
@@ -7669,6 +7780,10 @@ function showSettings() {
         { flag: 'sanctifiedGround', icon: '✝️', name: 'Sanctified Ground', desc: 'Heal 1 HP when waiting' },
         { flag: 'encore', icon: '🎶', name: 'Encore', desc: '30% chance charmed foes fight for you' },
         { flag: 'masterSmith', icon: '⚒️', name: 'Master Smith', desc: 'Forge gives +2 instead of +1' },
+        { flag: 'rampart', icon: '🧱', name: 'Rampart', desc: '+1 fortify charge per floor' },
+        { flag: 'mirrorImage', icon: '🎭', name: 'Mirror Image', desc: 'Place 2 illusions at once' },
+        { flag: 'fireWard', icon: '🔥', name: 'Fire Ward', desc: 'Cast fire spheres around you' },
+        { flag: 'doubleShot', icon: '🏹', name: 'Double Shot', desc: 'Fire 2 arrows in one turn' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -7793,6 +7908,12 @@ function showSettings() {
     efxSection.style.display = p ? '' : 'none';
     efxList.innerHTML = p ? '<span style="color:var(--text-dim);font-size:12px;">None</span>' : '';
     if (p) efxSection.style.display = '';
+  }
+
+  // Give Up button — only show during active game
+  const giveUpSection = $('give-up-section');
+  if (giveUpSection) {
+    giveUpSection.style.display = (p && !state.gameOver && !state.victory) ? '' : 'none';
   }
 
   // Hero icon picker
@@ -8658,10 +8779,10 @@ function fireRangedWeapon() {
 }
 
 // === RANGED COMBAT — THROWING DAGGERS ===
-function throwProjectile(dx, dy) {
+function throwProjectile(dx, dy, isSecondShot) {
   state.throwMode = false;
-  const throwData = state.throwItem;
-  state.throwItem = null;
+  const throwData = isSecondShot ? isSecondShot : state.throwItem;
+  if (!isSecondShot) state.throwItem = null;
   if (!throwData) { endTurn(); return; }
 
   const { item } = throwData;
@@ -8836,6 +8957,25 @@ function throwProjectile(dx, dy) {
     }
   }
 
+  // Ranger Double Shot: fire a second arrow in the same direction
+  if (isRangedShot && !isSecondShot && p.doubleShot) {
+    addMessage('🏹 Double Shot!', 'good');
+    // Consume second arrow for non-Rangers
+    if (!p.infiniteArrows) {
+      if (p.arrows <= 0) {
+        addMessage('No arrows for second shot!', 'damage');
+      } else {
+        const secondThrow = { item: { ...item, loadedArrow: null }, index: -1 };
+        throwProjectile(dx, dy, secondThrow);
+        return;
+      }
+    } else {
+      const secondThrow = { item: { ...item, loadedArrow: null }, index: -1 };
+      throwProjectile(dx, dy, secondThrow);
+      return;
+    }
+  }
+
   updateUI();
   render();
   endTurn();
@@ -8898,6 +9038,104 @@ function castAoeSpell() {
     for (const t of targets) { if (t.hp > 0) attackEntity(state.player, t); }
   }
   state.player.spellCooldown = 12;
+  endTurn();
+}
+
+// === WIZARD: FIRE WARD + MENU ===
+function activateWizardMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  // Check if both abilities are on cooldown — show status
+  const spellReady = p.spellCooldown <= 0;
+  const wardReady = p.fireWardCooldown <= 0;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '✨ WIZARD';
+  $('levelup-label').textContent = 'Choose a spell:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  // Option 1: Arcane Blast
+  const blastBtn = document.createElement('button');
+  blastBtn.className = 'perk-btn';
+  const blastStatus = spellReady ? 'Ready' : `${p.spellCooldown} turns`;
+  blastBtn.innerHTML = `<div class="perk-name">✨ Arcane Blast</div><div class="perk-desc">AoE damage to nearby enemies${spellReady ? '' : ` (${blastStatus})`}</div>`;
+  if (!spellReady) blastBtn.style.opacity = '0.5';
+  const blastHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (spellReady) castAoeSpell();
+    else addMessage(`Arcane blast recharging (${p.spellCooldown} turns).`, '');
+  };
+  blastBtn.addEventListener('click', blastHandler);
+  blastBtn.addEventListener('touchend', (e) => { e.preventDefault(); blastHandler(); }, { passive: false });
+  container.appendChild(blastBtn);
+  // Option 2: Fire Ward
+  const wardBtn = document.createElement('button');
+  wardBtn.className = 'perk-btn';
+  const wardStatus = wardReady ? 'Ready' : `${p.fireWardCooldown} turns`;
+  wardBtn.innerHTML = `<div class="perk-name">🔥 Fire Ward</div><div class="perk-desc">Ring of fire spheres (3 turns)${wardReady ? '' : ` (${wardStatus})`}</div>`;
+  if (!wardReady) wardBtn.style.opacity = '0.5';
+  const wardHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (wardReady) castFireWard();
+    else addMessage(`Fire Ward recharging (${p.fireWardCooldown} turns).`, '');
+  };
+  wardBtn.addEventListener('click', wardHandler);
+  wardBtn.addEventListener('touchend', (e) => { e.preventDefault(); wardHandler(); }, { passive: false });
+  container.appendChild(wardBtn);
+  // Cancel
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = `<div class="perk-name">❌ Cancel</div>`;
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+  overlay.classList.add('active');
+}
+
+function castFireWard() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  Audio.resume();
+  haptic(40);
+  const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},{x:1,y:1},{x:-1,y:-1},{x:1,y:-1},{x:-1,y:1}];
+  let placed = 0;
+  for (const d of dirs) {
+    const nx = p.x + d.x, ny = p.y + d.y;
+    if (isWalkable(nx, ny)) {
+      state.entities.push({ type: 'hazard', x: nx, y: ny, glyph: '🔥', name: 'Fire Ward', hazardType: 'fireward', turns: 3 });
+      animateEntityFlash(nx, ny, '#ff6020');
+      placed++;
+      // Damage any enemy standing there immediately
+      const enemy = enemyAt(nx, ny);
+      if (enemy && enemy.hp > 0 && !enemy.isAlly) {
+        const dmg = Math.max(1, 2 + Math.floor(p.level / 3));
+        enemy.hp -= dmg;
+        addMessage(`🔥 ${enemy.name} is scorched! (-${dmg})`, 'good');
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+  }
+  if (placed === 0) {
+    addMessage('No space for fire spheres!', 'damage');
+    return;
+  }
+  addMessage(`🔥 Fire Ward! ${placed} fire spheres surround you!`, 'good');
+  animateAoeBlast(p.x, p.y, 1.5, '#ff4000');
+  Audio.hit();
+  p.fireWardCooldown = 8;
+  computeFOV();
+  updateUI();
   endTurn();
 }
 
@@ -9256,31 +9494,32 @@ function activateIllusion() {
     addMessage(`Illusion not ready. (${p.illusionCooldown} turns)`, '');
     return;
   }
-  // Remove any existing illusion
+  // Remove any existing illusions
   for (let i = state.entities.length - 1; i >= 0; i--) {
     if (state.entities[i].type === 'illusion') state.entities.splice(i, 1);
   }
-  // Place illusion on a nearby walkable tile
+  // Place illusion(s) on nearby walkable tile(s) — Mirror Image perk allows 2
+  const maxIllusions = p.mirrorImage ? 2 : 1;
   const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},{x:1,y:1},{x:-1,y:-1},{x:1,y:-1},{x:-1,y:1}];
-  let placed = false;
+  let placedCount = 0;
   for (const d of dirs) {
+    if (placedCount >= maxIllusions) break;
     const nx = p.x + d.x, ny = p.y + d.y;
     const tile = getTile(nx, ny);
     if (tile === T.FLOOR || tile === T.CORRIDOR) {
-      const blocked = state.entities.some(e => e.x === nx && e.y === ny && (e.type === 'enemy' || e.type === 'merchant'));
+      const blocked = state.entities.some(e => e.x === nx && e.y === ny && (e.type === 'enemy' || e.type === 'merchant' || e.type === 'illusion'));
       if (!blocked) {
         state.entities.push({ type: 'illusion', x: nx, y: ny, hp: 3, turnsLeft: 8, glyph: '🎭' });
-        placed = true;
-        addMessage('🎭 You conjure a shimmering illusion!', 'good');
+        placedCount++;
         animateEntityFlash(nx, ny, '#cc44ff');
-        break;
       }
     }
   }
-  if (!placed) {
+  if (placedCount === 0) {
     addMessage('No space to summon an illusion!', 'damage');
     return;
   }
+  addMessage(placedCount > 1 ? '🎭 You conjure twin illusions!' : '🎭 You conjure a shimmering illusion!', 'good');
   p.illusionCooldown = maxCD;
   Audio.gold();
   haptic(40);
