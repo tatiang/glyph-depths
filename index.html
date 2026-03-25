@@ -553,6 +553,34 @@
       transition: background 0.2s;
     }
     .class-dot.active { background: var(--gold); }
+    .difficulty-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 4px;
+      width: 100%;
+    }
+    .difficulty-btn {
+      flex: 1;
+      max-width: 96px;
+      padding: 6px 4px;
+      font-size: 12px;
+      background: var(--panel-bg, var(--panel));
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .difficulty-btn.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .difficulty-btn[data-diff="hard"].active {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
     .class-card {
       background: var(--panel);
       border: 2px solid var(--panel-border);

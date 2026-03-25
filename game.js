@@ -22,7 +22,7 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1 };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.5 — 15 classes, teleport tiles, avalanches'; // updated each push
 const LAST_UPDATED = '2026-03-23 16:30';
@@ -841,6 +841,35 @@ function showClassSelect() {
 
   goToPage(0);
 
+  // Difficulty selector — inserted above Begin button
+  const existingDiffRow = $('class-footer').querySelector('.difficulty-row');
+  if (existingDiffRow) existingDiffRow.remove();
+  const diffRow = document.createElement('div');
+  diffRow.className = 'difficulty-row';
+  const difficulties = [
+    { id: 'easy',   label: '⚡ Easy',   title: 'Less hunger · enemies deal −1 damage' },
+    { id: 'normal', label: '⚔️ Normal', title: 'Standard challenge' },
+    { id: 'hard',   label: '💀 Hard',   title: 'More hunger · enemies have +20% HP' },
+  ];
+  for (const d of difficulties) {
+    const btn = document.createElement('button');
+    btn.className = 'difficulty-btn' + (settings.difficulty === d.id ? ' active' : '');
+    btn.setAttribute('data-diff', d.id);
+    btn.textContent = d.label;
+    btn.title = d.title;
+    const handler = () => {
+      settings.difficulty = d.id;
+      saveSettings();
+      diffRow.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
+    diffRow.appendChild(btn);
+  }
+  const footer = $('class-footer');
+  footer.insertBefore(diffRow, beginBtn);
+
   const startRun = () => {
     if (!selectedClass) return;
     $('title-screen').classList.remove('active');
@@ -856,6 +885,7 @@ function newRun(classId = 'adventurer') {
   randomizePotionScrollNames();
   state = {
     floor: 1,
+    difficulty: settings.difficulty || 'normal',
     turnCount: 0,
     player: createPlayer(classId),
     entities: [],
@@ -1751,8 +1781,8 @@ function createEnemy(template, x, y) {
     x, y,
     glyph: template.glyph,
     name: template.name,
-    hp: template.hp,
-    maxHp: template.hp,
+    hp: state && state.difficulty === 'hard' ? Math.ceil(template.hp * 1.2) : template.hp,
+    maxHp: state && state.difficulty === 'hard' ? Math.ceil(template.hp * 1.2) : template.hp,
     attack: template.attack,
     defense: template.defense,
     ai: template.ai,
@@ -2901,6 +2931,10 @@ function attackEntity(attacker, defender) {
   const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
+  // Easy mode: enemies deal 1 less damage
+  if (state.difficulty === 'easy' && attacker !== state.player) {
+    damage = Math.max(1, damage - 1);
+  }
 
   // Cleric Holy Aura: +2 damage vs undead, -1 damage from undead
   if (state.player.classId === 'cleric') {
@@ -5210,7 +5244,8 @@ function endTurn() {
     const ringBonus = hasRingEffect('hunger') ? 0.5 : 1;
     const runeBonus = hasRune('hunger') ? 0.75 : 1;
     const classRate = state.player.hungerRate || 1;
-    const rate = classRate * ringBonus * runeBonus;
+    const diffMult = state.difficulty === 'easy' ? 0.75 : state.difficulty === 'hard' ? 1.25 : 1;
+    const rate = classRate * ringBonus * runeBonus * diffMult;
     const drainBase = Math.floor(rate);
     const drainFrac = rate % 1;
     const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
@@ -7851,6 +7886,13 @@ function showSettings() {
       // Shrine-granted abilities
       if (p.drainImmune && p.classId !== 'cleric') {
         abilities.push({ icon: '🛡️', name: 'Sanctified Soul', desc: 'Immune to life-drain (shrine)' });
+      }
+
+      // Prepend difficulty badge
+      if (state) {
+        const diffLabel = state.difficulty === 'easy' ? '⚡ Easy' : state.difficulty === 'hard' ? '💀 Hard' : '⚔️ Normal';
+        const diffDesc = state.difficulty === 'easy' ? 'Less hunger · −1 enemy damage' : state.difficulty === 'hard' ? 'More hunger · +20% enemy HP' : 'Standard challenge';
+        abilities.unshift({ icon: diffLabel, name: 'Difficulty', desc: diffDesc });
       }
 
       const classAbilList = $('class-ability-list');
