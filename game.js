@@ -5941,6 +5941,125 @@ function closeLoadOverlay() {
   inputLocked = false;
 }
 
+function showCloudOverlay(fromTitle) {
+  if (!isFirebaseConfigured()) {
+    addMessage('Cloud saves not configured.', 'damage');
+    return;
+  }
+  const overlay = $('cloud-overlay');
+  const slotsEl = $('cloud-slots');
+  slotsEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">Loading cloud saves...</div>';
+
+  inputLocked = true;
+  overlay.classList.add('active');
+
+  loadFirebaseSDK().then(() => {
+    initFirebase();
+    if (!firebaseUser) {
+      slotsEl.innerHTML = '';
+      const signInBtn = document.createElement('button');
+      signInBtn.className = 'save-action-btn save-new';
+      signInBtn.textContent = '🔑 Sign in with Google';
+      signInBtn.style.cssText = 'width:100%;margin:8px 0;padding:12px;font-size:14px;';
+      const signInFn = () => {
+        cloudSignIn().then(() => renderCloudSlots(slotsEl, fromTitle)).catch(err => {
+          slotsEl.innerHTML = '<div style="color:#ff6040;padding:10px;text-align:center;">Sign-in failed: ' + (err.message || err) + '</div>';
+        });
+      };
+      signInBtn.addEventListener('click', signInFn);
+      signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
+      slotsEl.appendChild(signInBtn);
+    } else {
+      renderCloudSlots(slotsEl, fromTitle);
+    }
+  }).catch(err => {
+    slotsEl.innerHTML = '<div style="color:#ff6040;padding:10px;text-align:center;">Could not load: ' + (err.message || err) + '</div>';
+  });
+}
+
+function renderCloudSlots(container, fromTitle) {
+  container.innerHTML = '';
+
+  // Header with user info and sign out
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
+  header.innerHTML = '<span style="color:var(--accent);font-size:12px;">☁️ ' + (firebaseUser.displayName || firebaseUser.email) + '</span>';
+  const signOutBtn = document.createElement('button');
+  signOutBtn.textContent = 'Sign Out';
+  signOutBtn.style.cssText = 'font-size:10px;padding:2px 8px;background:var(--bg);color:var(--text-dim);border:1px solid var(--text-dim);border-radius:4px;';
+  const signOutFn = () => { cloudSignOut(); container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:10px;">Signed out.</div>'; };
+  signOutBtn.addEventListener('click', signOutFn);
+  signOutBtn.addEventListener('touchend', (e) => { e.preventDefault(); signOutFn(); }, { passive: false });
+  header.appendChild(signOutBtn);
+  container.appendChild(header);
+
+  // Save to cloud button (only if there's a game in progress)
+  if (state && !state.gameOver) {
+    const saveCloudBtn = document.createElement('button');
+    saveCloudBtn.className = 'save-action-btn save-new';
+    saveCloudBtn.textContent = '☁️ Save Current Game to Cloud';
+    saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;padding:10px;';
+    const saveCloudFn = () => {
+      const name = 'slot_' + (Date.now() % 100000);
+      cloudSaveGame(name).then(() => { renderCloudSlots(container, fromTitle); }).catch(err => {
+        addMessage('Cloud save failed: ' + (err.message || err), 'damage');
+      });
+    };
+    saveCloudBtn.addEventListener('click', saveCloudFn);
+    saveCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveCloudFn(); }, { passive: false });
+    container.appendChild(saveCloudBtn);
+  }
+
+  // List existing cloud saves
+  const listEl = document.createElement('div');
+  listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;font-size:11px;">Loading saves...</div>';
+  container.appendChild(listEl);
+
+  cloudListSaves().then(saves => {
+    listEl.innerHTML = '';
+    if (saves.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;font-size:11px;">No cloud saves yet.</div>';
+      return;
+    }
+    for (const save of saves) {
+      const info = save.playerInfo || {};
+      const div = document.createElement('div');
+      div.className = 'save-slot';
+      div.innerHTML = '<div class="save-slot-header"><span class="save-slot-name">' + (info.classIcon || '') + ' ' + (info.name || 'Unknown') + '</span><span class="save-slot-meta">' + (info.className || '') + '</span></div><div class="save-slot-details">Floor ' + (info.floor || '?') + ' · Lv.' + (info.level || '?') + ' · ' + (info.hp || '?') + '/' + (info.maxHp || '?') + ' HP<span class="save-slot-time">' + timeSince(save.timestamp) + '</span></div>';
+      const btnRow = document.createElement('div');
+      btnRow.className = 'save-slot-actions';
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'save-action-btn save-new';
+      loadBtn.textContent = '▶️ Load';
+      const loadFn = () => {
+        cloudLoadGame(save.slotName).then(ok => {
+          if (ok) {
+            closeCloudOverlay();
+            if (fromTitle) $('title-screen').classList.remove('active');
+          }
+        });
+      };
+      loadBtn.addEventListener('click', loadFn);
+      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+      btnRow.appendChild(loadBtn);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'save-action-btn save-delete';
+      delBtn.textContent = '🗑️';
+      const delFn = () => { cloudDeleteSave(save.slotName).then(() => renderCloudSlots(container, fromTitle)); };
+      delBtn.addEventListener('click', delFn);
+      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
+      btnRow.appendChild(delBtn);
+      div.appendChild(btnRow);
+      listEl.appendChild(div);
+    }
+  });
+}
+
+function closeCloudOverlay() {
+  $('cloud-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
 function timeSince(isoStr) {
   try {
     const diff = Date.now() - new Date(isoStr).getTime();
@@ -5966,13 +6085,12 @@ function hasSavedGames() {
 // No external scripts are loaded until the user explicitly activates this feature.
 
 const FIREBASE_CONFIG = {
-  // Replace these with your own Firebase project config
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyBRjLPYv0sGtVoByExDpX_5pVERUp9BYfI',
+  authDomain: 'glyph-depths.firebaseapp.com',
+  projectId: 'glyph-depths',
+  storageBucket: 'glyph-depths.firebasestorage.app',
+  messagingSenderId: '966606470290',
+  appId: '1:966606470290:web:3274d0965c5ea644f8fa4b'
 };
 
 let firebaseLoaded = false;
@@ -7232,6 +7350,7 @@ function setupInput() {
       // Save/Load overlays
       if ($('save-overlay').classList.contains('active')) { closeSaveOverlay(); return; }
       if ($('load-overlay').classList.contains('active')) { closeLoadOverlay(); return; }
+      if ($('cloud-overlay').classList.contains('active')) { closeCloudOverlay(); return; }
       // Item menu
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
@@ -7720,6 +7839,11 @@ function setupUI() {
     closeLoadBtn.addEventListener('click', closeLoadOverlay);
     closeLoadBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLoadOverlay(); }, { passive: false });
   }
+  const closeCloudBtn = $('btn-close-cloud');
+  if (closeCloudBtn) {
+    closeCloudBtn.addEventListener('click', closeCloudOverlay);
+    closeCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeCloudOverlay(); }, { passive: false });
+  }
 
   // Load from title screen
   const loadFromTitle = $('btn-load-from-title');
@@ -7775,6 +7899,14 @@ function setupUI() {
     };
     giveUpBtn.addEventListener('click', giveUpFn);
     giveUpBtn.addEventListener('touchend', (e) => { e.preventDefault(); giveUpFn(); }, { passive: false });
+  }
+
+  // Cloud save/load from title screen
+  const cloudFromTitle = $('btn-cloud-from-title');
+  if (cloudFromTitle) {
+    const cloudTitleFn = () => { Audio.resume(); showCloudOverlay(true); };
+    cloudFromTitle.addEventListener('click', cloudTitleFn);
+    cloudFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); cloudTitleFn(); }, { passive: false });
   }
 }
 

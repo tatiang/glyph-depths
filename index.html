@@ -1159,6 +1159,7 @@
       <div class="subtitle">What lies below has no name until you give it one.</div>
       <button class="big-btn" id="btn-start">Descend</button>
       <button class="big-btn" id="btn-load-from-title" style="display:none;margin-top:8px;background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Continue Saved Game</button>
+      <button class="big-btn" id="btn-cloud-from-title" style="margin-top:8px;background:var(--panel-bg);border-color:#7070c0;color:#7070c0;">☁️ Cloud Save / Load</button>
       <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
         <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
@@ -1579,6 +1580,12 @@
     <h1 style="margin-bottom:16px;">📂 Load Game</h1>
     <div id="load-slots" style="width:100%;max-width:300px;"></div>
     <button class="big-btn" id="btn-close-load" style="margin-top:16px;">Cancel</button>
+  </div>
+
+  <div class="overlay" id="cloud-overlay" style="justify-content:center;overflow-y:auto;">
+    <h1 style="margin-bottom:16px;">☁️ Cloud Saves</h1>
+    <div id="cloud-slots" style="width:100%;max-width:300px;"></div>
+    <button class="big-btn" id="btn-close-cloud" style="margin-top:16px;">Cancel</button>
   </div>
 
   <div id="minimap-overlay">
