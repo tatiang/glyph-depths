@@ -828,7 +828,7 @@ function newRun(classId = 'adventurer') {
     throwItem: null,
     fortifyMode: false,
     fortifyCandidates: null,
-    masonWalls: new Set(),
+    masonWalls: new Map(),
     floorData: Array.from({length: MAX_FLOOR + 1}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
     peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
     doorBashes: {},
@@ -1334,8 +1334,8 @@ function generateFloor() {
     state.player.tinkerFloorUsed = false;
   }
   // Brick Mason: reset fortify charges each floor
-  state.player.fortifyCharges = 2;
-  state.masonWalls = new Set();
+  state.player.fortifyCharges = state.player.fortifyMaxCharges || 2;
+  state.masonWalls = new Map();
   // Escape Artist: reset escape route each floor
   state.player.stairsTeleportFloorUsed = false;
 
@@ -3325,6 +3325,7 @@ function showLevelUp() {
     { name: 'Sanctified Ground', desc: 'Heal 1 HP when you wait (Space)', apply: () => { state.player.sanctifiedGround = true; }, rare: false, unique: true, flag: 'sanctifiedGround', classOnly: 'cleric' },
     { name: 'Encore', desc: 'Charmed enemies have 30% chance to fight for you', apply: () => { state.player.encore = true; }, rare: true, unique: true, flag: 'encore', classOnly: 'bard' },
     { name: 'Master Smith', desc: 'Forge upgrades give +2 instead of +1', apply: () => { state.player.masterSmith = true; }, rare: false, unique: true, flag: 'masterSmith', classOnly: 'artificer' },
+    { name: 'Rampart', desc: '+1 fortify charge per floor (max 3)', apply: () => { state.player.fortifyMaxCharges = Math.min(3, (state.player.fortifyMaxCharges || 2) + 1); state.player.fortifyCharges = Math.min(state.player.fortifyMaxCharges, state.player.fortifyCharges + 1); }, rare: false, unique: true, flag: 'rampart', classOnly: 'mason' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -3825,12 +3826,19 @@ function tryMoveEnemy(enemy, nx, ny) {
       Audio.door();
       return; // uses their move for this turn
     }
-    // Strong enemies (attack >= 5) can bash through Mason-built walls
+    // Strong enemies (attack >= 5) can bash through Mason-built walls (takes 3 hits)
     if (getTile(nx, ny) === T.WALL && enemy.attack >= 5 && enemy.alertness >= 2 &&
         state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
-      setTile(nx, ny, T.FLOOR);
-      state.masonWalls.delete(ny * MAP_W + nx);
-      addMessage(`${enemy.name} smashes through your wall!`, 'damage');
+      const eKey = ny * MAP_W + nx;
+      const eWallHp = (state.masonWalls.get(eKey) || 3) - 1;
+      if (eWallHp <= 0) {
+        setTile(nx, ny, T.FLOOR);
+        state.masonWalls.delete(eKey);
+        addMessage(`${enemy.name} smashes through your wall!`, 'damage');
+      } else {
+        state.masonWalls.set(eKey, eWallHp);
+        addMessage(`${enemy.name} hammers your wall (${eWallHp} HP left)!`, 'damage');
+      }
       Audio.door();
       computeFOV();
       return; // uses their move for this turn
@@ -4010,13 +4018,19 @@ function playerMove(dx, dy) {
     return;
   }
 
-  // Bash Mason-built walls — costs 1 HP, breaks in a single hit
+  // Bash Mason-built walls — costs 1 HP, takes 3 hits to break
   if (getTile(nx, ny) === T.WALL && state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
     const key = ny * MAP_W + nx;
     state.player.hp = Math.max(1, state.player.hp - 1);
-    setTile(nx, ny, T.FLOOR);
-    state.masonWalls.delete(key);
-    addMessage('You bash through the mason wall! (-1 HP)', 'good');
+    const wallHp = (state.masonWalls.get(key) || 3) - 1;
+    if (wallHp <= 0) {
+      setTile(nx, ny, T.FLOOR);
+      state.masonWalls.delete(key);
+      addMessage('You smash through the mason wall! (-1 HP)', 'good');
+    } else {
+      state.masonWalls.set(key, wallHp);
+      addMessage(`You chip the mason wall (${wallHp} HP left, -1 HP)`, '');
+    }
     Audio.door();
     haptic(40);
     computeFOV();
@@ -6023,10 +6037,19 @@ function render() {
       ctx.font = `${fontSize}px monospace`;
       let tileGlyph, tileColor;
       switch (tile) {
-        case T.WALL:
+        case T.WALL: {
+          const mKey = my * MAP_W + mx;
+          const isMasonWall = state.masonWalls && state.masonWalls.has(mKey);
           tileGlyph = '▓';
-          tileColor = vis ? biome.wallVis : biome.wallDim;
+          if (isMasonWall) {
+            const mHp = state.masonWalls.get(mKey) || 3;
+            // Orange-brown for fresh walls, darkens as damaged
+            tileColor = vis ? (mHp >= 3 ? '#c87838' : mHp === 2 ? '#a85e28' : '#804020') : '#5a3018';
+          } else {
+            tileColor = vis ? biome.wallVis : biome.wallDim;
+          }
           break;
+        }
         case T.FLOOR:
           tileGlyph = '·';
           tileColor = vis ? biome.floorVis : biome.floorDim;
@@ -6583,7 +6606,7 @@ function updateUI() {
         setBar(0, 'var(--text-dim)');
       } else {
         setBtn(`🧱 FORTIFY ×${p.fortifyCharges}`, true);
-        setBar((p.fortifyCharges / 2) * 100, 'var(--gold)');
+        setBar((p.fortifyCharges / (p.fortifyMaxCharges || 2)) * 100, 'var(--gold)');
       }
     } else if (cls === 'daredevil') {
       spRow.style.display = '';
@@ -9002,16 +9025,9 @@ function activateFortify() {
     const nx = p.x + dx, ny = p.y + dy;
     const t = getTile(nx, ny);
     if (t === T.FLOOR || t === T.CORRIDOR) {
-      // Build candidate — not occupied by enemy, not adjacent to a door
+      // Build candidate — not occupied by enemy
       if (enemyAt(nx, ny)) continue;
-      let nearDoor = false;
-      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-        const nt = getTile(nx + ddx, ny + ddy);
-        if (nt === T.DOOR_CLOSED || nt === T.DOOR_OPEN || nt === T.DOOR_ONEWAY || nt === T.DOOR_SEALED || nt === T.DOOR_LOCKED) {
-          nearDoor = true; break;
-        }
-      }
-      if (!nearDoor) candidates.push({ nx, ny, dx, dy, action: 'build' });
+      candidates.push({ nx, ny, dx, dy, action: 'build' });
     } else if (t === T.WALL && nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
       // Demolish candidate — non-border wall
       candidates.push({ nx, ny, dx, dy, action: 'demolish' });
@@ -9044,7 +9060,7 @@ function executeFortify(dx, dy) {
   const key = cand.ny * MAP_W + cand.nx;
   if (cand.action === 'build') {
     setTile(cand.nx, cand.ny, T.WALL);
-    state.masonWalls.add(key);
+    state.masonWalls.set(key, 3);
     animateEntityFlash(p.x, p.y, '#a0a0a0');
     addMessage('🧱 You build a wall!', 'good');
   } else {
