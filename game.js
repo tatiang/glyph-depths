@@ -5128,6 +5128,8 @@ function renderDropSection(container, refreshCallback) {
 
 function renderShopItems(merchant) {
   $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+  const discountEl = $('merchant-discount');
+  if (discountEl) discountEl.style.display = state.player.bartererDiscount ? '' : 'none';
   const container = $('shop-items');
   container.innerHTML = '';
 
@@ -6766,12 +6768,32 @@ function updateUI() {
       }
     } else if (cls === 'wizard') {
       spRow.style.display = '';
-      if (p.spellCooldown > 0) {
-        setBtn(`✨ BLAST ${p.spellCooldown}t`, false);
-        setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
+      if (p.fireWard) {
+        // Fire Ward unlocked: button opens spell menu (Arcane Blast + Fire Ward)
+        const blastReady = p.spellCooldown <= 0;
+        const wardReady = p.fireWardCooldown <= 0;
+        if (blastReady && wardReady) {
+          setBtn('✨ SPELLS ✓', true);
+          setBar(100, 'var(--gold)');
+        } else if (blastReady) {
+          setBtn(`✨ SPELLS (ward ${p.fireWardCooldown}t)`, true);
+          setBar(100, '#a060ff');
+        } else if (wardReady) {
+          setBtn(`✨ SPELLS (blast ${p.spellCooldown}t)`, true);
+          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
+        } else {
+          const minCD = Math.min(p.spellCooldown, p.fireWardCooldown);
+          setBtn(`✨ SPELLS ${minCD}t`, false);
+          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
+        }
       } else {
-        setBtn('✨ ARCANE BLAST', true);
-        setBar(100, 'var(--gold)');
+        if (p.spellCooldown > 0) {
+          setBtn(`✨ BLAST ${p.spellCooldown}t`, false);
+          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
+        } else {
+          setBtn('✨ ARCANE BLAST', true);
+          setBar(100, 'var(--gold)');
+        }
       }
     } else if (cls === 'ranger') {
       spRow.style.display = '';
