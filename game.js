@@ -15,7 +15,7 @@ const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13, RUBBLE: 14 };
 
 // === GAME STATE ===
 let state = null; // main game state object
@@ -1752,13 +1752,13 @@ function setTile(x, y, t) {
 
 function isWalkable(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
+  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
   // TELEPORT and TELEPORT_VIS are walkable (floor-like)
 }
 
 function isTransparent(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
+  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
   // One-way doors are visible (transparent) but handled specially for movement
 }
 
@@ -2549,7 +2549,7 @@ function triggerAvalanche() {
     if (tile !== T.FLOOR) continue;
     // Skip tiles with entities (enemies, items, NPCs, merchants)
     if (state.entities.some(e => e.x === t.x && e.y === t.y)) continue;
-    setTile(t.x, t.y, T.WALL);
+    setTile(t.x, t.y, T.RUBBLE);
     filled++;
   }
   if (filled > 0) {
@@ -6343,6 +6343,11 @@ function render() {
           tileGlyph = '◊';
           tileColor = vis ? '#40e0d0' : '#1a6060';
           break;
+        case T.RUBBLE:
+          // Avalanche debris — warm brown, impassable
+          tileGlyph = '▒';
+          tileColor = vis ? '#9a6535' : '#3a2515';
+          break;
         default:
           tileGlyph = ' ';
           tileColor = '#000';
@@ -8399,7 +8404,7 @@ function renderMinimap() {
   const ctx = mc.getContext('2d');
   const scale = 5; // pixels per tile
   const biome = getFloorBiome(state.floor);
-  const LEGEND_H = 68; // pixels of legend strip at bottom
+  const LEGEND_H = 90; // pixels of legend strip at bottom
   mc.width = MAP_W * scale;
   mc.height = MAP_H * scale + LEGEND_H;
 
@@ -8458,6 +8463,9 @@ function renderMinimap() {
           continue;
         case T.TELEPORT_VIS:
           ctx.fillStyle = '#40e0d0';
+          break;
+        case T.RUBBLE:
+          ctx.fillStyle = vis ? '#9a6535' : '#4a2e12';
           break;
         default:
           continue;
@@ -8611,7 +8619,7 @@ function renderMinimap() {
   ctx.fillStyle = '#aaa'; ctx.fillText('Up', 62, row3 - 1);
 
   // Row 2: entities
-  const row4 = ly + 42;
+  const row4 = ly + 46;
   ctx.fillStyle = '#ff4040'; ctx.fillRect(4, row4, 6, 6);
   ctx.fillStyle = '#aaa'; ctx.fillText('Foe', 12, row4 - 1);
 
@@ -8629,7 +8637,7 @@ function renderMinimap() {
   ctx.fillStyle = '#aaa'; ctx.fillText('Sage', halfW + 12, row4 - 1);
 
   // Row 3: doors
-  const row5 = ly + 54;
+  const row5 = ly + 62;
   ctx.fillStyle = '#8B6914'; ctx.fillRect(4, row5, 6, 6);
   ctx.fillStyle = '#aaa'; ctx.fillText('Door', 12, row5 - 1);
 
@@ -8638,6 +8646,11 @@ function renderMinimap() {
 
   ctx.fillStyle = '#6a2020'; ctx.fillRect(110, row5, 6, 6);
   ctx.fillStyle = '#aaa'; ctx.fillText('Sealed', 118, row5 - 1);
+
+  // Row 4: terrain
+  const row6 = ly + 78;
+  ctx.fillStyle = '#9a6535'; ctx.fillRect(4, row6, 6, 6);
+  ctx.fillStyle = '#aaa'; ctx.fillText('Rubble', 12, row6 - 1);
 }
 
 // === QUICKCAST ===
