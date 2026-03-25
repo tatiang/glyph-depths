@@ -729,64 +729,117 @@ function startGame() {
 }
 
 function showClassSelect() {
-  const cardsEl = $('class-cards');
-  const scrollEl = $('class-cards-scroll');
+  const track = $('class-pager-track');
+  const dotsEl = $('class-dots');
+  const pager = $('class-pager');
   const beginBtn = $('btn-begin');
   const labelEl = $('selected-class-label');
-  if (!cardsEl || !beginBtn) return;
+  if (!track || !beginBtn) return;
   let selectedClass = null;
 
-  cardsEl.innerHTML = '';
+  track.innerHTML = '';
+  dotsEl.innerHTML = '';
   beginBtn.disabled = true;
   if (labelEl) labelEl.textContent = '';
 
-  for (const cls of CLASS_DEFS) {
-    const card = document.createElement('div');
-    card.className = 'class-card';
-    card.innerHTML = `
-      <div class="class-icon">${cls.icon}</div>
-      <div class="class-name">${cls.name}</div>
-      <div class="class-flavor">${cls.flavor}</div>
-      <div class="class-badge-row">
-        ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
-      </div>
-      <div class="class-badge-row" style="margin-top:3px;">
-        ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
-      </div>
-      <div class="class-start-items">${cls.startItems}</div>
-    `;
-    const selectFn = () => {
-      selectedClass = cls.id;
-      cardsEl.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      beginBtn.disabled = false;
-      if (labelEl) labelEl.textContent = `${cls.icon}  ${cls.name}`;
-    };
-
-    // Mouse click — always safe, no scroll ambiguity
-    card.addEventListener('click', selectFn);
-
-    // Touch: only fire on a genuine tap.
-    // Strategy: record scroll container's scrollTop and finger position at touchstart.
-    // At touchend, reject if the container scrolled OR finger moved > 8px.
-    let tapStartX = 0, tapStartY = 0, tapScrollTop = 0;
-    card.addEventListener('touchstart', (e) => {
-      tapStartX = e.touches[0].clientX;
-      tapStartY = e.touches[0].clientY;
-      tapScrollTop = scrollEl ? scrollEl.scrollTop : 0;
-    }, { passive: true });
-    card.addEventListener('touchend', (e) => {
-      const dx = Math.abs(e.changedTouches[0].clientX - tapStartX);
-      const dy = Math.abs(e.changedTouches[0].clientY - tapStartY);
-      const scrolled = scrollEl ? Math.abs(scrollEl.scrollTop - tapScrollTop) > 2 : false;
-      if (!scrolled && dx < 8 && dy < 8) {
-        e.preventDefault();
-        selectFn();
-      }
-    }, { passive: false });
-
-    cardsEl.appendChild(card);
+  // Paginate: 4 classes per page
+  const perPage = 4;
+  const pages = [];
+  for (let i = 0; i < CLASS_DEFS.length; i += perPage) {
+    pages.push(CLASS_DEFS.slice(i, i + perPage));
   }
+
+  let currentPage = 0;
+  const allCards = [];
+
+  function goToPage(idx) {
+    currentPage = Math.max(0, Math.min(pages.length - 1, idx));
+    track.style.transform = `translateX(-${currentPage * 100}%)`;
+    dotsEl.querySelectorAll('.class-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === currentPage);
+    });
+  }
+
+  // Build pages
+  pages.forEach((pageCls) => {
+    const pageEl = document.createElement('div');
+    pageEl.className = 'class-page';
+    const grid = document.createElement('div');
+    grid.className = 'class-page-grid';
+
+    for (const cls of pageCls) {
+      const card = document.createElement('div');
+      card.className = 'class-card';
+      card.innerHTML = `
+        <div class="class-icon">${cls.icon}</div>
+        <div class="class-name">${cls.name}</div>
+        <div class="class-flavor">${cls.flavor}</div>
+        <div class="class-badge-row">
+          ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+        </div>
+        <div class="class-badge-row" style="margin-top:3px;">
+          ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+        </div>
+        <div class="class-start-items">${cls.startItems}</div>
+      `;
+      const selectFn = () => {
+        selectedClass = cls.id;
+        allCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        beginBtn.disabled = false;
+        if (labelEl) labelEl.textContent = `${cls.icon}  ${cls.name}`;
+      };
+      card.addEventListener('click', selectFn);
+      card.addEventListener('touchend', (e) => {
+        // Only fire on genuine taps, not swipes
+        if (e.cancelable) e.preventDefault();
+        selectFn();
+      }, { passive: false });
+      grid.appendChild(card);
+      allCards.push(card);
+    }
+
+    pageEl.appendChild(grid);
+    track.appendChild(pageEl);
+  });
+
+  // Build dots
+  pages.forEach((_, idx) => {
+    const dot = document.createElement('div');
+    dot.className = 'class-dot' + (idx === 0 ? ' active' : '');
+    dot.addEventListener('click', () => goToPage(idx));
+    dot.addEventListener('touchend', (e) => { e.preventDefault(); goToPage(idx); }, { passive: false });
+    dotsEl.appendChild(dot);
+  });
+
+  // Swipe support on pager
+  let swipeStartX = 0, swipeStartY = 0, swiping = false;
+  pager.addEventListener('touchstart', (e) => {
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+  pager.addEventListener('touchmove', (e) => {
+    if (!swiping) return;
+    const dx = e.touches[0].clientX - swipeStartX;
+    const dy = e.touches[0].clientY - swipeStartY;
+    // If horizontal swipe dominates, prevent vertical scroll
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+  pager.addEventListener('touchend', (e) => {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    const dy = e.changedTouches[0].clientY - swipeStartY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0 && currentPage < pages.length - 1) goToPage(currentPage + 1);
+      else if (dx > 0 && currentPage > 0) goToPage(currentPage - 1);
+    }
+  }, { passive: true });
+
+  goToPage(0);
 
   const startRun = () => {
     if (!selectedClass) return;
@@ -1881,7 +1934,7 @@ const NPC_LORE = [
   "A translucent wanderer pauses: \"The stairs go down, always down. Some say there is no bottom. Others say the bottom found them before they found it.\"",
   "A pale figure stares at the ceiling: \"I can hear the surface sometimes. Rain. Birds. Laughter. Then I remember that I died four hundred years ago and the surface I hear may not exist anymore.\"",
   "A ghost kneels in the corridor: \"I was an adventurer. I found every rune. I slew the King. I won. And then I woke up back on floor one. And again. And again.\"",
-  "A spectral wanderer whispers: \"The potions you find are brewed by the dungeon itself. It wants you alive long enough to suffer. Death is easy. Survival is the punishment.\"",
+  "A spectral wanderer whispers: \"The potions you find are brewed by the dungeon itself. Each sip is a gamble — some heal, some harm. The dungeon giveth, and the dungeon taketh away.\"",
 ];
 
 function spawnNPCs() {
@@ -5578,6 +5631,65 @@ function showSaveOverlay() {
   const slotsEl = $('save-slots');
   slotsEl.innerHTML = '';
 
+  // Find if current hero already has a save slot (match by name + class)
+  const curName = state.playerName || '';
+  const curClass = state.player ? state.player.classId : '';
+  let matchedSlot = state._loadedFromSlot || null;
+  if (!matchedSlot) {
+    for (let j = 1; j <= SAVE_SLOTS; j++) {
+      const si = getSaveSlotInfo(j);
+      if (si && si.playerName === curName) {
+        const cls = CLASS_DEFS.find(c => c.name === si.className);
+        if (cls && cls.id === curClass) { matchedSlot = j; break; }
+      }
+    }
+  }
+
+  // If we found the current hero's slot, prompt to overwrite immediately
+  if (matchedSlot) {
+    const mInfo = getSaveSlotInfo(matchedSlot);
+    if (mInfo) {
+      const promptDiv = document.createElement('div');
+      promptDiv.className = 'save-slot';
+      promptDiv.style.borderColor = 'var(--gold)';
+      const age = timeSince(mInfo.timestamp);
+      promptDiv.innerHTML =
+        `<div style="color:var(--gold);font-weight:700;font-size:12px;margin-bottom:6px;">Update existing save?</div>`
+        + `<div class="save-slot-header">`
+        + `<span class="save-slot-name">${mInfo.classIcon} ${mInfo.playerName} ${mInfo.playerEpithet}</span>`
+        + `<span class="save-slot-meta">${mInfo.className}</span>`
+        + `</div>`
+        + `<div class="save-slot-details">`
+        + `Floor ${mInfo.floor} · Lv.${mInfo.level} · ${mInfo.hp}/${mInfo.maxHp} HP`
+        + `<span class="save-slot-time">${age}</span>`
+        + `</div>`;
+      const btnRow = document.createElement('div');
+      btnRow.className = 'save-slot-actions';
+      const overwriteBtn = document.createElement('button');
+      overwriteBtn.className = 'save-action-btn save-overwrite';
+      overwriteBtn.textContent = '💾 Overwrite';
+      overwriteBtn.style.background = '#2a5a3a';
+      const mSlot = matchedSlot;
+      const mSaveFn = () => {
+        if (saveGameToSlot(mSlot)) {
+          addMessage(`Game saved to slot ${mSlot}.`, 'good');
+          closeSaveOverlay();
+        }
+      };
+      overwriteBtn.addEventListener('click', mSaveFn);
+      overwriteBtn.addEventListener('touchend', (e) => { e.preventDefault(); mSaveFn(); }, { passive: false });
+      btnRow.appendChild(overwriteBtn);
+      promptDiv.appendChild(btnRow);
+      slotsEl.appendChild(promptDiv);
+
+      // Separator
+      const sep = document.createElement('div');
+      sep.style.cssText = 'text-align:center;color:var(--text-dim);font-size:11px;margin:8px 0;';
+      sep.textContent = '— or choose another slot —';
+      slotsEl.appendChild(sep);
+    }
+  }
+
   for (let i = 1; i <= SAVE_SLOTS; i++) {
     const info = getSaveSlotInfo(i);
     const slotDiv = document.createElement('div');
@@ -6743,10 +6855,18 @@ function showItemMenu(item, index, event) {
   menu.appendChild(nameDiv);
 
   const actions = [];
-  if (['weapon', 'armor', 'ring', 'ranged'].includes(item.itemType)) {
+  if (['weapon', 'ranged'].includes(item.itemType)) {
+    actions.push({ label: 'Wield', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'armor') {
+    actions.push({ label: 'Wear', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'ring') {
     actions.push({ label: 'Equip', fn: () => { useItem(item, index); closeItemMenu(); }});
-  } else if (['potion', 'scroll', 'food'].includes(item.itemType)) {
-    actions.push({ label: 'Use', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'food') {
+    actions.push({ label: 'Eat', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'potion') {
+    actions.push({ label: 'Drink', fn: () => { useItem(item, index); closeItemMenu(); }});
+  } else if (item.itemType === 'scroll') {
+    actions.push({ label: 'Read', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'thrown') {
     actions.push({ label: `Throw (${item.ammo} left)`, fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'special_arrow') {
@@ -7342,7 +7462,7 @@ function setupUI() {
 
   // Minimap
   $('btn-minimap').addEventListener('click', () => { Audio.resume(); toggleMinimap(); });
-  $('minimap-overlay').addEventListener('click', () => { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); });
+  $('minimap-overlay').addEventListener('click', () => { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); stopMinimapPulse(); inputLocked = false; });
 
   // Merchant close
   const leaveShopFn = () => { $('merchant-overlay').classList.remove('active'); inputLocked = false; endTurn(); };
@@ -9044,7 +9164,7 @@ function activateFortify() {
   const hasBuild = candidates.some(c => c.action === 'build');
   const hasDemo = candidates.some(c => c.action === 'demolish');
   const modeDesc = hasBuild && hasDemo ? 'build or demolish' : hasBuild ? 'build' : 'demolish';
-  addMessage(`🧱 Fortify (${p.fortifyCharges} left) — ${modeDesc}! (Q to cancel)`, 'good');
+  addMessage(`🧱 Fortify (${p.fortifyCharges} left) — ${modeDesc}! (hold to cancel)`, 'good');
   updateUI();
   render();
 }
