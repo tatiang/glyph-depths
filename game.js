@@ -839,6 +839,15 @@ function showClassSelect() {
     }
   }, { passive: true });
 
+  // Arrow key navigation for class pager
+  function classKeyNav(e) {
+    if (e.key === 'ArrowRight' && currentPage < pages.length - 1) { goToPage(currentPage + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); }
+  }
+  document.addEventListener('keydown', classKeyNav);
+  // Clean up when overlay closes (beginBtn starts the game, which hides the overlay)
+  pager._classKeyNav = classKeyNav;
+
   goToPage(0);
 
   // Difficulty selector — inserted above Begin button
@@ -6069,9 +6078,12 @@ function cloudSignOut() {
 function firestoreTimeout(promise, ms) {
   return Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(
-      'Operation timed out. Check that Firestore is enabled and security rules allow access.'
-    )), ms || 15000))
+    new Promise((_, reject) => setTimeout(() => {
+      console.error('[Glyph Depths] Firestore operation timed out after ' + ((ms || 10000) / 1000) + 's');
+      reject(new Error(
+        'Cloud operation timed out. Check that Firestore is enabled in Firebase Console and security rules allow authenticated access.'
+      ));
+    }, ms || 10000))
   ]);
 }
 
@@ -7459,6 +7471,13 @@ function setupInput() {
       }
       swiping = false;
     }, { passive: true });
+
+    // Arrow key navigation for config pager (only when config overlay is visible)
+    document.addEventListener('keydown', (e) => {
+      if (!$('config-overlay') || !$('config-overlay').classList.contains('active')) return;
+      if (e.key === 'ArrowRight' && currentPage < totalPages - 1) { goToPage(currentPage + 1); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); }
+    });
 
     // Expose goToPage for resetting on overlay open
     window._configGoToPage = goToPage;
