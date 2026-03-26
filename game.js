@@ -67,6 +67,7 @@ const BADGE_DEFS = [
   { id: 'win_escapeartist', name: "Escape Artist's Exit", icon: '💨', desc: 'Win as Escape Artist', cat: 'class' },
   { id: 'win_conjurer', name: "Conjurer's Phantom", icon: '🎭', desc: 'Win as Conjurer', cat: 'class' },
   { id: 'win_barterer', name: "Barterer's Fortune", icon: '🪙', desc: 'Win as Barterer', cat: 'class' },
+  { id: 'win_sage', name: "Sage's Codex", icon: '📖', desc: 'Win as Sage', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -197,6 +198,7 @@ const MASTERY_DEFS = [
   { id: 'ea_mastery',   trigger: 'win_escapeartist', name: 'Escape Artist Mastery', desc: 'All Escape Artists get 2 Escape Route uses/floor', classReq: 'escapeartist', bonus: { extraEscape: true } },
   { id: 'conj_mastery', trigger: 'win_conjurer',   name: 'Conjurer Mastery',    desc: 'All Conjurers start with Illusion cooldown 6 instead of 8', classReq: 'conjurer', bonus: { fastIllusion: true } },
   { id: 'bart_mastery', trigger: 'win_barterer',   name: 'Barterer Mastery',    desc: 'All Barterers start with +5 gold',         classReq: 'barterer',   bonus: { startGold: 5 } },
+  { id: 'sage_mastery', trigger: 'win_sage', name: 'Sage Mastery', desc: 'All Sages start with +3 max HP', classReq: 'sage', bonus: { maxHp: 3 } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -603,6 +605,16 @@ const CLASS_DEFS = [
     startItems: '20 Gold · Healing Potion',
     statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
     passBadges: [{ label: '25% Discount', cls: 'pos' }, { label: 'Extra Gold', cls: 'pos' }, { label: '🪙 Merchant Radar', cls: 'pos' }]
+  },
+  {
+    id: 'sage', name: 'Sage', icon: '📖',
+    flavor: 'Knowledge is the sharpest weapon. All items start identified.',
+    hp: 10, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.05,
+    passive: '📖 All items identified · +5 XP from lore · Scroll mastery',
+    startItems: 'Scroll of Mapping · Healing Potion',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: 'neg' }],
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: 'Lore XP', cls: 'pos' }, { label: 'Scroll+', cls: 'pos' }]
   }
 ];
 
@@ -1044,7 +1056,11 @@ function createPlayer(classId = 'adventurer') {
     fireWard: false,
     fireWardCooldown: 0,
     // Ranger double shot perk
-    doubleShot: false
+    doubleShot: false,
+    // Sage
+    sageClass: classId === 'sage',
+    scrollMastery: classId === 'sage',
+    ancientTongue: false
   };
 }
 
@@ -1112,6 +1128,10 @@ function applyClassStartingItems(classId) {
     p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+    // Bard starts with Enchanted Lute + a random Song
+    p.inventory.push({ name: 'Enchanted Lute', glyph: '🎸', itemType: 'instrument', desc: 'Play songs to create magical effects.', indestructible: true });
+    const startSong = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
+    p.inventory.push(makeSong(startSong));
   } else if (classId === 'artificer') {
     const sword = WEAPONS.find(w => w.name === 'Short Sword');
     if (sword) p.equipped.weapon = { ...sword };
@@ -1162,6 +1182,16 @@ function applyClassStartingItems(classId) {
     p.gold = 20;
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'sage') {
+    // Sage starts with all items identified
+    for (const pn of potionNames) potionIdentified[pn.id] = true;
+    for (const sn of scrollNames) scrollIdentified[sn.id] = true;
+    const mapScroll = scrollNames.find(n => n.id === 'mapping');
+    if (mapScroll) {
+      p.inventory.push({ ...mapScroll, glyph: '📜', itemType: 'scroll', identified: true });
+    }
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { p.inventory.push(makePotion(healPotion)); }
   }
 }
 
@@ -2492,6 +2522,56 @@ function showTavern(tavern) {
   gambleBtn.addEventListener('touchend', (e) => { e.preventDefault(); gambleHandler(); }, { passive: false });
   container.appendChild(gambleBtn);
 
+  // Hire Sword — hire a companion ally
+  const hasAlly = state.entities.some(e => e.type === 'enemy' && e.isAlly);
+  const HIRE_COST = 40;
+  const bartDiscount = p.bartererDiscount;
+  const finalHireCost = bartDiscount ? Math.max(1, Math.floor(HIRE_COST * 0.75)) : HIRE_COST;
+  const hireBtn = document.createElement('button');
+  hireBtn.className = 'perk-btn';
+  const allyHp = Math.floor(10 + state.floor * 2);
+  const allyAtk = Math.floor(2 + state.floor);
+  hireBtn.innerHTML = `<div class="perk-name">⚔️ Hire Sword (${finalHireCost}💰)</div><div class="perk-desc">${allyHp} HP, ${allyAtk} ATK companion${bartDiscount ? ' 🪙' : ''}</div>`;
+  if (hasAlly) {
+    hireBtn.style.opacity = '0.4';
+    hireBtn.style.pointerEvents = 'none';
+    hireBtn.querySelector('.perk-desc').textContent = 'You already have a companion.';
+  }
+  const hireHandler = () => {
+    if (hasAlly) {
+      tavernFeedback('You already have a companion.', 'damage');
+      return;
+    }
+    if (p.gold >= finalHireCost) {
+      p.gold -= finalHireCost;
+      // Spawn ally near the player
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+      let ax = state.player.x, ay = state.player.y;
+      for (const [dx, dy] of dirs) {
+        const nx = state.player.x + dx, ny = state.player.y + dy;
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny) && !allyAt(nx, ny)) { ax = nx; ay = ny; break; }
+      }
+      state.entities.push({
+        type: 'enemy', x: ax, y: ay, glyph: '💂', name: 'Hired Sword',
+        hp: allyHp, maxHp: allyHp,
+        attack: allyAtk, defense: 1, xp: 0,
+        ai: 'chase', alertness: 'active', isAlly: true, allyTurns: 999,
+        statusEffects: []
+      });
+      tavernFeedback('A hired sword joins you!', 'good');
+      Audio.gold();
+      haptic(30);
+      hireBtn.style.opacity = '0.4';
+      hireBtn.style.pointerEvents = 'none';
+      refreshGold();
+    } else {
+      tavernFeedback('Not enough gold.', 'damage');
+    }
+  };
+  hireBtn.addEventListener('click', hireHandler);
+  hireBtn.addEventListener('touchend', (e) => { e.preventDefault(); hireHandler(); }, { passive: false });
+  container.appendChild(hireBtn);
+
   // Leave button
   const leaveBtn = document.createElement('button');
   leaveBtn.className = 'perk-btn';
@@ -2569,6 +2649,11 @@ function generateShopItems(floor) {
     if (exclusiveItem) {
       items.push({ item: exclusiveItem, price: exclusiveItem.value + 20, artificerOnly: true });
     }
+  }
+  // 25% chance merchant stocks a random song
+  if (Math.random() < 0.25) {
+    const songDef = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
+    items.push({ item: makeSong(songDef), price: songDef.value });
   }
   return items;
 }
@@ -2798,6 +2883,10 @@ function generateRandomItem(floor) {
   } else if (roll < 0.96) {
     // Special arrows
     return { ...SPECIAL_ARROWS[Math.floor(Math.random() * SPECIAL_ARROWS.length)] };
+  } else if (roll < 0.98) {
+    // Song (rare drop)
+    const songDef = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
+    return makeSong(songDef);
   } else {
     // Food
     return { ...FOOD };
@@ -2859,6 +2948,18 @@ function makeScroll(s) {
     identified: !!identified,
     value: 15
   };
+}
+
+// === SONG DEFINITIONS ===
+const SONG_DEFS = [
+  { id: 'courage',  name: 'Song of Courage',  glyph: '🎵', desc: '+1 attack, +1 defense for 20 turns', effectType: 'courage', turns: 20, value: 20 },
+  { id: 'lullaby',  name: 'Lullaby',          glyph: '🎵', desc: 'Enemies 30% skip chance for 15 turns', effectType: 'lullaby', turns: 15, value: 22 },
+  { id: 'dirge',    name: 'Dirge of Pain',    glyph: '🎵', desc: '1 damage to visible enemies per turn for 10 turns', effectType: 'dirge', turns: 10, value: 25 },
+  { id: 'plenty',   name: 'Song of Plenty',   glyph: '🎵', desc: 'Halves hunger consumption for 30 turns', effectType: 'plenty', turns: 30, value: 18 },
+];
+
+function makeSong(s) {
+  return { name: s.name, glyph: s.glyph, itemType: 'song', songId: s.id, effectType: s.effectType, turns: s.turns, desc: s.desc, value: s.value };
 }
 
 // === FOV — RECURSIVE SHADOWCASTING ===
@@ -3219,6 +3320,8 @@ function getEffectiveAttack(entity) {
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
     // Sage blessing
     if (hasStatusEffect(state.player, 'blessed')) atk += 2;
+    // Song of Courage
+    if (hasStatusEffect(state.player, 'courage')) atk += 1;
     // Battle Fury perk: +3 attack when below 30% HP (Berserker's Rage synergy: +5)
     if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) {
       atk += hasSynergy('berserkers_rage') ? 5 : 3;
@@ -3236,6 +3339,8 @@ function getEffectiveDefense(entity) {
     if (state.player.equipped.armor) def += state.player.equipped.armor.defense;
     if (state.player.equipped.ring?.special === 'protection') def += 3;
     if (state.player.equipped.weapon?.special === 'chaos') def -= 1;
+    // Song of Courage
+    if (hasStatusEffect(state.player, 'courage')) def += 1;
     return Math.max(0, def);
   }
   return entity.defense;
@@ -3524,6 +3629,7 @@ function showLevelUp() {
     { name: 'Reckless Charge', desc: 'Flip deals full ATK to enemies above 75% HP', apply: () => { state.player.recklessCharge = true; }, rare: false, unique: true, flag: 'recklessCharge', classOnly: 'daredevil' },
     { name: 'Smoke Screen', desc: 'Teleport leaves a 3-turn smoke cloud behind', apply: () => { state.player.smokeScreen = true; }, rare: false, unique: true, flag: 'smokeScreen', classOnly: 'escapeartist' },
     { name: 'Sharp Dealer', desc: 'Every 3rd merchant purchase grants a free item', apply: () => { state.player.sharpDealer = true; }, rare: false, unique: true, flag: 'sharpDealer', classOnly: 'barterer' },
+    { name: 'Ancient Tongue', desc: 'Scrolls have double duration effects', apply: () => { state.player.ancientTongue = true; }, rare: false, unique: true, flag: 'ancientTongue', classOnly: 'sage' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -3588,6 +3694,20 @@ function processStatusEffects() {
   // Player effects
   processEntityEffects(state.player);
 
+  // Dirge: damage all visible enemies each turn
+  if (hasStatusEffect(state.player, 'dirge')) {
+    const visible = state.entities.filter(e => e.type === 'enemy' && e.hp > 0 && !e.isAlly && state.visible[e.y * MAP_W + e.x]);
+    for (const e of visible) {
+      e.hp -= 1;
+      if (e.hp <= 0) {
+        addMessage(`${e.name} succumbs to the dirge!`, 'good');
+        state.player.xp += e.xp;
+        removeEntity(e);
+        state.enemiesKilled++;
+      }
+    }
+  }
+
   // Enemy effects — snapshot array to avoid mutation during iteration
   const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0);
   for (const e of enemies) {
@@ -3626,6 +3746,10 @@ function processEntityEffects(entity) {
       if (isPlayer && eff.type === 'invisibility') addMessage('You become visible again.', '');
       if (isPlayer && eff.type === 'strength') addMessage('Your strength fades.', '');
       if (isPlayer && eff.type === 'blessed') addMessage('The sage\'s blessing fades.', '');
+      if (isPlayer && eff.type === 'courage') addMessage('The Song of Courage fades.', '');
+      if (isPlayer && eff.type === 'lullaby') addMessage('The Lullaby fades.', '');
+      if (isPlayer && eff.type === 'dirge') addMessage('The Dirge of Pain fades.', '');
+      if (isPlayer && eff.type === 'plenty') addMessage('The Song of Plenty fades.', '');
     }
   }
 
@@ -3673,6 +3797,9 @@ function processEnemies() {
       allyAI(enemy);
       continue;
     }
+
+    // Lullaby: 30% chance enemies skip turn
+    if (hasStatusEffect(state.player, 'lullaby') && Math.random() < 0.3) continue;
 
     // Troll regeneration: heals 2 HP every 4 turns
     if (enemy.special === 'troll_regen' && enemy.hp > 0 && enemy.hp < enemy.maxHp && state.turnCount % 4 === 0) {
@@ -4410,6 +4537,17 @@ function playerMove(dx, dy) {
     if (!npc.spoken) {
       npc.spoken = true;
       addMessage(npc.lore, 'gold');
+      // Sage class: gain XP from hearing lore
+      if (state.player.sageClass) {
+        state.player.xp += 5;
+        addMessage('+5 XP (sage insight)', 'good');
+        while (state.player.xp >= state.player.xpToNext) {
+          state.player.xp -= state.player.xpToNext;
+          state.player.level++;
+          state.player.xpToNext = 15 + state.player.level * 10;
+          showLevelUp();
+        }
+      }
     } else {
       addMessage(`${npc.name} drifts silently, its message already given.`, '');
     }
@@ -4902,6 +5040,31 @@ function useItem(item, index) {
       if (state.runStats) state.runStats.foodEaten++;
       break;
     }
+
+    case 'song': {
+      // Need an instrument to play
+      const hasInstrument = p.inventory.some(it => it.itemType === 'instrument');
+      if (!hasInstrument) {
+        addMessage('You need an instrument to play songs.', 'damage');
+        return;
+      }
+      // Non-Bards have 50% failure chance
+      if (p.classId !== 'bard' && Math.random() < 0.5) {
+        addMessage('You fumble the melody. The song is wasted.', 'damage');
+        p.inventory.splice(p.inventory.indexOf(item), 1);
+        updateUI();
+        endTurn();
+        return;
+      }
+      addStatusEffect(p, item.effectType, item.turns);
+      addMessage(`🎵 You play ${item.name}!`, 'good');
+      haptic(30);
+      Audio.gold();
+      p.inventory.splice(p.inventory.indexOf(item), 1);
+      updateUI();
+      endTurn();
+      return;
+    }
   }
 
   updateUI();
@@ -5327,8 +5490,9 @@ function endTurn() {
     const ringBonus = hasRingEffect('hunger') ? 0.5 : 1;
     const runeBonus = hasRune('hunger') ? 0.75 : 1;
     const classRate = state.player.hungerRate || 1;
+    const plentyBonus = hasStatusEffect(state.player, 'plenty') ? 0.5 : 1;
     const diffMult = state.difficulty === 'easy' ? 0.75 : state.difficulty === 'hard' ? 1.25 : 1;
-    const rate = classRate * ringBonus * runeBonus * diffMult;
+    const rate = classRate * ringBonus * runeBonus * plentyBonus * diffMult;
     const drainBase = Math.floor(rate);
     const drainFrac = rate % 1;
     const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
@@ -7273,7 +7437,33 @@ function showItemMenu(item, index, event) {
   menu.innerHTML = '';
   menu.appendChild(nameDiv);
 
-  const actions = [];
+  let actions = [];
+  if (item.itemType === 'instrument') {
+    actions = [
+      { label: 'Info', fn: () => { addMessage(`${item.name}: ${item.desc}`, ''); closeItemMenu(); } },
+      { label: 'Cancel', fn: () => closeItemMenu() }
+    ];
+    for (const act of actions) {
+      const btn = document.createElement('button');
+      btn.textContent = act.label;
+      btn.addEventListener('click', (e) => { e.stopPropagation(); act.fn(); });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); act.fn(); }, { passive: false });
+      menu.appendChild(btn);
+    }
+    menu.style.left = '50%';
+    menu.style.transform = 'translateX(-50%)';
+    menu.style.bottom = '180px';
+    menu.style.top = 'auto';
+    menu.classList.add('active');
+    setTimeout(() => {
+      const closer = (e) => {
+        if (!$('item-menu').contains(e.target)) closeItemMenu();
+      };
+      document.addEventListener('click', closer, { once: true });
+      document.addEventListener('touchend', closer, { once: true });
+    }, 100);
+    return;
+  }
   if (['weapon', 'ranged'].includes(item.itemType)) {
     actions.push({ label: 'Wield', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'armor') {
@@ -7297,6 +7487,8 @@ function showItemMenu(item, index, event) {
         closeItemMenu();
       }});
     }
+  } else if (item.itemType === 'song') {
+    actions.push({ label: 'Play', fn: () => { useItem(item, index); closeItemMenu(); }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
@@ -9134,7 +9326,11 @@ function renderStatusFX() {
     webbed:       { icon: '🕸', text: 'Webbed', cls: 'fx-webbed' },
     invisibility: { icon: '👁', text: 'Invis',  cls: 'fx-invisibility' },
     strength:     { icon: '💪', text: 'Str+',   cls: 'fx-strength' },
-    blessed:      { icon: '⚔️', text: 'Blessed', cls: 'fx-strength' }
+    blessed:      { icon: '⚔️', text: 'Blessed', cls: 'fx-strength' },
+    courage:      { icon: '🎵', text: 'Courage', cls: 'fx-strength' },
+    lullaby:      { icon: '🎵', text: 'Lullaby', cls: 'fx-invisibility' },
+    dirge:        { icon: '🎵', text: 'Dirge',   cls: 'fx-burning' },
+    plenty:       { icon: '🎵', text: 'Plenty',  cls: 'fx-strength' }
   };
 
   let html = '';
