@@ -6008,31 +6008,21 @@ function initFirebase() {
     firebase.initializeApp(FIREBASE_CONFIG);
   }
   firebaseDb = firebase.firestore();
-  // iOS Safari partitions sessionStorage across origins, causing Firebase's popup auth to
-  // fail with "missing initial state". We use signInWithRedirect on iOS/Safari instead,
-  // so check for a pending redirect result on every init.
-  return firebase.auth().getRedirectResult().then(result => {
-    if (result && result.user) {
-      firebaseUser = result.user;
-      addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
-    }
-  }).catch(() => {});
+  // Wait for Firebase Auth to resolve persisted session (currentUser is null until
+  // auth state loads asynchronously from localStorage/IndexedDB).
+  if (firebaseUser) return Promise.resolve(); // Already signed in this session
+  return new Promise(resolve => {
+    const unsub = firebase.auth().onAuthStateChanged(user => {
+      unsub();
+      if (user) firebaseUser = user;
+      resolve();
+    });
+  });
 }
 
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
-  // iOS Safari blocks cross-origin sessionStorage access, causing signInWithPopup to fail
-  // with "missing initial state" when Firebase redirects through firebaseapp.com. Fall back
-  // to signInWithRedirect, which reloads the page; getRedirectResult() in initFirebase()
-  // captures the result after reload.
-  const ua = navigator.userAgent;
-  const isIOSSafari = /iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua));
-  if (isIOSSafari) {
-    addMessage('Redirecting to Google sign-in...', '');
-    firebase.auth().signInWithRedirect(provider);
-    return new Promise(() => {}); // Page will reload; this promise intentionally never resolves
-  }
   return firebase.auth().signInWithPopup(provider).then(result => {
     firebaseUser = result.user;
     addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
@@ -6171,9 +6161,16 @@ function showCloudSaveUI(container) {
   saveCloudBtn.textContent = '☁️ Save to Cloud';
   saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;';
   const saveCloudFn = () => {
+    saveCloudBtn.disabled = true;
+    saveCloudBtn.textContent = '☁️ Saving...';
     const name = 'slot_' + (Date.now() % 100000);
     cloudSaveGame(name).then(() => { showCloudSaveUI(container); }).catch(err => {
-      addMessage(`Cloud save failed: ${err.message || err}`, 'damage');
+      saveCloudBtn.disabled = false;
+      saveCloudBtn.textContent = '☁️ Save to Cloud';
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'color:#ff6040;padding:6px;text-align:center;font-size:11px;';
+      errDiv.textContent = `Save failed: ${err.message || err}`;
+      container.appendChild(errDiv);
     });
   };
   saveCloudBtn.addEventListener('click', saveCloudFn);
@@ -6213,6 +6210,11 @@ function showCloudSaveUI(container) {
       div.appendChild(btnRow);
       container.appendChild(div);
     }
+  }).catch(err => {
+    const errDiv = document.createElement('div');
+    errDiv.style.cssText = 'color:#ff6040;padding:6px;text-align:center;font-size:11px;';
+    errDiv.textContent = `Could not list cloud saves: ${err.message || err}`;
+    container.appendChild(errDiv);
   });
 }
 
