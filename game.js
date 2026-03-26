@@ -6141,10 +6141,36 @@ function initFirebase() {
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
-  return firebase.auth().signInWithPopup(provider).then(result => {
-    firebaseUser = result.user;
-    addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
-    return firebaseUser;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
+
+    firebase.auth().signInWithPopup(provider).then(result => {
+      if (settled) return;
+      settle();
+      firebaseUser = result.user;
+      addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+      resolve(firebaseUser);
+    }).catch(err => {
+      if (settled) return;
+      settle();
+      reject(err);
+    });
+
+    // On iOS/mobile, signInWithPopup opens a new tab. If the Firebase auth
+    // handler at authDomain fails (cross-origin storage partitioning), the
+    // promise above never settles. Detect when the user returns to the app
+    // tab and fail gracefully after a brief grace period.
+    function onVisible() {
+      if (document.visibilityState !== 'visible' || settled) return;
+      setTimeout(() => {
+        if (settled) return;
+        settle();
+        reject(new Error('Sign-in did not complete. On iOS Safari, try Chrome or Firefox.'));
+      }, 3000);
+    }
+    // Delay listener so the initial tab-switch from opening the popup doesn't trigger it
+    setTimeout(() => { if (!settled) document.addEventListener('visibilitychange', onVisible); }, 1500);
   });
 }
 
@@ -6241,8 +6267,19 @@ function showCloudSaveOverlay() {
         signInBtn.textContent = '🔑 Sign in with Google';
         signInBtn.style.cssText = 'width:100%;margin:8px 0;';
         const signInFn = () => {
+          signInBtn.disabled = true;
+          signInBtn.textContent = '🔑 Signing in...';
+          // Remove previous error if retrying
+          const prevErr = cloudSection.querySelector('.cloud-sign-in-error');
+          if (prevErr) prevErr.remove();
           cloudSignIn().then(() => showCloudSaveUI(cloudSection)).catch(err => {
-            cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;">Sign-in failed: ${err.message || err}</div>`;
+            signInBtn.disabled = false;
+            signInBtn.textContent = '🔑 Sign in with Google';
+            const errDiv = document.createElement('div');
+            errDiv.className = 'cloud-sign-in-error';
+            errDiv.style.cssText = 'color:#ff6040;padding:8px;text-align:center;font-size:11px;';
+            errDiv.textContent = 'Sign-in failed: ' + (err.message || err);
+            cloudSection.appendChild(errDiv);
           });
         };
         signInBtn.addEventListener('click', signInFn);
