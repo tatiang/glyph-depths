@@ -6121,16 +6121,36 @@ function loadFirebaseSDK() {
 }
 
 function initFirebase() {
-  if (!window.firebase) return;
+  if (!window.firebase) return Promise.resolve();
   if (!firebase.apps.length) {
     firebase.initializeApp(FIREBASE_CONFIG);
   }
   firebaseDb = firebase.firestore();
+  // iOS Safari partitions sessionStorage across origins, causing Firebase's popup auth to
+  // fail with "missing initial state". We use signInWithRedirect on iOS/Safari instead,
+  // so check for a pending redirect result on every init.
+  return firebase.auth().getRedirectResult().then(result => {
+    if (result && result.user) {
+      firebaseUser = result.user;
+      addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+    }
+  }).catch(() => {});
 }
 
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
+  // iOS Safari blocks cross-origin sessionStorage access, causing signInWithPopup to fail
+  // with "missing initial state" when Firebase redirects through firebaseapp.com. Fall back
+  // to signInWithRedirect, which reloads the page; getRedirectResult() in initFirebase()
+  // captures the result after reload.
+  const ua = navigator.userAgent;
+  const isIOSSafari = /iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua));
+  if (isIOSSafari) {
+    addMessage('Redirecting to Google sign-in...', '');
+    firebase.auth().signInWithRedirect(provider);
+    return new Promise(() => {}); // Page will reload; this promise intentionally never resolves
+  }
   return firebase.auth().signInWithPopup(provider).then(result => {
     firebaseUser = result.user;
     addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
@@ -6222,7 +6242,8 @@ function showCloudSaveOverlay() {
 
   const doCloud = () => {
     loadFirebaseSDK().then(() => {
-      initFirebase();
+      return initFirebase();
+    }).then(() => {
       if (!firebaseUser) {
         cloudSection.innerHTML = '';
         const signInBtn = document.createElement('button');
