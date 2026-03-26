@@ -2031,10 +2031,25 @@ function spawnSage() {
   });
 }
 
+const SAGE_LORE = [
+  '"The labyrinth remembers every soul that passed through it."',
+  '"Knowledge costs less than ignorance. Eventually."',
+  '"I have uncursed a thousand relics. Each one screamed a different name."',
+  '"The deeper you descend, the less the surface will welcome you back."',
+  '"Gold means nothing to the dead — and yet they carry it still."',
+  '"Not all that descends ascends. The wise accept this early."',
+  '"The stairwell ahead breathes. It knows your weight."',
+  '"Every curse was once a gift. Someone merely changed their mind."',
+];
+
 function showSage(sage) {
   sage.visited = true;
   inputLocked = true;
   Audio.merchant();
+  if (!sage._loreSeen) {
+    sage._loreSeen = true;
+    addMessage('🔮 Sage: ' + SAGE_LORE[Math.floor(Math.random() * SAGE_LORE.length)], '');
+  }
   renderSageServices(sage);
   $('sage-overlay').classList.add('active');
 }
@@ -2045,9 +2060,37 @@ function renderSageServices(sage) {
   const container = $('sage-services');
   container.innerHTML = '';
 
-  const UNCURSE_COST = 30;
-  const IDENTIFY_COST = 15;
-  const HEAL_COST = 20;
+  // Prices scale with floor depth (+5% per floor)
+  const floorMult = 1 + state.floor * 0.05;
+  const scalePrice = (base) => Math.floor(base * floorMult);
+
+  // Class-specific base costs
+  const isScholar = p.classId === 'wizard' || p.classId === 'darkwizard';
+  const isCleric  = p.classId === 'cleric';
+  const UNCURSE_BASE  = isCleric  ? 20 : 30;
+  const IDENTIFY_BASE = isScholar ? 8  : 15;
+  const HEAL_BASE     = isCleric  ? 12 : 20;
+  const BLESS_BASE    = 25;
+
+  // Barterer discount (same 25% as merchant)
+  const discount = p.bartererDiscount;
+  const finalPrice = (base) => Math.max(1, discount ? Math.floor(scalePrice(base) * 0.75) : scalePrice(base));
+
+  const UNCURSE_COST  = finalPrice(UNCURSE_BASE);
+  const IDENTIFY_COST = finalPrice(IDENTIFY_BASE);
+  const HEAL_COST     = finalPrice(HEAL_BASE);
+  const BLESS_COST    = finalPrice(BLESS_BASE);
+
+  // Show discount banner for Barterer or scholars/clerics
+  if (discount || isScholar || isCleric) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'font-size:11px;color:var(--accent);text-align:center;margin-bottom:6px;';
+    if (discount && (isScholar || isCleric)) banner.textContent = '🪙 Barterer + class discount applied';
+    else if (discount) banner.textContent = '🪙 Barterer discount applied';
+    else if (isScholar) banner.textContent = '📜 Scholar pricing';
+    else if (isCleric) banner.textContent = '✨ Cleric pricing';
+    container.appendChild(banner);
+  }
 
   // Uncurse equipped items
   const hasCursedEquip = ['weapon', 'armor', 'ring', 'ranged'].some(slot => p.equipped[slot]?.cursed);
@@ -2150,6 +2193,32 @@ function renderSageServices(sage) {
     healDiv.style.pointerEvents = 'none';
   }
   container.appendChild(healDiv);
+
+  // Bless: +2 attack for 50 turns
+  const alreadyBlessed = hasStatusEffect(p, 'blessed');
+  const blessDiv = document.createElement('div');
+  blessDiv.className = 'shop-item';
+  if (!alreadyBlessed) {
+    blessDiv.innerHTML = `<span>⚔️ Bless (+2 Atk, 50 turns)</span><span class="price">${BLESS_COST}💰</span>`;
+    blessDiv.addEventListener('click', () => {
+      if (p.gold >= BLESS_COST) {
+        p.gold -= BLESS_COST;
+        applyStatusEffect(p, 'blessed', 50);
+        addMessage('The sage blesses your weapon! (+2 Atk, 50 turns)', 'good');
+        Audio.gold();
+        animateEntityFlash(p.x, p.y, '#ffe060');
+        renderSageServices(sage);
+        updateUI();
+      } else {
+        addMessage("Not enough gold.", 'damage');
+      }
+    });
+  } else {
+    blessDiv.innerHTML = `<span style="color:var(--text-dim)">⚔️ Bless</span><span style="color:var(--text-dim)">Already blessed</span>`;
+    blessDiv.style.opacity = '0.4';
+    blessDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(blessDiv);
 
   // Drop section for inventory management at the sage
   renderDropSection(container, () => renderSageServices(sage));
@@ -3148,6 +3217,8 @@ function getEffectiveAttack(entity) {
     if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
     // Strength potion
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
+    // Sage blessing
+    if (hasStatusEffect(state.player, 'blessed')) atk += 2;
     // Battle Fury perk: +3 attack when below 30% HP (Berserker's Rage synergy: +5)
     if (state.player.hasFury && state.player.hp < state.player.maxHp * 0.3) {
       atk += hasSynergy('berserkers_rage') ? 5 : 3;
@@ -3554,6 +3625,7 @@ function processEntityEffects(entity) {
       entity.statusEffects.splice(i, 1);
       if (isPlayer && eff.type === 'invisibility') addMessage('You become visible again.', '');
       if (isPlayer && eff.type === 'strength') addMessage('Your strength fades.', '');
+      if (isPlayer && eff.type === 'blessed') addMessage('The sage\'s blessing fades.', '');
     }
   }
 
@@ -9061,7 +9133,8 @@ function renderStatusFX() {
     poison:       { icon: '☠️', text: 'Poison', cls: 'fx-poison' },
     webbed:       { icon: '🕸', text: 'Webbed', cls: 'fx-webbed' },
     invisibility: { icon: '👁', text: 'Invis',  cls: 'fx-invisibility' },
-    strength:     { icon: '💪', text: 'Str+',   cls: 'fx-strength' }
+    strength:     { icon: '💪', text: 'Str+',   cls: 'fx-strength' },
+    blessed:      { icon: '⚔️', text: 'Blessed', cls: 'fx-strength' }
   };
 
   let html = '';
