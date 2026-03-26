@@ -6181,6 +6181,18 @@ function cloudSignOut() {
   addMessage('☁️ Signed out of cloud saves.', '');
 }
 
+// Wrap a Firestore promise with a timeout so it doesn't hang forever.
+// Firestore's SDK silently retries on connection/permission failures
+// instead of rejecting, which leaves the UI stuck on "Saving..." etc.
+function firestoreTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(
+      'Operation timed out. Check that Firestore is enabled and security rules allow access.'
+    )), ms || 15000))
+  ]);
+}
+
 function cloudSaveGame(slotName) {
   if (!firebaseUser || !firebaseDb || !state) return Promise.reject('Not signed in');
   const saveData = {
@@ -6203,7 +6215,7 @@ function cloudSaveGame(slotName) {
     }
   };
   const docId = `${firebaseUser.uid}_${slotName}`;
-  return firebaseDb.collection('saves').doc(docId).set(saveData).then(() => {
+  return firestoreTimeout(firebaseDb.collection('saves').doc(docId).set(saveData)).then(() => {
     addMessage(`☁️ Saved to cloud: ${slotName}`, 'good');
   });
 }
@@ -6211,7 +6223,7 @@ function cloudSaveGame(slotName) {
 function cloudLoadGame(slotName) {
   if (!firebaseUser || !firebaseDb) return Promise.reject('Not signed in');
   const docId = `${firebaseUser.uid}_${slotName}`;
-  return firebaseDb.collection('saves').doc(docId).get().then(doc => {
+  return firestoreTimeout(firebaseDb.collection('saves').doc(docId).get()).then(doc => {
     if (!doc.exists) { addMessage('No cloud save found.', 'damage'); return false; }
     const data = doc.data();
     // Reuse local load logic
@@ -6226,17 +6238,17 @@ function cloudLoadGame(slotName) {
 
 function cloudListSaves() {
   if (!firebaseUser || !firebaseDb) return Promise.resolve([]);
-  return firebaseDb.collection('saves')
+  return firestoreTimeout(firebaseDb.collection('saves')
     .where('uid', '==', firebaseUser.uid)
     .orderBy('timestamp', 'desc')
     .get()
-    .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
 }
 
 function cloudDeleteSave(slotName) {
   if (!firebaseUser || !firebaseDb) return Promise.reject('Not signed in');
   const docId = `${firebaseUser.uid}_${slotName}`;
-  return firebaseDb.collection('saves').doc(docId).delete().then(() => {
+  return firestoreTimeout(firebaseDb.collection('saves').doc(docId).delete()).then(() => {
     addMessage(`☁️ Cloud save deleted: ${slotName}`, '');
   });
 }
