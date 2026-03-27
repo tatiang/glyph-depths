@@ -920,6 +920,7 @@ function showClassSelect() {
 
 // === NEW RUN ===
 function newRun(classId = 'adventurer') {
+  setupCanvas();
   randomizePotionScrollNames();
   state = {
     floor: 1,
@@ -3454,6 +3455,9 @@ function attackEntity(attacker, defender) {
   const isPlayer = attacker === state.player;
   const targetIsPlayer = defender === state.player;
 
+  // Floating damage number
+  animateDamageNumber(defender.x, defender.y, damage, isCrit, targetIsPlayer);
+
   // Track damage for death recap
   const floorIdx = Math.min(state.floor, MAX_FLOOR);
   if (isPlayer && !targetIsPlayer) state.floorData[floorIdx].damageDealt += damage;
@@ -5205,6 +5209,7 @@ function playerDescend() {
   inputLocked = true;
 
   setTimeout(() => {
+    activeAnimations.length = 0;
     generateFloor();
     // Place player at stairs up position or first room
     if (state.floor < MAX_FLOOR) {
@@ -6404,6 +6409,24 @@ function animateEntityFlash(ex, ey, color) {
   requestAnimationFrame(tickAnimations);
 }
 
+function animateDamageNumber(mapX, mapY, amount, isCrit, targetIsPlayer) {
+  const p = state.player;
+  const ts = tileSize;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const color = targetIsPlayer ? '#ff4444' : (isCrit ? '#ffaa00' : '#ffffff');
+  activeAnimations.push({
+    type: 'dmgnum',
+    text: String(amount),
+    color,
+    scale: isCrit ? 1.35 : 1.0,
+    cx: (mapX - camX) * ts + ts / 2,
+    cy: (mapY - camY) * ts + ts / 2,
+    t: 0, dur: 600
+  });
+  requestAnimationFrame(tickAnimations);
+}
+
 let lastAnimTime = 0;
 function tickAnimations(now) {
   if (!lastAnimTime) lastAnimTime = now;
@@ -6451,6 +6474,19 @@ function tickAnimations(now) {
       ctx.globalAlpha = 0.5 * (1 - progress);
       ctx.fillStyle = a.color;
       ctx.fillRect(a.cx - a.size / 2, a.cy - a.size / 2, a.size, a.size);
+      ctx.globalAlpha = 1.0;
+    } else if (a.type === 'dmgnum') {
+      const yDraw = a.cy - progress * tileSize * 1.5;
+      const alpha = progress < 0.4 ? 1.0 : 1.0 - (progress - 0.4) / 0.6;
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.font = `bold ${Math.floor(tileSize * 0.55 * a.scale)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 1;
+      ctx.fillStyle = a.color;
+      ctx.fillText(a.text, a.cx, yDraw);
+      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1.0;
     }
 
@@ -6660,6 +6696,7 @@ function loadGameFromSlot(slot) {
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
     // Recompute FOV and render
+    setupCanvas();
     computeFOV();
     render();
     updateUI();
