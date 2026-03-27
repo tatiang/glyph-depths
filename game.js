@@ -25,7 +25,7 @@ let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.5 — 15 classes, teleport tiles, avalanches'; // updated each push
-const LAST_UPDATED = '2026-03-23 16:30';
+const LAST_UPDATED = 'March 26, 2026 at 5:00 PM';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -2027,6 +2027,50 @@ const NPC_LORE = [
   "A pale figure stares at the ceiling: \"I can hear the surface sometimes. Rain. Birds. Laughter. Then I remember that I died four hundred years ago and the surface I hear may not exist anymore.\"",
   "A ghost kneels in the corridor: \"I was an adventurer. I found every rune. I slew the King. I won. And then I woke up back on floor one. And again. And again.\"",
   "A spectral wanderer whispers: \"The potions you find are brewed by the dungeon itself. Each sip is a gamble — some heal, some harm. The dungeon giveth, and the dungeon taketh away.\"",
+  // Deeper mechanical hints
+  "A shade of a scholar reads from nothing: \"Sealed doors cost blood but never kill. The glyphs are cruel but not murderous. A fine distinction when you are bleeding.\"",
+  "A ghostly lookout warns: \"Enemies near doors are more dangerous than enemies in open rooms. Corners are where heroes die. Fight in wide spaces.\"",
+  "A spectral healer sighs: \"Shrines ask for sacrifice. Always sacrifice what you can afford to lose. Gold buys gear. HP buys survival. Know which you need more.\"",
+  "A pale hunter advises: \"Rangers who hoard arrows survive. Rangers who waste them do not. Even infinite quivers run dry against the King.\"",
+  "A ghost in armor rattles: \"Defense is arithmetic. Each point of DEF subtracts from every hit. At high DEF, weak enemies cannot hurt you. Stack it.\"",
+  "A spirit taps the wall: \"Not all walls are solid. Bump them. Listen. Some crumble. Behind them: gold, potions, sometimes something worse.\"",
+  // More class-specific lore
+  "A shade of a ninja whispers: \"The shadow arts are simple: strike first, strike hard, vanish. If you are seen, you are already slower than you should be.\"",
+  "A translucent mason pats a wall: \"I built walls to survive. The enemies built corridors to hunt. We were both architects of our own fate.\"",
+  "A spectral conjurer laughs: \"My illusions fooled even me eventually. I forgot which version of myself was real. The dungeon remembers, but it won't tell.\"",
+  "A ghost of a daredevil grins: \"Flipping over enemies is not bravery. It is geometry. They swing where you were. You land where they aren't.\"",
+  "A pale escape artist murmurs: \"I could always find the stairs. The problem was what stood between me and them. Speed is survival, not cowardice.\"",
+  "A shade of a barterer counts invisible coins: \"Everything has a price. The dungeon sells power for pain. Good barterers know when the price is too high.\"",
+  // Environmental and atmospheric
+  "A translucent figure traces glyphs on the wall: \"The runes are alive. Not sentient — alive, like moss or coral. They grow where power concentrates. The King is their sun.\"",
+  "A ghost stares at its own hands: \"I can see through myself now. Not just my skin — my memories. They are thinning. Soon I will be nothing but an echo of an echo.\"",
+  "A shade stands at a crossroads: \"Every corridor is a choice. Left or right. Fight or flee. The dungeon does not judge. It simply remembers.\"",
+  "A spectral child draws in the dust: \"The rats in the Sewers are not rats. They are what remains of the city's cats after the runes changed them. Everything changed.\"",
+  "A pale figure clutches a broken sword: \"My weapon shattered against the Cave Troll's hide. I fought with my fists after that. I lasted two more floors. Longer than I expected.\"",
+  "A wandering shade hums: \"There is music in the deepest floors. Not beautiful music — mathematical music. The runes vibrate at frequencies that rearrange bone.\"",
+  "A ghost sits against a wall: \"I have been here so long that I remember when these corridors were streets. When the Sewers were gardens. When the King was just Aldric.\"",
+  "A spectral figure examines a crack: \"The Abyss is not below us. The Abyss is beside us. The dungeon is a thin skin over something that has no shape and no patience.\"",
+  // Strategy and wisdom
+  "A shade of a veteran says: \"Never fight two enemies at once if you can fight them one at a time. Corridors are chokepoints. Use them.\"",
+  "A translucent sage advises: \"Hunger is the true enemy. Monsters wound you. Hunger kills you. A ration saved is a floor survived.\"",
+  "A ghostly merchant confides: \"The best deals are on floor 3. By floor 15, prices match desperation. Buy early, buy often, buy wisely.\"",
+  "A phantom scout warns: \"The minimap lies by omission. It shows where you've been, not what has moved since you left. Clear rooms do not stay clear.\"",
+  "A spectral warrior advises: \"Critical hits are luck. Defense is mathematics. Rely on what you can control.\"",
+  "A shade recalls: \"I once found three runes on a single floor. The synergy made me invincible. For two floors. Then I met something that didn't care about synergies.\"",
+  // Humor and personality
+  "A ghost laughs to itself: \"The Glyph King sends his regards. I don't know what that means. I've been saying it for centuries because another ghost told me to.\"",
+  "A spectral figure gestures broadly: \"Welcome to the Unnamed Depths! Population: declining. Amenities: merchants who can't leave and taverns that serve ghost ale. Enjoy your stay.\"",
+  "A translucent cook grumbles: \"Rations in this dungeon taste like cardboard soaked in regret. But they keep you alive, so eat them and stop complaining.\"",
+  "A shade of a locksmith mutters: \"Bone keys. Who makes keys out of bone? Aldric, that's who. The man was practical in the worst possible way.\"",
+  "A ghost waves dismissively: \"Everyone asks how to beat the King. Nobody asks how the King is doing. The answer is: bored, immortal, and rewriting the laws of physics for fun.\"",
+  "A pale figure counts on translucent fingers: \"Twenty floors. Five biomes. One king. Zero exits. The math of this place is not in your favor.\"",
+  "A spectral poet recites: \"Roses are red, corridors are dark, the Lich took my soul, and the Hydra took my arm.\"",
+  // More enemy lore
+  "A shade trembles: \"Banshees scream not from rage but from memory. Each wail is the moment of their death, replayed forever. Cover your ears and strike fast.\"",
+  "A spectral knight reports: \"Dark Knights were the King's honor guard. Their armor is fused to their bones. They cannot remove it. They cannot stop fighting. Pity them, then kill them.\"",
+  "A ghost hides behind a pillar: \"Elder Mimics don't pretend to be chests. They pretend to be rooms. You are standing in one right now. Just kidding. Probably.\"",
+  "A wandering shade points: \"Arch Liches collect spellbooks the way children collect beetles. With the same casual cruelty and none of the guilt.\"",
+  "A faded ranger whispers: \"Phase enemies walk through walls because the walls are not real to them. To a Phase Wraith, you are the only solid thing. That is why it reaches for you.\"",
 ];
 
 function spawnNPCs() {
@@ -5917,20 +5961,23 @@ function tickAnimations(now) {
     const progress = Math.min(1, a.t / a.dur);
 
     if (a.type === 'projectile') {
-      const x = a.sx + (a.ex - a.sx) * progress;
-      const y = a.sy + (a.ey - a.sy) * progress;
+      // Check if an enemy is at the target — if so, stop the projectile short
+      let hasTarget = false;
+      if (a.targetMapX != null && state) {
+        hasTarget = state.entities.some(e => e.type === 'enemy' && e.x === a.targetMapX && e.y === a.targetMapY);
+      }
+      // If hitting a target, projectile stops at ~85% of the way (just before the enemy)
+      const effectiveProgress = hasTarget ? Math.min(progress, 0.85) : progress;
+      const x = a.sx + (a.ex - a.sx) * effectiveProgress;
+      const y = a.sy + (a.ey - a.sy) * effectiveProgress;
+      // Fade out projectile as it reaches target
+      const fadeAlpha = hasTarget && progress > 0.7 ? Math.max(0, 1 - (progress - 0.7) / 0.3) : 1;
+      ctx.globalAlpha = fadeAlpha;
       ctx.font = `${Math.floor(tileSize * 0.6)}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(a.glyph, x, y);
-      // Redraw enemy on top of projectile so arrow appears to go behind/past monster
-      if (a.targetMapX != null && state) {
-        const enemy = state.entities.find(e => e.type === 'enemy' && e.x === a.targetMapX && e.y === a.targetMapY && e.hp > 0);
-        if (enemy) {
-          ctx.font = `${Math.floor(tileSize * 0.7)}px serif`;
-          ctx.fillText(enemy.glyph, a.ex, a.ey);
-        }
-      }
+      ctx.globalAlpha = 1.0;
     } else if (a.type === 'aoe') {
       const r = a.maxR * progress;
       ctx.globalAlpha = 0.4 * (1 - progress);
@@ -8897,6 +8944,20 @@ function showManual() {
     searchInput._wired = true;
     searchInput.addEventListener('input', () => {
       const query = searchInput.value.toLowerCase().trim();
+      const pager = $('manual-pager');
+      const track = $('manual-pager-track');
+      if (query) {
+        // Show all pages flattened when searching
+        track.style.transform = 'translateX(0)';
+        track.style.flexWrap = 'wrap';
+        overlay.querySelectorAll('.manual-page').forEach(p => { p.style.minWidth = '100%'; });
+        $('manual-dots').style.display = 'none';
+      } else {
+        // Restore pager
+        track.style.flexWrap = '';
+        $('manual-dots').style.display = 'flex';
+        if (window._manualGoToPage) window._manualGoToPage(window._manualCurrentPage || 0);
+      }
       const sections = overlay.querySelectorAll('.help-section');
       for (const sec of sections) {
         if (!query) {
@@ -8910,6 +8971,65 @@ function showManual() {
   }
   // Clear search on open
   if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+
+  // Set up pager if not already done
+  if (!overlay._pagerWired) {
+    overlay._pagerWired = true;
+    const track = $('manual-pager-track');
+    const dotsEl = $('manual-dots');
+    const pages = track.querySelectorAll('.manual-page');
+    const totalPages = pages.length;
+    let currentPage = 0;
+    const pageLabels = ['Lore', 'Classes', 'Perks', 'Mastery', 'Enemies'];
+
+    function goToPage(idx) {
+      currentPage = Math.max(0, Math.min(totalPages - 1, idx));
+      window._manualCurrentPage = currentPage;
+      track.style.transform = `translateX(-${currentPage * 100}%)`;
+      dotsEl.querySelectorAll('.manual-dot').forEach((d, i) => d.classList.toggle('active', i === currentPage));
+      overlay.scrollTop = 0;
+    }
+    window._manualGoToPage = goToPage;
+
+    // Create dots
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < totalPages; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'manual-dot' + (i === 0 ? ' active' : '');
+      dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:var(--text-dim);cursor:pointer;transition:background 0.15s;';
+      dot.addEventListener('click', () => goToPage(i));
+      dotsEl.appendChild(dot);
+    }
+
+    // Style active dots
+    const style = document.createElement('style');
+    style.textContent = '.manual-dot.active{background:var(--gold) !important;}';
+    document.head.appendChild(style);
+
+    // Swipe support
+    let sx = 0;
+    const pager = $('manual-pager');
+    pager.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    pager.addEventListener('touchend', (e) => {
+      const diff = sx - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 40) {
+        if (diff > 0 && currentPage < totalPages - 1) goToPage(currentPage + 1);
+        else if (diff < 0 && currentPage > 0) goToPage(currentPage - 1);
+      }
+    }, { passive: true });
+
+    // Arrow key navigation
+    document.addEventListener('keydown', (e) => {
+      if (!$('manual-overlay') || !$('manual-overlay').classList.contains('active')) return;
+      if (e.key === 'ArrowRight' && currentPage < totalPages - 1) { goToPage(currentPage + 1); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); }
+    });
+
+    goToPage(0);
+  } else {
+    // Reset to first page on reopen
+    if (window._manualGoToPage) window._manualGoToPage(0);
+  }
 }
 
 function closeManual() {
@@ -9677,7 +9797,8 @@ function throwProjectile(dx, dy, isSecondShot) {
       if (isAimedShot) {
         addMessage(`🏹 Aimed Shot hits ${target.name} for ${dmg}!`, 'good');
       } else if (isRangedShot) {
-        addMessage(`🏹 Arrow hits ${target.name} for ${dmg}!`, 'good');
+        const shotLabel = isSecondShot ? '2nd arrow' : 'Arrow';
+        addMessage(`🏹 ${shotLabel} hits ${target.name} for ${dmg}!`, 'good');
       } else {
         addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
       }
