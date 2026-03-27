@@ -24,8 +24,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'v0.9.5 — 15 classes, teleport tiles, avalanches'; // updated each push
-const LAST_UPDATED = 'March 26, 2026 at 5:00 PM';
+const GAME_VERSION = 'v0.9.6 — sage refresh, teleport potions restored'; // updated each push
+const LAST_UPDATED = 'March 26, 2026 at 6:00 PM';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -1216,7 +1216,8 @@ const POTION_EFFECTS = [
   { id: 'strength', name: 'Potion of Strength', desc: '+2 Attack for 30 turns' },
   { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
   { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
-  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' }
+  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
+  { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' }
 ];
 
 const SCROLL_EFFECTS = [
@@ -2101,7 +2102,8 @@ function spawnSage() {
     x, y,
     glyph: '🔮',
     name: 'Wandering Sage',
-    visited: false
+    visited: false,
+    refreshesLeft: 1
   });
 }
 
@@ -2293,6 +2295,35 @@ function renderSageServices(sage) {
     blessDiv.style.pointerEvents = 'none';
   }
   container.appendChild(blessDiv);
+
+  // Refresh services button
+  const REFRESH_COST = finalPrice(30);
+  const refreshDiv = document.createElement('div');
+  refreshDiv.className = 'shop-item';
+  if (sage.refreshesLeft > 0) {
+    refreshDiv.innerHTML = `<span>🔄 Refresh Services</span><span class="price" style="color:var(--accent)">${REFRESH_COST}💰 (${sage.refreshesLeft} left)</span>`;
+    const refreshHandler = () => {
+      if (p.gold >= REFRESH_COST) {
+        p.gold -= REFRESH_COST;
+        sage.refreshesLeft--;
+        // Remove blessed status so it can be re-purchased
+        p.statusEffects = p.statusEffects.filter(e => e.type !== 'blessed');
+        addMessage('The sage prepares fresh incantations!', 'good');
+        Audio.gold();
+        renderSageServices(sage);
+        updateUI();
+      } else {
+        addMessage("Not enough gold to refresh.", 'damage');
+      }
+    };
+    refreshDiv.addEventListener('click', refreshHandler);
+    refreshDiv.addEventListener('touchend', (e) => { e.preventDefault(); refreshHandler(); }, { passive: false });
+  } else {
+    refreshDiv.innerHTML = `<span style="color:var(--text-dim)">🔄 No more refreshes</span><span></span>`;
+    refreshDiv.style.opacity = '0.4';
+    refreshDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(refreshDiv);
 
   // Drop section for inventory management at the sage
   renderDropSection(container, () => renderSageServices(sage));
@@ -6328,9 +6359,34 @@ function renderCloudSlots(container, fromTitle) {
     saveCloudBtn.textContent = '☁️ Save Current Game to Cloud';
     saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;padding:10px;';
     const saveCloudFn = () => {
-      const name = 'slot_' + (Date.now() % 100000);
-      cloudSaveGame(name).then(() => { renderCloudSlots(container, fromTitle); }).catch(err => {
-        addMessage('Cloud save failed: ' + (err.message || err), 'damage');
+      // Check for existing cloud save matching this character (name + class)
+      const curName = state.playerName || '';
+      const curClass = state.player ? state.player.classId : '';
+      cloudListSaves().then(saves => {
+        let matchedSlot = state._cloudLoadedSlot || null;
+        if (!matchedSlot) {
+          for (const save of saves) {
+            const info = save.playerInfo || {};
+            const cls = CLASS_DEFS.find(c => c.name === info.className);
+            if (info.name === curName && cls && cls.id === curClass) {
+              matchedSlot = save.slotName;
+              break;
+            }
+          }
+        }
+        const slotName = matchedSlot || ('slot_' + (Date.now() % 100000));
+        cloudSaveGame(slotName).then(() => {
+          state._cloudLoadedSlot = slotName;
+          renderCloudSlots(container, fromTitle);
+        }).catch(err => {
+          addMessage('Cloud save failed: ' + (err.message || err), 'damage');
+        });
+      }).catch(() => {
+        // Fallback: save with new slot name
+        const name = 'slot_' + (Date.now() % 100000);
+        cloudSaveGame(name).then(() => { renderCloudSlots(container, fromTitle); }).catch(err => {
+          addMessage('Cloud save failed: ' + (err.message || err), 'damage');
+        });
       });
     };
     saveCloudBtn.addEventListener('click', saveCloudFn);
