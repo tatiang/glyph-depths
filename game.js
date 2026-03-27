@@ -1223,8 +1223,7 @@ const POTION_EFFECTS = [
   { id: 'strength', name: 'Potion of Strength', desc: '+2 Attack for 30 turns' },
   { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
   { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
-  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
-  { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' }
+  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' }
 ];
 
 const SCROLL_EFFECTS = [
@@ -1355,13 +1354,15 @@ const ENEMY_TIERS = {
     { name: 'Dark Knight', glyph: '🗡️', hp: 25, attack: 7, defense: 4, ai: 'chase', xp: 28, special: null, detect: 8 },
     { name: 'Banshee', glyph: '👻', hp: 14, attack: 6, defense: 1, ai: 'chase', xp: 25, special: 'phase', detect: 9 },
     { name: 'Hydra', glyph: '🐉', hp: 30, attack: 5, defense: 3, ai: 'chase', xp: 32, special: 'split', detect: 7 },
-    { name: 'Warlock', glyph: '🧙', hp: 16, attack: 4, defense: 2, ai: 'flee', xp: 30, special: 'summon', detect: 9 }
+    { name: 'Warlock', glyph: '🧙', hp: 16, attack: 4, defense: 2, ai: 'flee', xp: 30, special: 'summon', detect: 9 },
+    { name: 'Shadow Stalker', glyph: '🕶️', hp: 16, attack: 6, defense: 2, ai: 'ambush', xp: 26, special: 'stealth', detect: 6 }
   ],
   5: [
     { name: 'Abyssal Fiend', glyph: '👿', hp: 35, attack: 8, defense: 5, ai: 'chase', xp: 40, special: 'fire_trail', detect: 10 },
     { name: 'Void Wraith', glyph: '🌀', hp: 20, attack: 7, defense: 2, ai: 'chase', xp: 38, special: 'drain', detect: 10 },
     { name: 'Elder Mimic', glyph: '📦', hp: 28, attack: 6, defense: 5, ai: 'ambush', xp: 35, special: 'mimic', detect: 4 },
-    { name: 'Arch Lich', glyph: '☠️', hp: 22, attack: 5, defense: 3, ai: 'flee', xp: 45, special: 'summon', detect: 10 }
+    { name: 'Arch Lich', glyph: '☠️', hp: 22, attack: 5, defense: 3, ai: 'flee', xp: 45, special: 'summon', detect: 10 },
+    { name: 'Phantom Assassin', glyph: '🗝️', hp: 24, attack: 9, defense: 3, ai: 'ambush', xp: 42, special: 'stealth', detect: 5 }
   ]
 };
 
@@ -1700,7 +1701,7 @@ function bfsReachable(sx, sy, tx, ty) {
       const nx = x + dx, ny = y + dy;
       const t = getTile(nx, ny);
       // Treat closed doors and corridors as passable for connectivity check
-      if (t === T.WALL || t === T.DOOR_SEALED) continue;
+      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET) continue;
       q.push([nx, ny]);
     }
   }
@@ -2847,7 +2848,19 @@ function triggerAvalanche() {
     setTile(t.x, t.y, T.RUBBLE);
     filled++;
   }
+  // Verify player can still reach downstairs after the avalanche
   if (filled > 0) {
+    let sx = -1, sy = -1;
+    for (let i = 0; i < state.map.length; i++) {
+      if (state.map[i] === T.STAIRS_DOWN) { sx = i % MAP_W; sy = Math.floor(i / MAP_W); break; }
+    }
+    if (sx >= 0 && !bfsReachable(state.player.x, state.player.y, sx, sy)) {
+      // Undo: revert rubble back to floor
+      for (const t of tiles) {
+        if (getTile(t.x, t.y) === T.RUBBLE) setTile(t.x, t.y, T.FLOOR);
+      }
+      return; // silently cancel avalanche
+    }
     addMessage('The earth rumbles! Rocks collapse in a nearby chamber.', 'damage');
     haptic(60);
     Audio.hit();
@@ -3971,8 +3984,12 @@ function processEnemies() {
     const canDetect = dist <= enemy.detect - stealthBonus - rogueBonus && !playerInvis;
 
     if (canDetect && hasLOS(enemy.x, enemy.y, state.player.x, state.player.y)) {
+      // Stealth enemy reveal
+      if (enemy.alertness < 2 && enemy.special === 'stealth') {
+        addMessage(`A ${enemy.name} materializes from the shadows!`, 'damage');
+      }
       // Ninja/Rogue sense approaching enemies
-      if (enemy.alertness < 2 && (state.player.classId === 'rogue' || state.player.classId === 'ninja')) {
+      else if (enemy.alertness < 2 && (state.player.classId === 'rogue' || state.player.classId === 'ninja')) {
         addMessage(`You sense a ${enemy.name} approaching!`, 'damage');
       }
       enemy.alertness = 2;
@@ -7226,6 +7243,12 @@ function render() {
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
 
+    // Stealth enemies are invisible until within 3 tiles (or hostile)
+    if (e.special === 'stealth' && e.alertness < 2) {
+      const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
+      if (dist > 3) continue; // completely invisible at distance
+    }
+
     // Mimic looks like a chest until adjacent
     if (e.special === 'mimic' && e.alertness < 2) {
       const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
@@ -9398,6 +9421,11 @@ function renderMinimap() {
     if (e.type !== 'enemy' || e.hp <= 0) continue;
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
+    // Stealth enemies hidden on minimap until close or hostile
+    if (e.special === 'stealth' && e.alertness < 2) {
+      const dist = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
+      if (dist > 3) continue;
+    }
     ctx.fillStyle = e.isAlly ? '#40c040' : '#ff4040';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
@@ -9866,9 +9894,13 @@ function throwProjectile(dx, dy, isSecondShot) {
     }
   }
 
-  // Animation
+  // Animation — delay endTurn until projectile animation finishes so enemies
+  // don't move while the projectile is still visually in flight
   const projGlyph = isAcidBolt ? '☣️' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
-  animateProjectile(p.x, p.y, landX, landY, projGlyph);
+  // Check if double shot will fire after this — if so, don't attach endTurn callback to this animation
+  const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && (p.infiniteArrows || p.arrows > 0);
+  const deferEndTurn = true; // always defer endTurn until animation completes
+  animateProjectile(p.x, p.y, landX, landY, projGlyph, willDoubleShot ? null : () => { updateUI(); render(); endTurn(); });
 
   // Acid bolt: apply poison on hit, set cooldown
   if (isAcidBolt) {
@@ -9969,9 +10001,12 @@ function throwProjectile(dx, dy, isSecondShot) {
     }
   }
 
-  updateUI();
-  render();
-  endTurn();
+  // If endTurn was deferred to animation callback, skip here
+  if (!deferEndTurn) {
+    updateUI();
+    render();
+    endTurn();
+  }
 }
 
 // === MINI-BOSS SPAWNING ===
