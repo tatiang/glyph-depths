@@ -853,7 +853,7 @@ function showClassSelect() {
 
   // Arrow key navigation for class pager
   function classKeyNav(e) {
-    if (!$('class-section') || $('class-section').style.display === 'none') return;
+    if (!$('title-screen') || !$('title-screen').classList.contains('active') || $('class-section').style.display === 'none') return;
     if (e.key === 'ArrowRight' && currentPage < pages.length - 1) { goToPage(currentPage + 1); e.preventDefault(); e.stopPropagation(); }
     else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); e.stopPropagation(); }
   }
@@ -6429,7 +6429,7 @@ function renderCloudSlots(container, fromTitle) {
       const info = save.playerInfo || {};
       const div = document.createElement('div');
       div.className = 'save-slot';
-      div.innerHTML = '<div class="save-slot-header"><span class="save-slot-name">' + (info.classIcon || '') + ' ' + (info.name || 'Unknown') + '</span><span class="save-slot-meta">' + (info.className || '') + '</span></div><div class="save-slot-details">Floor ' + (info.floor || '?') + ' · Lv.' + (info.level || '?') + ' · ' + (info.hp || '?') + '/' + (info.maxHp || '?') + ' HP<span class="save-slot-time">' + timeSince(save.timestamp) + '</span></div>';
+      div.innerHTML = '<div class="save-slot-header"><span class="save-slot-name">' + (info.classIcon || '') + ' ' + (info.name || 'Unknown') + (info.epithet ? ' ' + info.epithet : '') + '</span><span class="save-slot-meta">' + (info.className || '') + '</span></div><div class="save-slot-details">Floor ' + (info.floor || '?') + ' · Lv.' + (info.level || '?') + ' · ' + (info.hp || '?') + '/' + (info.maxHp || '?') + ' HP<span class="save-slot-time">' + timeSince(save.timestamp) + '</span></div>';
       const btnRow = document.createElement('div');
       btnRow.className = 'save-slot-actions';
       const loadBtn = document.createElement('button');
@@ -6612,7 +6612,8 @@ function cloudSaveGame(slotName) {
     displayName: firebaseUser.displayName || '',
     slotName: slotName || 'Cloud Save',
     playerInfo: {
-      name: state.player.name,
+      name: state.playerName || 'Unknown',
+      epithet: state.playerEpithet || '',
       className: CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer',
       classIcon: CLASS_DEFS.find(c => c.id === state.player.classId)?.icon || '?',
       floor: state.floor,
@@ -8048,7 +8049,7 @@ function setupInput() {
 
     // Arrow key navigation for config pager (only when config overlay is visible)
     document.addEventListener('keydown', (e) => {
-      if (!$('config-overlay') || !$('config-overlay').classList.contains('active')) return;
+      if (!$('settings-overlay') || !$('settings-overlay').classList.contains('active')) return;
       if (e.key === 'ArrowRight' && currentPage < totalPages - 1) { goToPage(currentPage + 1); e.preventDefault(); }
       else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); }
     });
@@ -8419,7 +8420,9 @@ function setupUI() {
         inputLocked = false;
         state.gameOver = true;
         state.player.hp = 0;
-        showDeath('Gave up the run');
+        saveGhost();
+        saveHighScore();
+        showTitle();
       };
       yesBtn.addEventListener('click', confirmFn);
       yesBtn.addEventListener('touchend', (e) => { e.preventDefault(); confirmFn(); }, { passive: false });
