@@ -1767,8 +1767,7 @@ function generateBossFloor() {
       setTile(x, y, T.CORRIDOR);
     }
   }
-  // Stairs up at entrance
-  setTile(2, room.y + Math.floor(room.h / 2), T.STAIRS_UP);
+  // No upstairs — player can only descend
   // Player start
   state.player.x = 5;
   state.player.y = room.y + Math.floor(room.h / 2);
@@ -2667,11 +2666,28 @@ function spawnSpecialTiles() {
 }
 
 // Spawn invisible teleport tiles (1-2 per floor, starting floor 3)
+// Never place in the same room as the downstairs
 function spawnTeleportTiles() {
+  // Find the room containing stairs down
+  let stairsRoom = null;
+  for (let i = 0; i < state.map.length; i++) {
+    if (state.map[i] === T.STAIRS_DOWN) {
+      const sx = i % MAP_W, sy = Math.floor(i / MAP_W);
+      stairsRoom = state.rooms.find(r => sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h);
+      break;
+    }
+  }
   const count = 1 + (Math.random() < 0.4 ? 1 : 0);
   for (let i = 0; i < count; i++) {
-    const pos = randomRoomFloorTile();
-    if (pos) setTile(pos.x, pos.y, T.TELEPORT);
+    for (let attempts = 0; attempts < 50; attempts++) {
+      const pos = randomRoomFloorTile();
+      if (!pos) break;
+      // Reject if in the stairs room
+      if (stairsRoom && pos.x >= stairsRoom.x && pos.x < stairsRoom.x + stairsRoom.w &&
+          pos.y >= stairsRoom.y && pos.y < stairsRoom.y + stairsRoom.h) continue;
+      setTile(pos.x, pos.y, T.TELEPORT);
+      break;
+    }
   }
 }
 
@@ -4863,7 +4879,7 @@ function playerDescend() {
       const firstRoom = state.rooms[0];
       state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
       state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
-      setTile(state.player.x, state.player.y, T.STAIRS_UP);
+      // Player starts on regular floor (no upstairs in this game)
     }
     addMessage(`You descend to floor ${state.floor}...`, '');
     if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
@@ -6737,8 +6753,8 @@ function render() {
           tileColor = '#80ff80';
           break;
         case T.STAIRS_UP:
-          tileGlyph = '▲';
-          tileColor = '#ffff80';
+          tileGlyph = '·';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
           break;
         case T.DOOR_CLOSED:
           tileGlyph = '+';
@@ -7026,13 +7042,22 @@ function render() {
     ctx.font = `${Math.floor(ts * 0.7)}px serif`;
     ctx.fillText(e.glyph, sx, sy);
 
+    // Green ally indicator ring
+    if (e.isAlly) {
+      ctx.strokeStyle = '#40e040';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, ts * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // HP bar for damaged enemies
     if (e.hp < e.maxHp) {
       const barW = ts - 4;
       const barH = 2;
       const barX = (e.x - camX) * ts + 2;
       const barY = (e.y - camY) * ts;
-      ctx.fillStyle = '#c04040';
+      ctx.fillStyle = e.isAlly ? '#206020' : '#c04040';
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = '#40c040';
       ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
@@ -7292,10 +7317,10 @@ function updateUI() {
     } else if (cls === 'darkwizard') {
       spRow.style.display = '';
       if (p.acidBoltCooldown > 0) {
-        setBtn(`🟢 BOLT ${p.acidBoltCooldown}t`, false);
+        setBtn(`☣️ BOLT ${p.acidBoltCooldown}t`, false);
         setBar(((7 - p.acidBoltCooldown) / 7) * 100, '#44cc44');
       } else {
-        setBtn('🟢 ACID BOLT', true, '#44cc44');
+        setBtn('☣️ ACID BOLT', true, '#44cc44');
         setBar(100, '#44cc44');
       }
     } else if (cls === 'mason') {
@@ -8020,7 +8045,7 @@ function handleLongPress(clientX, clientY) {
       else if (item.item.defense) desc = `+${item.item.defense} Defense`;
     } else {
       const tile = getTile(mx, my);
-      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Stairs Up', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.DOOR_ONEWAY]: 'One-Way Door', [T.DOOR_SEALED]: 'Sealed Passage', [T.SPECIAL]: 'Mysterious Glyph', [T.TELEPORT_VIS]: 'Teleport Glyph' };
+      const tileNames = { [T.WALL]: 'Wall', [T.FLOOR]: 'Floor', [T.CORRIDOR]: 'Corridor', [T.STAIRS_DOWN]: 'Stairs Down', [T.STAIRS_UP]: 'Floor', [T.DOOR_CLOSED]: 'Closed Door', [T.DOOR_OPEN]: 'Open Door', [T.DOOR_ONEWAY]: 'One-Way Door', [T.DOOR_SEALED]: 'Sealed Passage', [T.SPECIAL]: 'Mysterious Glyph', [T.TELEPORT_VIS]: 'Teleport Glyph' };
       name = tileNames[tile] || 'Unknown';
     }
   }
@@ -8069,6 +8094,12 @@ function setupUI() {
       btn.textContent = 'View Stats';
     }
   });
+  const closeDeathStatsFn = () => {
+    $('death-full-stats').style.display = 'none';
+    $('btn-death-stats').textContent = 'View Stats';
+  };
+  $('btn-close-death-stats').addEventListener('click', closeDeathStatsFn);
+  $('btn-close-death-stats').addEventListener('touchend', (e) => { e.preventDefault(); closeDeathStatsFn(); }, { passive: false });
   $('btn-restart').addEventListener('click', () => {
     saveGhost();
     saveHighScore();
@@ -8354,7 +8385,7 @@ function showSettings() {
           break;
         case 'darkwizard':
           abilities.push({ icon: '💀', name: 'Necromancy', desc: `${Math.min(30, 8 + 2 * (p.level || 1))}% chance slain foes rise as allies` });
-          abilities.push({ icon: '🟢', name: 'Acid Bolt', desc: `Ranged poison attack (${p.acidBoltCooldown > 0 ? p.acidBoltCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '☣️', name: 'Acid Bolt', desc: `Ranged poison attack (${p.acidBoltCooldown > 0 ? p.acidBoltCooldown + 't CD' : 'Ready'})` });
           break;
         case 'mason':
           abilities.push({ icon: '🧱', name: 'Fortify', desc: `Build/demolish walls (${p.fortifyCharges}/${p.fortifyMaxCharges || 2} charges)` });
@@ -8397,7 +8428,7 @@ function showSettings() {
         { flag: 'fireWard', icon: '🔥', name: 'Fire Ward', desc: 'Cast fire spheres around you' },
         { flag: 'doubleShot', icon: '🏹', name: 'Double Shot', desc: 'Fire 2 arrows in one turn' },
         { flag: 'silentKill', icon: '💨', name: 'Silent Kill', desc: 'Kills grant/refresh stealth (2 turns)' },
-        { flag: 'necroticSurge', icon: '🟢', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
+        { flag: 'necroticSurge', icon: '☣️', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
         { flag: 'recklessCharge', icon: '🤸', name: 'Reckless Charge', desc: 'Flip strikes healthy enemies (>75% HP)' },
         { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
         { flag: 'sharpDealer', icon: '🎁', name: 'Sharp Dealer', desc: 'Every 3rd purchase grants a free item' },
@@ -8929,7 +8960,7 @@ function renderMinimap() {
           ctx.fillStyle = '#00e060';
           break;
         case T.STAIRS_UP:
-          ctx.fillStyle = '#60c0ff';
+          ctx.fillStyle = vis ? biome.floorVis : biome.floorDim;
           break;
         case T.DOOR_CLOSED:
           ctx.fillStyle = (state.rogueClosedDoors && state.rogueClosedDoors.has(idx)) ? '#40a0a0' : '#8B6914';
@@ -8975,10 +9006,10 @@ function renderMinimap() {
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const tile = state.map[y * MAP_W + x];
-        if (tile === T.STAIRS_DOWN || tile === T.STAIRS_UP) {
+        if (tile === T.STAIRS_DOWN) {
           const explored = state.explored[y * MAP_W + x];
           if (!explored) {
-            ctx.fillStyle = tile === T.STAIRS_DOWN ? 'rgba(0,224,96,0.5)' : 'rgba(96,192,255,0.5)';
+            ctx.fillStyle = 'rgba(0,224,96,0.5)';
             ctx.fillRect(x * scale, y * scale, scale, scale);
           }
         }
@@ -8994,14 +9025,11 @@ function renderMinimap() {
     for (let x = 0; x < MAP_W; x++) {
       const idx = y * MAP_W + x;
       const tile = state.map[idx];
-      const show = state.explored[idx] || (state.player.pathfinder && (tile === T.STAIRS_DOWN || tile === T.STAIRS_UP));
+      const show = state.explored[idx] || (state.player.pathfinder && tile === T.STAIRS_DOWN);
       if (!show) continue;
       if (tile === T.STAIRS_DOWN) {
         ctx.fillStyle = '#003818';
         ctx.fillText('▼', x * scale + scale / 2, y * scale + scale / 2);
-      } else if (tile === T.STAIRS_UP) {
-        ctx.fillStyle = '#002840';
-        ctx.fillText('▲', x * scale + scale / 2, y * scale + scale / 2);
       }
     }
   }
@@ -9108,10 +9136,7 @@ function renderMinimap() {
   // Row 1: stairs
   const row3 = ly + 30;
   ctx.fillStyle = '#00e060'; ctx.fillRect(4, row3, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Down', 12, row3 - 1);
-
-  ctx.fillStyle = '#60c0ff'; ctx.fillRect(54, row3, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Up', 62, row3 - 1);
+  ctx.fillStyle = '#aaa'; ctx.fillText('Stairs', 12, row3 - 1);
 
   // Row 2: entities
   const row4 = ly + 46;
@@ -9524,7 +9549,7 @@ function throwProjectile(dx, dy, isSecondShot) {
   }
 
   // Animation
-  const projGlyph = isAcidBolt ? '🟢' : (isAimedShot || isRangedShot) ? '🏹' : '🗡️';
+  const projGlyph = isAcidBolt ? '☣️' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
   animateProjectile(p.x, p.y, landX, landY, projGlyph);
 
   // Acid bolt: apply poison on hit, set cooldown
@@ -9532,7 +9557,7 @@ function throwProjectile(dx, dy, isSecondShot) {
     if (!hit) addMessage('The acid bolt splashes into the darkness.', '');
     else if (hitTarget && hitTarget.hp > 0) {
       addStatusEffect(hitTarget, 'poison', 5);
-      addMessage(`🟢 ${hitTarget.name} is coated in acid! (poison)`, 'good');
+      addMessage(`☣️ ${hitTarget.name} is coated in acid! (poison)`, 'good');
     }
     // Necrotic Surge: splash poison to adjacent enemies on hit
     if (p.necroticSurge && hit && hitTarget) {
@@ -9542,7 +9567,7 @@ function throwProjectile(dx, dy, isSecondShot) {
           const adj = enemyAt(ax, ay);
           if (adj && adj.hp > 0 && !adj.isAlly) {
             addStatusEffect(adj, 'poison', 3);
-            addMessage(`🟢 Necrotic Surge poisons ${adj.name}!`, 'good');
+            addMessage(`☣️ Necrotic Surge poisons ${adj.name}!`, 'good');
           }
         }
       }
@@ -10005,7 +10030,7 @@ function activateAcidBolt() {
     item: { name: 'Acid Bolt', damage: p.attack, ammo: Infinity, itemType: 'acid_bolt', range: 10 },
     index: -1
   };
-  addMessage('🟢 Acid Bolt — choose direction!', 'good');
+  addMessage('☣️ Acid Bolt — choose direction!', 'good');
   updateUI();
   render();
 }
