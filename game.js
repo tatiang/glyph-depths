@@ -11246,4 +11246,21 @@ function conjureRation() {
 // === BOOT ===
 document.addEventListener('DOMContentLoaded', boot);
 
+// Handle bfcache page restoration (iOS PWA force-quit/reopen, Chrome back navigation).
+// DOMContentLoaded does NOT re-fire after a bfcache restore — only pageshow does.
+// Canvas content is NOT preserved in bfcache, so we must repaint after restoration.
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return; // normal fresh load — boot() already handled it
+  if (state && !state.gameOver && !state.victory) {
+    // Mid-game restore: canvas is blank, repaint the dungeon
+    setupCanvas();
+    computeFOV();
+    render();
+    updateUI();
+  } else if (!state) {
+    // No game in progress (at title screen or never started): re-show title
+    showTitle();
+  }
+});
+
 })();
