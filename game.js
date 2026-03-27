@@ -6022,6 +6022,8 @@ function serializeState() {
     const val = state[key];
     if (val instanceof Uint8Array) {
       s[key] = { _uint8: true, data: Array.from(val) };
+    } else if (val instanceof Map) {
+      s[key] = { _map: true, data: Array.from(val.entries()) };
     } else if (val instanceof Set) {
       s[key] = { _set: true, data: Array.from(val) };
     } else if (key === 'ghost') {
@@ -6045,6 +6047,7 @@ function loadFromRaw(raw) {
     const s = saveData.state;
     for (const key of Object.keys(s)) {
       if (s[key] && s[key]._uint8) s[key] = new Uint8Array(s[key].data);
+      else if (s[key] && s[key]._map) s[key] = new Map(s[key].data);
       else if (s[key] && s[key]._set) s[key] = new Set(s[key].data);
     }
     state = s;
