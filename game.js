@@ -1029,6 +1029,7 @@ function createPlayer(classId = 'adventurer') {
     encore: false,
     songOfRestCooldown: 0,
     songOfRestFloorUsed: false,
+    enemiesKilledThisFloor: 0,
     // Artificer
     tinkerFloorUsed: false,
     masterSmith: false,
@@ -1037,6 +1038,7 @@ function createPlayer(classId = 'adventurer') {
     starThrowCooldown: 0,
     // Dark Wizard
     necromancer: classId === 'darkwizard',
+    necroBonus: 0,
     acidBoltCooldown: 0,
     // Brick Mason
     fortifyCharges: 2,
@@ -1052,6 +1054,8 @@ function createPlayer(classId = 'adventurer') {
     mirrorImage: false,
     // Barterer
     bartererDiscount: classId === 'barterer',
+    bartererFreeRefresh: classId === 'barterer',
+    bartererAppraiseUsed: false,
     // Wizard fire ward perk
     fireWard: false,
     fireWardCooldown: 0,
@@ -1060,7 +1064,9 @@ function createPlayer(classId = 'adventurer') {
     // Sage
     sageClass: classId === 'sage',
     scrollMastery: classId === 'sage',
-    ancientTongue: false
+    ancientTongue: false,
+    // Soul Amulet
+    soulFragments: 0
   };
 }
 
@@ -1072,6 +1078,7 @@ function applyMasteryBonuses(classId) {
   if (m.defense > 0)    { p.defense += m.defense; }
   if (m.critChance > 0) { p.critChance += m.critChance; }
   if (m.charmBonus > 0) { p.charmChance += m.charmBonus; }
+  if (m.necroBonus > 0) { p.necroBonus = (p.necroBonus || 0) + m.necroBonus; }
   if (m.startGold > 0)  { p.gold += m.startGold; }
 }
 
@@ -1263,7 +1270,8 @@ const RINGS = [
   { name: 'Ring of Sight', glyph: '💍', itemType: 'ring', special: 'sight', value: 50 },
   { name: 'Ring of Haste', glyph: '💍', itemType: 'ring', special: 'haste', value: 60 },
   { name: 'Ring of Protection', glyph: '💍', itemType: 'ring', special: 'protection', value: 55 },
-  { name: 'Ring of Hunger', glyph: '💍', itemType: 'ring', special: 'hunger', value: 45 }
+  { name: 'Ring of Hunger', glyph: '💍', itemType: 'ring', special: 'hunger', value: 45 },
+  { name: 'Soul Amulet', glyph: '📿', itemType: 'ring', special: 'soul', desc: 'Collects soul fragments from kills. Spend for powerful effects.', value: 30 }
 ];
 
 const FOOD = { name: 'Ration', glyph: '🍖', itemType: 'food', value: 5 };
@@ -1462,6 +1470,8 @@ function generateFloor() {
   if (state.player.classId === 'bard') {
     state.player.songOfRestFloorUsed = false;
   }
+  // Reset per-floor kill counter
+  state.player.enemiesKilledThisFloor = 0;
 
   // Artificer: reset tinker each floor
   if (state.player.classId === 'artificer') {
@@ -1472,6 +1482,8 @@ function generateFloor() {
   state.masonWalls = new Map();
   // Escape Artist: reset escape route each floor
   state.player.stairsTeleportFloorUsed = false;
+  // Barterer: reset free refresh and appraise each floor
+  if (state.player.classId === 'barterer') { state.player.bartererFreeRefresh = true; state.player.bartererAppraiseUsed = false; }
 
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
@@ -2250,6 +2262,58 @@ function renderSageServices(sage) {
   }
   container.appendChild(blessDiv);
 
+  // Enchanted Lantern (if player doesn't already have one)
+  const hasLantern = p.inventory.some(it => it.itemType === 'lantern');
+  const LANTERN_COST = finalPrice(35);
+  const lanternDiv = document.createElement('div');
+  lanternDiv.className = 'shop-item';
+  if (!hasLantern) {
+    lanternDiv.innerHTML = `<span>🔦 Enchanted Lantern</span><span class="price">${LANTERN_COST}💰</span>`;
+    lanternDiv.addEventListener('click', () => {
+      if (p.gold >= LANTERN_COST) {
+        p.gold -= LANTERN_COST;
+        p.inventory.push({ name: 'Enchanted Lantern', glyph: '🔦', itemType: 'lantern', desc: 'Use Oil Flasks to light. +3 FOV when lit.', value: 35, indestructible: true });
+        addMessage('You purchase an Enchanted Lantern!', 'good');
+        Audio.gold();
+        renderSageServices(sage);
+        updateUI();
+      } else {
+        addMessage("Not enough gold.", 'damage');
+      }
+    });
+  } else {
+    lanternDiv.innerHTML = `<span style="color:var(--text-dim)">🔦 Enchanted Lantern</span><span style="color:var(--text-dim)">Already owned</span>`;
+    lanternDiv.style.opacity = '0.4';
+    lanternDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(lanternDiv);
+
+  // Alchemist's Mortar (if player doesn't already have one)
+  const hasMortar = p.inventory.some(it => it.itemType === 'mortar');
+  const MORTAR_COST = finalPrice(30);
+  const mortarDiv = document.createElement('div');
+  mortarDiv.className = 'shop-item';
+  if (!hasMortar) {
+    mortarDiv.innerHTML = `<span>🧪 Alchemist's Mortar</span><span class="price">${MORTAR_COST}💰</span>`;
+    mortarDiv.addEventListener('click', () => {
+      if (p.gold >= MORTAR_COST) {
+        p.gold -= MORTAR_COST;
+        p.inventory.push({ name: "Alchemist's Mortar", glyph: '🧪', itemType: 'mortar', desc: 'Combine 2 potions + herb to brew powerful elixirs.', value: 30, indestructible: true });
+        addMessage("You purchase an Alchemist's Mortar!", 'good');
+        Audio.gold();
+        renderSageServices(sage);
+        updateUI();
+      } else {
+        addMessage("Not enough gold.", 'damage');
+      }
+    });
+  } else {
+    mortarDiv.innerHTML = `<span style="color:var(--text-dim)">🧪 Alchemist's Mortar</span><span style="color:var(--text-dim)">Already owned</span>`;
+    mortarDiv.style.opacity = '0.4';
+    mortarDiv.style.pointerEvents = 'none';
+  }
+  container.appendChild(mortarDiv);
+
   // Drop section for inventory management at the sage
   renderDropSection(container, () => renderSageServices(sage));
 }
@@ -2650,6 +2714,14 @@ function generateShopItems(floor) {
       items.push({ item: exclusiveItem, price: exclusiveItem.value + 20, artificerOnly: true });
     }
   }
+  // 20% chance merchant stocks an Oil Flask
+  if (Math.random() < 0.20) {
+    items.push({ item: { name: 'Oil Flask', glyph: '🛢️', itemType: 'oil', desc: 'Fuel for the Enchanted Lantern. +3 FOV.', value: 10 }, price: 10 });
+  }
+  // 15% chance merchant stocks Herbs (if player has mortar)
+  if (state.player && state.player.inventory.some(it => it.itemType === 'mortar') && Math.random() < 0.15) {
+    items.push({ item: { name: 'Herb Bundle', glyph: '🌿', itemType: 'herb', desc: 'Combine with potions in the Alchemist\'s Mortar.', value: 5 }, price: 6 });
+  }
   // 25% chance merchant stocks a random song
   if (Math.random() < 0.25) {
     const songDef = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
@@ -2977,7 +3049,8 @@ const OCTANT_TRANSFORMS = [
 function computeFOV() {
   const p = state.player;
   const rangedSightBonus = (state.player.equipped.ranged?.special === 'sight') ? 1 : 0;
-  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus;
+  const lanternBonus = hasStatusEffect(state.player, 'lanternLit') ? 3 : 0;
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus + lanternBonus;
   state.visible.fill(0);
 
   // Player's tile is always visible
@@ -3067,6 +3140,8 @@ function findPath(sx, sy, gx, gy, phaseThrough) {
       // Don't walk into other enemies
       const other = enemyAt(nx, ny);
       if (other && (nx !== gx || ny !== gy)) continue;
+      // Illusions block pathfinding for enemies (allow walking to goal tile)
+      if (state.entities.some(e => e.type === 'illusion' && e.hp > 0 && e.x === nx && e.y === ny) && (nx !== gx || ny !== gy)) continue;
 
       open.push({ x: nx, y: ny, g: cur.g + 1, h: Math.abs(gx - nx) + Math.abs(gy - ny), parent: cur });
     }
@@ -3365,9 +3440,16 @@ function applyWeaponSpecial(weapon, target) {
 function killEnemy(enemy) {
   state.player.xp += enemy.xp;
   state.enemiesKilled++;
+  state.player.enemiesKilledThisFloor++;
   state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
+
+  // Soul Amulet: collect fragment on kill
+  if (hasRingEffect('soul')) {
+    state.player.soulFragments = Math.min(10, state.player.soulFragments + 1);
+    addMessage(`📿 Soul fragment (${state.player.soulFragments}/10)`, '');
+  }
 
   // Track toughest kill
   if (!state.toughestKill || enemy.xp > state.toughestKill.xp) {
@@ -3409,7 +3491,8 @@ function killEnemy(enemy) {
   if (state.player.classId === 'darkwizard' && state.player.necromancer) {
     const undead = ['Skeleton', 'Wraith', 'Ghost', 'Banshee', 'Arch Lich', 'Void Wraith', 'Mini Slime', 'Hatchling'];
     if (!undead.includes(enemy.name) && enemy.ai !== 'boss' && !enemy.isAlly) {
-      const necroChance = Math.min(0.30, 0.08 + 0.02 * state.player.level);
+      const necroBonus = state.player.necroBonus || 0;
+      const necroChance = Math.min(0.50, 0.25 + necroBonus + 0.02 * state.player.level);
       if (Math.random() < necroChance) {
         const skel = createEnemy(
           { name: 'Skeletal ' + enemy.name, glyph: '💀', hp: Math.max(3, Math.floor(enemy.maxHp / 2)),
@@ -3417,7 +3500,7 @@ function killEnemy(enemy) {
           enemy.x, enemy.y
         );
         skel.isAlly = true;
-        skel.allyTurns = 20;
+        skel.allyTurns = 9999;
         skel.alertness = 2;
         state.entities.push(skel);
         addMessage(`💀 The ${enemy.name} rises to serve you!`, 'good');
@@ -3750,6 +3833,8 @@ function processEntityEffects(entity) {
       if (isPlayer && eff.type === 'lullaby') addMessage('The Lullaby fades.', '');
       if (isPlayer && eff.type === 'dirge') addMessage('The Dirge of Pain fades.', '');
       if (isPlayer && eff.type === 'plenty') addMessage('The Song of Plenty fades.', '');
+      if (isPlayer && eff.type === 'lanternLit') { addMessage('🔦 The lantern flickers out.', ''); computeFOV(); }
+      if (isPlayer && eff.type === 'phasing') addMessage('You solidify again.', '');
     }
   }
 
@@ -3875,24 +3960,37 @@ function wanderAI(enemy) {
 function chaseAI(enemy) {
   if (enemy.alertness < 2) { wanderAI(enemy); return; }
 
-  // Conjurer illusion: enemies prefer the decoy over the player
-  const illusion = state.entities.find(e => e.type === 'illusion');
-  const tx = illusion ? illusion.x : state.player.x;
-  const ty = illusion ? illusion.y : state.player.y;
+  // Conjurer illusion: enemies within 3 tiles MUST target it; farther enemies still prefer it
+  const illusions = state.entities.filter(e => e.type === 'illusion' && e.hp > 0);
+  let target = state.player;
+  if (illusions.length > 0) {
+    const nearestIllusion = illusions.reduce((best, ill) => {
+      const d = Math.abs(enemy.x - ill.x) + Math.abs(enemy.y - ill.y);
+      return (!best || d < best.d) ? { ill, d } : best;
+    }, null);
+    if (nearestIllusion && nearestIllusion.d <= 3) {
+      target = nearestIllusion.ill;
+    } else {
+      // Farther than 3: still prefer illusion over player (existing behavior)
+      target = illusions[0];
+    }
+  }
+  const tx = target.x;
+  const ty = target.y;
 
   const px = state.player.x, py = state.player.y;
   const dist = Math.abs(enemy.x - tx) + Math.abs(enemy.y - ty);
 
   // Adjacent to target — attack it
   if (dist === 1) {
-    if (illusion) {
+    if (target.type === 'illusion') {
       // Attack the illusion: deal damage to it, destroying it when hp runs out
-      illusion.hp--;
-      if (state.visible[illusion.y * MAP_W + illusion.x]) {
+      target.hp--;
+      if (state.visible[target.y * MAP_W + target.x]) {
         addMessage(`${enemy.name} strikes the illusion!`, '');
       }
-      if (illusion.hp <= 0) {
-        removeEntity(illusion);
+      if (target.hp <= 0) {
+        removeEntity(target);
         addMessage('The illusion shatters!', 'good');
       }
     } else {
@@ -4461,8 +4559,8 @@ function playerMove(dx, dy) {
     return;
   }
 
-  // Check walkable
-  if (!isWalkable(nx, ny)) return;
+  // Check walkable (phasing ghosts can walk through walls)
+  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) return;
 
   const oldX = p.x, oldY = p.y;
   p.x = nx;
@@ -4470,14 +4568,19 @@ function playerMove(dx, dy) {
   Audio.step();
   haptic(10);
 
-  // Escape Artist ice trap: leave a trap at old tile if enemies were adjacent
+  // Escape Artist ice trap: leave a trap at old tile if enemies were adjacent (up to 3 active)
   if (p.iceTrapPassive) {
     const wasNearEnemy = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]].some(([ddx, ddy]) => {
       const e = enemyAt(oldX + ddx, oldY + ddy);
       return e && e.hp > 0 && !e.isAlly;
     });
     if (wasNearEnemy) {
-      state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '❄️', name: 'Ice Trap', hazardType: 'ice', turns: 5 });
+      const iceTraps = state.entities.filter(e => e.type === 'hazard' && e.hazardType === 'ice');
+      if (iceTraps.length >= 3) {
+        removeEntity(iceTraps[0]);
+      }
+      state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '❄️', name: 'Ice Trap', hazardType: 'ice', turns: 8 });
+      addMessage('❄️ Ice trap placed!', '');
     }
   }
 
@@ -5041,6 +5144,23 @@ function useItem(item, index) {
       break;
     }
 
+    case 'oil': {
+      const hasLantern = p.inventory.some(it => it.itemType === 'lantern');
+      if (!hasLantern) {
+        addMessage('You need a lantern to use oil flasks.', 'damage');
+        return;
+      }
+      addStatusEffect(p, 'lanternLit', state.player.sageClass ? 80 : 40);
+      addMessage('🔦 You light the lantern! (+3 FOV)', 'good');
+      haptic(30);
+      p.inventory.splice(index, 1);
+      computeFOV();
+      updateUI();
+      render();
+      endTurn();
+      return;
+    }
+
     case 'song': {
       // Need an instrument to play
       const hasInstrument = p.inventory.some(it => it.itemType === 'instrument');
@@ -5117,6 +5237,24 @@ function applyPotionEffect(potion) {
       if (pos) { p.x = pos.x; p.y = pos.y; }
       addMessage('The world blurs around you!', '');
       computeFOV();
+      break;
+    // Brewed potions (Alchemist's Mortar)
+    case 'fortitude':
+      p.maxHp += 5; p.hp += 5;
+      addMessage('You feel permanently tougher! (+5 max HP)', 'good');
+      break;
+    case 'ghostwalk':
+      addStatusEffect(p, 'invisibility', 5);
+      addStatusEffect(p, 'phasing', 5);
+      addMessage('You become a ghost! Invisible and phasing!', 'good');
+      break;
+    case 'elixir':
+      p.maxHp += 3; p.hp = p.maxHp;
+      addMessage('The elixir restores and strengthens you! (+3 max HP, full heal)', 'good');
+      break;
+    case 'potent_healing':
+      p.hp = Math.min(p.maxHp, p.hp + 20);
+      addMessage('Potent healing surges through you! (+20 HP)', 'good');
       break;
   }
 }
@@ -5443,6 +5581,24 @@ function renderShopItems(merchant) {
     div.addEventListener('click', buyHandler);
     div.addEventListener('touchend', (e) => { e.preventDefault(); buyHandler(); }, { passive: false });
     container.appendChild(div);
+  }
+
+  // Barterer free refresh button
+  if (state.player.bartererFreeRefresh) {
+    const freeRefDiv = document.createElement('div');
+    freeRefDiv.className = 'shop-item';
+    freeRefDiv.innerHTML = `<span>🔄 Free Reroll</span><span class="price" style="color:var(--good)">FREE (1/floor)</span>`;
+    const freeRefHandler = () => {
+      merchant.shopItems = generateShopItems(state.floor);
+      state.player.bartererFreeRefresh = false;
+      addMessage('You talk the merchant into showing new wares!', 'good');
+      Audio.gold();
+      renderShopItems(merchant);
+      updateUI();
+    };
+    freeRefDiv.addEventListener('click', freeRefHandler);
+    freeRefDiv.addEventListener('touchend', (e) => { e.preventDefault(); freeRefHandler(); }, { passive: false });
+    container.appendChild(freeRefDiv);
   }
 
   // Refresh stock button
@@ -7259,11 +7415,13 @@ function updateUI() {
       }
     } else if (cls === 'bard') {
       spRow.style.display = '';
+      const bardBonus = Math.min(state.floor, p.enemiesKilledThisFloor);
+      const bardHeal = 3 + bardBonus;
       if (p.songOfRestFloorUsed) {
         setBtn('🎵 SONG ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('🎵 SONG OF REST', true);
+        setBtn(`🎵 SONG (${bardHeal} HP)`, true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'artificer') {
@@ -7489,6 +7647,34 @@ function showItemMenu(item, index, event) {
     }
   } else if (item.itemType === 'song') {
     actions.push({ label: 'Play', fn: () => { useItem(item, index); closeItemMenu(); }});
+  }
+  // Barterer Appraise: free identify for unidentified potions/scrolls (1/floor)
+  if (state.player.bartererDiscount && !state.player.bartererAppraiseUsed &&
+      (item.itemType === 'potion' || item.itemType === 'scroll') && !item.identified) {
+    actions.push({ label: 'Appraise (free)', fn: () => {
+      if (item.itemType === 'potion') {
+        potionIdentified[item.effectId] = true;
+      } else {
+        scrollIdentified[item.effectId] = true;
+      }
+      item.identified = true;
+      item.name = item.trueName;
+      item.desc = item.itemType === 'potion'
+        ? potionNames.find(p => p.id === item.effectId).desc
+        : scrollNames.find(s => s.id === item.effectId).desc;
+      state.player.bartererAppraiseUsed = true;
+      addMessage(`You appraise the item: ${item.name}!`, 'good');
+      // Update all matching items in inventory
+      for (const inv of state.player.inventory) {
+        if (inv.effectId === item.effectId && !inv.identified) {
+          inv.identified = true;
+          inv.name = item.name;
+          inv.desc = item.desc;
+        }
+      }
+      updateUI();
+      closeItemMenu();
+    }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
@@ -8333,7 +8519,9 @@ function showSettings() {
           break;
         case 'bard':
           abilities.push({ icon: '🎶', name: 'Charm', desc: `${Math.round(p.charmChance * 100)}% chance to pacify on hit` });
-          abilities.push({ icon: '🎵', name: 'Song of Rest', desc: `Heal self + allies 3 HP (1/floor)${p.songOfRestFloorUsed ? ' — USED' : ' — Ready'}` });
+          const songBonus = Math.min(state.floor, p.enemiesKilledThisFloor);
+          const songHeal = 3 + songBonus;
+          abilities.push({ icon: '🎵', name: 'Song of Rest', desc: `Heal self + allies ${songHeal} HP (1/floor)${p.songOfRestFloorUsed ? ' — USED' : ' — Ready'}` });
           abilities.push({ icon: '🎤', name: '5% Dodge', desc: 'Natural agility' });
           break;
         case 'artificer':
@@ -8514,6 +8702,13 @@ function showSettings() {
     invisibility: { icon: '👁', text: 'Invisible',   color: '#6080ff' },
     strength:     { icon: '💪', text: 'Strengthened',color: '#ff8040' },
     frozen:       { icon: '❄️', text: 'Frozen',      color: '#40c0ff' },
+    blessed:      { icon: '⚔️', text: 'Blessed',     color: '#ffe060' },
+    courage:      { icon: '🎵', text: 'Courage',     color: '#ff8040' },
+    lullaby:      { icon: '🎵', text: 'Lullaby',     color: '#6080ff' },
+    dirge:        { icon: '🎵', text: 'Dirge',       color: '#ff4040' },
+    plenty:       { icon: '🎵', text: 'Plenty',      color: '#60c040' },
+    lanternLit:   { icon: '🔦', text: 'Lantern',     color: '#ffc040' },
+    phasing:      { icon: '👻', text: 'Phasing',     color: '#a080ff' },
   };
   const effects = p ? (p.statusEffects || []) : [];
   if (effects.length > 0) {
@@ -9332,7 +9527,9 @@ function renderStatusFX() {
     courage:      { icon: '🎵', text: 'Courage', cls: 'fx-strength' },
     lullaby:      { icon: '🎵', text: 'Lullaby', cls: 'fx-invisibility' },
     dirge:        { icon: '🎵', text: 'Dirge',   cls: 'fx-burning' },
-    plenty:       { icon: '🎵', text: 'Plenty',  cls: 'fx-strength' }
+    plenty:       { icon: '🎵', text: 'Plenty',  cls: 'fx-strength' },
+    lanternLit:   { icon: '🔦', text: 'Lantern', cls: 'fx-strength' },
+    phasing:      { icon: '👻', text: 'Phase',   cls: 'fx-invisibility' }
   };
 
   let html = '';
@@ -9837,7 +10034,8 @@ function activateSongOfRest() {
   Audio.resume();
   haptic(40);
   const p = state.player;
-  const healAmount = 3;
+  const bonusHeal = Math.min(state.floor, p.enemiesKilledThisFloor);
+  const healAmount = 3 + bonusHeal;
   p.hp = Math.min(p.maxHp, p.hp + healAmount);
   // Heal allies too
   const allies = state.entities.filter(e => e.type === 'enemy' && e.isAlly && e.hp > 0);
@@ -10033,10 +10231,13 @@ function activateFortify() {
     } else if (t === T.WALL && nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
       // Demolish candidate — non-border wall
       candidates.push({ nx, ny, dx, dy, action: 'demolish' });
+    } else if (t === T.DOOR_OPEN) {
+      // Mason can re-seal open doors
+      candidates.push({ nx, ny, dx, dy, action: 'seal' });
     }
   }
   if (candidates.length === 0) {
-    addMessage('No room to build or demolish here.', '');
+    addMessage('No room to build, demolish, or seal here.', '');
     return;
   }
   Audio.resume();
@@ -10045,7 +10246,9 @@ function activateFortify() {
   state.fortifyCandidates = candidates;
   const hasBuild = candidates.some(c => c.action === 'build');
   const hasDemo = candidates.some(c => c.action === 'demolish');
-  const modeDesc = hasBuild && hasDemo ? 'build or demolish' : hasBuild ? 'build' : 'demolish';
+  const hasSeal = candidates.some(c => c.action === 'seal');
+  const modes = [hasBuild && 'build', hasDemo && 'demolish', hasSeal && 'seal'].filter(Boolean);
+  const modeDesc = modes.join(' or ');
   addMessage(`🧱 Fortify (${p.fortifyCharges} left) — ${modeDesc}! (hold to cancel)`, 'good');
   updateUI();
   render();
@@ -10062,9 +10265,13 @@ function executeFortify(dx, dy) {
   const key = cand.ny * MAP_W + cand.nx;
   if (cand.action === 'build') {
     setTile(cand.nx, cand.ny, T.WALL);
-    state.masonWalls.set(key, 3);
+    state.masonWalls.set(key, 5);
     animateEntityFlash(p.x, p.y, '#a0a0a0');
     addMessage('🧱 You build a wall!', 'good');
+  } else if (cand.action === 'seal') {
+    setTile(cand.nx, cand.ny, T.DOOR_SEALED);
+    animateEntityFlash(p.x, p.y, '#a0a0a0');
+    addMessage('🚪 You seal the door shut!', 'good');
   } else {
     setTile(cand.nx, cand.ny, T.FLOOR);
     state.masonWalls.delete(key);
