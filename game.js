@@ -853,11 +853,11 @@ function showClassSelect() {
 
   // Arrow key navigation for class pager
   function classKeyNav(e) {
-    if (e.key === 'ArrowRight' && currentPage < pages.length - 1) { goToPage(currentPage + 1); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); }
+    if (!$('class-section') || $('class-section').style.display === 'none') return;
+    if (e.key === 'ArrowRight' && currentPage < pages.length - 1) { goToPage(currentPage + 1); e.preventDefault(); e.stopPropagation(); }
+    else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); e.stopPropagation(); }
   }
   document.addEventListener('keydown', classKeyNav);
-  // Clean up when overlay closes (beginBtn starts the game, which hides the overlay)
   pager._classKeyNav = classKeyNav;
 
   goToPage(0);
@@ -6454,8 +6454,8 @@ function cloudSaveGame(slotName) {
     slotName: slotName || 'Cloud Save',
     playerInfo: {
       name: state.player.name,
-      className: state.player.className,
-      classIcon: state.player.classIcon,
+      className: CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer',
+      classIcon: CLASS_DEFS.find(c => c.id === state.player.classId)?.icon || '?',
       floor: state.floor,
       level: state.player.level,
       hp: state.player.hp,
@@ -7721,6 +7721,8 @@ function setupInput() {
       if (state && state.fortifyMode) { state.fortifyMode = false; state.fortifyCandidates = null; addMessage('Fortify cancelled.', ''); updateUI(); render(); return; }
       return;
     }
+
+    if (!state) return;
 
     switch (e.key) {
       case 'ArrowUp': case 'w': playerMove(0, -1); break;
