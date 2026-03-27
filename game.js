@@ -24,8 +24,8 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'v0.9.6 — sage refresh, teleport potions restored'; // updated each push
-const LAST_UPDATED = 'March 26, 2026 at 6:00 PM';
+const GAME_VERSION = 'v0.9.7 — identification persistence, instrument loot, sage DEF'; // updated each push
+const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -1060,7 +1060,8 @@ function createPlayer(classId = 'adventurer') {
     // Sage
     sageClass: classId === 'sage',
     scrollMastery: classId === 'sage',
-    ancientTongue: false
+    ancientTongue: false,
+    defPurchases: 0  // Sage shop: tracks escalating +1 DEF cost
   };
 }
 
@@ -1697,6 +1698,27 @@ function bfsReachable(sx, sy, tx, ty) {
   return false;
 }
 
+// Stricter BFS that also excludes one-way doors and locked doors.
+// Used for avalanche validation where we need to be certain the path is walkable.
+function bfsReachableStrict(sx, sy, tx, ty) {
+  const visited = new Set();
+  const q = [[sx, sy]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    if (x === tx && y === ty) return true;
+    const k = y * MAP_W + x;
+    if (visited.has(k)) continue;
+    visited.add(k);
+    for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      const nx = x + dx, ny = y + dy;
+      const t = getTile(nx, ny);
+      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET || t === T.DOOR_ONEWAY || t === T.DOOR_LOCKED) continue;
+      q.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
 function addOneWayDoors() {
   if (state.floor <= 1 || state.floor >= MAX_FLOOR) return;
 
@@ -2214,19 +2236,10 @@ function renderSageServices(sage) {
         p.gold -= IDENTIFY_COST;
         let count = 0;
         for (const inv of p.inventory) {
-          if (inv.itemType === 'potion' && !inv.identified) {
-            potionIdentified[inv.effectId] = true;
-            inv.name = inv.trueName;
-            inv.identified = true;
-            count++;
-          }
-          if (inv.itemType === 'scroll' && !inv.identified) {
-            scrollIdentified[inv.effectId] = true;
-            inv.name = inv.trueName;
-            inv.identified = true;
-            count++;
-          }
+          if (inv.itemType === 'potion' && !inv.identified) { potionIdentified[inv.effectId] = true; count++; }
+          if (inv.itemType === 'scroll' && !inv.identified) { scrollIdentified[inv.effectId] = true; count++; }
         }
+        refreshIdentifiedItems();
         addMessage(`The sage reveals ${count} item${count === 1 ? '' : 's'}!`, 'good');
         Audio.gold();
         animateEntityFlash(p.x, p.y, '#60c0ff');
@@ -2295,6 +2308,28 @@ function renderSageServices(sage) {
     blessDiv.style.pointerEvents = 'none';
   }
   container.appendChild(blessDiv);
+
+  // +1 Defense (escalating cost per purchase)
+  const DEF_BASE = 15 + (p.defPurchases || 0) * 10;
+  const DEF_COST = finalPrice(DEF_BASE);
+  const defDiv = document.createElement('div');
+  defDiv.className = 'shop-item';
+  defDiv.innerHTML = `<span>🛡️ +1 Defense</span><span class="price">${DEF_COST}💰</span>`;
+  defDiv.addEventListener('click', () => {
+    if (p.gold >= DEF_COST) {
+      p.gold -= DEF_COST;
+      p.defense += 1;
+      p.defPurchases = (p.defPurchases || 0) + 1;
+      addMessage(`The sage hardens your resolve! (+1 DEF, now ${p.defense})`, 'good');
+      Audio.gold();
+      animateEntityFlash(p.x, p.y, '#80b0ff');
+      renderSageServices(sage);
+      updateUI();
+    } else {
+      addMessage("Not enough gold.", 'damage');
+    }
+  });
+  container.appendChild(defDiv);
 
   // Refresh services button
   const REFRESH_COST = finalPrice(30);
@@ -2813,7 +2848,7 @@ function triggerAvalanche() {
     for (let i = 0; i < state.map.length; i++) {
       if (state.map[i] === T.STAIRS_DOWN) { sx = i % MAP_W; sy = Math.floor(i / MAP_W); break; }
     }
-    if (sx >= 0 && !bfsReachable(state.player.x, state.player.y, sx, sy)) {
+    if (sx >= 0 && !bfsReachableStrict(state.player.x, state.player.y, sx, sy)) {
       // Undo: revert rubble back to floor
       for (const t of tiles) {
         if (getTile(t.x, t.y) === T.RUBBLE) setTile(t.x, t.y, T.FLOOR);
@@ -2987,10 +3022,13 @@ function generateRandomItem(floor) {
   } else if (roll < 0.96) {
     // Special arrows
     return { ...SPECIAL_ARROWS[Math.floor(Math.random() * SPECIAL_ARROWS.length)] };
-  } else if (roll < 0.98) {
+  } else if (roll < 0.975) {
     // Song (rare drop)
     const songDef = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
     return makeSong(songDef);
+  } else if (roll < 0.985) {
+    // Instrument (very rare) — lets non-Bards play songs
+    return { name: 'Enchanted Lute', glyph: '🎸', itemType: 'instrument', desc: 'Play songs to create magical effects.', indestructible: true, value: 30 };
   } else {
     // Food
     return { ...FOOD };
@@ -3022,6 +3060,55 @@ function generateMonsterDrop(floor, enemyXp) {
     const pool = [...WEAPONS.filter(w => w.tier <= tier), ...ARMORS.filter(a => a.tier <= tier), ...RANGED_WEAPONS.filter(r => r.tier <= tier)];
     if (pool.length > 0) return maybeCurse(applyFloorBonus({ ...pool[Math.floor(Math.random() * pool.length)] }, floor), state.floor);
     return { ...FOOD };
+  }
+}
+
+// Update ALL existing potion/scroll items in the game to reflect current identification state.
+// Called after any identification event (use, Scroll of Identify, Sage Identify All).
+function refreshIdentifiedItems() {
+  const p = state.player;
+  // Inventory
+  for (const inv of p.inventory) {
+    if (inv.itemType === 'potion' && !inv.identified && potionIdentified[inv.effectId]) {
+      inv.name = inv.trueName; inv.identified = true;
+      const pe = POTION_EFFECTS.find(e => e.id === inv.effectId);
+      if (pe) inv.desc = pe.desc;
+    }
+    if (inv.itemType === 'scroll' && !inv.identified && scrollIdentified[inv.effectId]) {
+      inv.name = inv.trueName; inv.identified = true;
+      const se = SCROLL_EFFECTS.find(e => e.id === inv.effectId);
+      if (se) inv.desc = se.desc;
+    }
+  }
+  // Ground entities
+  for (const e of state.entities) {
+    if (e.type === 'item' && e.item) {
+      if (e.item.itemType === 'potion' && !e.item.identified && potionIdentified[e.item.effectId]) {
+        e.item.name = e.item.trueName; e.item.identified = true;
+        const pe = POTION_EFFECTS.find(p => p.id === e.item.effectId);
+        if (pe) e.item.desc = pe.desc;
+      }
+      if (e.item.itemType === 'scroll' && !e.item.identified && scrollIdentified[e.item.effectId]) {
+        e.item.name = e.item.trueName; e.item.identified = true;
+        const se = SCROLL_EFFECTS.find(s => s.id === e.item.effectId);
+        if (se) e.item.desc = se.desc;
+      }
+    }
+    // Merchant shop items
+    if (e.type === 'merchant' && e.shopItems) {
+      for (const si of e.shopItems) {
+        if (si.item.itemType === 'potion' && !si.item.identified && potionIdentified[si.item.effectId]) {
+          si.item.name = si.item.trueName; si.item.identified = true;
+          const pe = POTION_EFFECTS.find(p => p.id === si.item.effectId);
+          if (pe) si.item.desc = pe.desc;
+        }
+        if (si.item.itemType === 'scroll' && !si.item.identified && scrollIdentified[si.item.effectId]) {
+          si.item.name = si.item.trueName; si.item.identified = true;
+          const se = SCROLL_EFFECTS.find(s => s.id === si.item.effectId);
+          if (se) si.item.desc = se.desc;
+        }
+      }
+    }
   }
 }
 
@@ -3492,7 +3579,7 @@ function killEnemy(enemy) {
       for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
         if (spawned >= (isHydra ? 3 : 2)) break;
         const nx = enemy.x + dx, ny = enemy.y + dy;
-        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny) && !(nx === state.player.x && ny === state.player.y)) {
           const mini = createEnemy(template, nx, ny);
           mini.alertness = 2;
           state.entities.push(mini);
@@ -4061,7 +4148,7 @@ function fleeAI(enemy) {
       const template = ENEMY_TIERS[1][1]; // Skeleton
       for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
         const nx = enemy.x + dx, ny = enemy.y + dy;
-        if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+        if (isWalkable(nx, ny) && !enemyAt(nx, ny) && !(nx === state.player.x && ny === state.player.y)) {
           const minion = createEnemy(template, nx, ny);
           minion.alertness = 2;
           state.entities.push(minion);
@@ -4125,7 +4212,7 @@ function bossAI(enemy) {
     for (const [ddx, ddy] of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]) {
       if (spawned >= maxMinions) break;
       const nx = enemy.x + ddx, ny = enemy.y + ddy;
-      if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+      if (isWalkable(nx, ny) && !enemyAt(nx, ny) && !(nx === state.player.x && ny === state.player.y)) {
         const minion = createEnemy(template, nx, ny);
         minion.alertness = 2;
         state.entities.push(minion);
@@ -5046,24 +5133,10 @@ function useItem(item, index) {
     case 'potion':
       applyPotionEffect(item);
       p.inventory.splice(index, 1);
-      // Identify this potion type
       if (!item.identified) {
         potionIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
-        // Update names of matching potions in inventory
-        for (const inv of p.inventory) {
-          if (inv.itemType === 'potion' && inv.effectId === item.effectId) {
-            inv.name = inv.trueName;
-            inv.identified = true;
-          }
-        }
-        // Update matching potions on the ground (floor entities)
-        for (const e of state.entities) {
-          if (e.type === 'item' && e.item && e.item.itemType === 'potion' && e.item.effectId === item.effectId) {
-            e.item.name = e.item.trueName;
-            e.item.identified = true;
-          }
-        }
+        refreshIdentifiedItems();
       }
       break;
 
@@ -5073,19 +5146,7 @@ function useItem(item, index) {
       if (!item.identified) {
         scrollIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
-        for (const inv of p.inventory) {
-          if (inv.itemType === 'scroll' && inv.effectId === item.effectId) {
-            inv.name = inv.trueName;
-            inv.identified = true;
-          }
-        }
-        // Update matching scrolls on the ground
-        for (const e of state.entities) {
-          if (e.type === 'item' && e.item && e.item.itemType === 'scroll' && e.item.effectId === item.effectId) {
-            e.item.name = e.item.trueName;
-            e.item.identified = true;
-          }
-        }
+        refreshIdentifiedItems();
       }
       break;
 
@@ -5154,6 +5215,8 @@ function useItem(item, index) {
       const hasInstrument = p.inventory.some(it => it.itemType === 'instrument');
       if (!hasInstrument) {
         addMessage('You need an instrument to play songs.', 'damage');
+        updateUI();
+        render();
         return;
       }
       // Non-Bards have 50% failure chance
@@ -5290,19 +5353,12 @@ function applyScrollEffect(scroll) {
       break;
     }
     case 'identify':
-      // Identify all potions and scrolls in inventory
+      // Identify all potions and scrolls in inventory, then update everything
       for (const item of state.player.inventory) {
-        if (item.itemType === 'potion' && !item.identified) {
-          potionIdentified[item.effectId] = true;
-          item.name = item.trueName;
-          item.identified = true;
-        }
-        if (item.itemType === 'scroll' && !item.identified) {
-          scrollIdentified[item.effectId] = true;
-          item.name = item.trueName;
-          item.identified = true;
-        }
+        if (item.itemType === 'potion' && !item.identified) potionIdentified[item.effectId] = true;
+        if (item.itemType === 'scroll' && !item.identified) scrollIdentified[item.effectId] = true;
       }
+      refreshIdentifiedItems();
       addMessage('Your items shimmer with clarity!', 'good');
       break;
     case 'remove_curse': {
@@ -6016,11 +6072,30 @@ function loadFromRaw(raw) {
     $('minimap-overlay').classList.remove('active');
     Audio.init();
     Audio.setEnabled(settings.sound);
+    // Safety net: if rubble blocks path to stairs, clear all rubble
+    fixBlockedStairs();
     computeFOV();
     render();
     updateUI();
     return true;
   } catch { return false; }
+}
+
+// Clear rubble if player cannot reach stairs — fixes saves where avalanche blocked the path
+function fixBlockedStairs() {
+  if (!state || !state.map || !state.player) return;
+  let sx = -1, sy = -1;
+  for (let i = 0; i < state.map.length; i++) {
+    if (state.map[i] === T.STAIRS_DOWN) { sx = i % MAP_W; sy = Math.floor(i / MAP_W); break; }
+  }
+  if (sx < 0) return;
+  if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
+    let cleared = 0;
+    for (let i = 0; i < state.map.length; i++) {
+      if (state.map[i] === T.RUBBLE) { state.map[i] = T.FLOOR; cleared++; }
+    }
+    if (cleared > 0) addMessage('Rubble crumbles, revealing a passable path!', 'good');
+  }
 }
 
 function loadGameFromSlot(slot) {
@@ -6067,6 +6142,8 @@ function loadGameFromSlot(slot) {
     // Track which save slot was loaded (for auto-delete on death)
     state._loadedFromSlot = slot;
 
+    // Safety net: if rubble blocks path to stairs, clear all rubble
+    fixBlockedStairs();
     // Recompute FOV and render
     computeFOV();
     render();
@@ -6286,8 +6363,77 @@ function showLoadOverlay(fromTitle) {
     slotsEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No saved games found.</div>';
   }
 
+  // Cloud load section
+  if (isFirebaseConfigured()) {
+    const cloudSection = document.createElement('div');
+    cloudSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--text-dim);padding-top:12px;';
+    cloudSection.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;">Loading cloud saves...</div>';
+    slotsEl.appendChild(cloudSection);
+    loadFirebaseSDK().then(() => initFirebase()).then(() => {
+      if (!firebaseUser) {
+        cloudSection.innerHTML = '';
+        const signInBtn = document.createElement('button');
+        signInBtn.className = 'save-action-btn save-new';
+        signInBtn.textContent = '🔑 Sign in for Cloud Saves';
+        signInBtn.style.cssText = 'width:100%;margin:8px 0;';
+        const signInFn = () => {
+          cloudSignIn().then(() => renderCloudLoadSection(cloudSection, fromTitle)).catch(err => {
+            cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;font-size:11px;">Sign-in failed: ${err.message || err}</div>`;
+          });
+        };
+        signInBtn.addEventListener('click', signInFn);
+        signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
+        cloudSection.appendChild(signInBtn);
+      } else {
+        renderCloudLoadSection(cloudSection, fromTitle);
+      }
+    }).catch(err => {
+      cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;font-size:11px;">Could not load: ${err.message || err}</div>`;
+    });
+  }
+
   inputLocked = true;
   overlay.classList.add('active');
+}
+
+function renderCloudLoadSection(container, fromTitle) {
+  container.innerHTML = '';
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  header.innerHTML = `<span style="color:var(--accent);font-size:12px;">☁️ ${firebaseUser.displayName || firebaseUser.email}</span>`;
+  container.appendChild(header);
+  cloudListSaves().then(saves => {
+    if (saves.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'text-align:center;color:var(--text-dim);padding:10px;font-size:11px;';
+      empty.textContent = 'No cloud saves found.';
+      container.appendChild(empty);
+      return;
+    }
+    for (const save of saves) {
+      const info = save.playerInfo || {};
+      const div = document.createElement('div');
+      div.className = 'save-slot';
+      div.innerHTML = `<div class="save-slot-header"><span class="save-slot-name">${info.classIcon || ''} ${info.name || 'Unknown'}</span><span class="save-slot-meta">${info.className || ''}</span></div><div class="save-slot-details">Floor ${info.floor || '?'} · Lv.${info.level || '?'} · ${info.hp || '?'}/${info.maxHp || '?'} HP<span class="save-slot-time">${timeSince(save.timestamp)}</span></div>`;
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'save-action-btn save-new';
+      loadBtn.textContent = '▶️ Load';
+      const loadFn = () => {
+        cloudLoadGame(save.slotName).then(ok => {
+          if (ok) {
+            closeLoadOverlay();
+            if (fromTitle) $('title-screen').classList.remove('active');
+          }
+        });
+      };
+      loadBtn.addEventListener('click', loadFn);
+      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+      div.appendChild(loadBtn);
+      container.appendChild(div);
+    }
+  }).catch(err => {
+    container.innerHTML = `<div style="color:#ff6040;padding:6px;text-align:center;font-size:11px;">Could not list cloud saves: ${err.message || err}</div>`;
+  });
 }
 
 function closeSaveOverlay() {
