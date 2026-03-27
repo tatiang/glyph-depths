@@ -618,22 +618,6 @@ const CLASS_DEFS = [
   }
 ];
 
-// === CLASS DEFINITIONS ===
-const CLASS_DEFS = {
-  '🧝': { name: 'Conjurer', desc: 'Place illusions that taunt and block enemies', abilityIcon: '👻', abilityLabel: 'Illusion' },
-  '🥷': { name: 'Escape Artist', desc: 'Leave ice traps that freeze pursuing enemies', abilityIcon: '❄️', abilityLabel: 'Trap' },
-  '🧛': { name: 'Dark Wizard', desc: 'Raise slain foes as undead allies', abilityIcon: '💀', abilityLabel: 'Raise' },
-  '🧟': { name: 'Brick Mason', desc: 'Fortify positions with walls and doors', abilityIcon: '🧱', abilityLabel: 'Fortify' },
-  '🧞': { name: 'Barterer', desc: 'Haggle with merchants and appraise items', abilityIcon: '🪙', abilityLabel: 'Appraise' },
-  '🧚': { name: 'Bard', desc: 'Song of Rest heals more with each kill', abilityIcon: '🎵', abilityLabel: 'Song' },
-  '🦸': { name: 'Adventurer', desc: 'No special abilities — classic mode' },
-  '🏹': { name: 'Adventurer', desc: 'No special abilities — classic mode' },
-  '🐉': { name: 'Adventurer', desc: 'No special abilities — classic mode' }
-};
-
-function getPlayerClass() {
-  return CLASS_DEFS[settings.heroIcon] || CLASS_DEFS['🦸'];
-}
 
 // Potion/scroll name randomization for the run
 let potionNames = [];
@@ -8018,16 +8002,6 @@ function updateUI() {
     hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
   }
   $('hp-bar').style.backgroundColor = hpColor;
-
-  // Class ability button
-  const classDef = getPlayerClass();
-  if (classDef.abilityIcon) {
-    $('btn-ability').style.display = '';
-    $('ability-icon').textContent = classDef.abilityIcon;
-    $('ability-label').textContent = classDef.abilityLabel;
-  } else {
-    $('btn-ability').style.display = 'none';
-  }
 
   // Messages
   const msgLog = $('msg-log');
