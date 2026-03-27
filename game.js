@@ -618,6 +618,23 @@ const CLASS_DEFS = [
   }
 ];
 
+// === CLASS DEFINITIONS ===
+const CLASS_DEFS = {
+  '🧝': { name: 'Conjurer', desc: 'Place illusions that taunt and block enemies', abilityIcon: '👻', abilityLabel: 'Illusion' },
+  '🥷': { name: 'Escape Artist', desc: 'Leave ice traps that freeze pursuing enemies', abilityIcon: '❄️', abilityLabel: 'Trap' },
+  '🧛': { name: 'Dark Wizard', desc: 'Raise slain foes as undead allies', abilityIcon: '💀', abilityLabel: 'Raise' },
+  '🧟': { name: 'Brick Mason', desc: 'Fortify positions with walls and doors', abilityIcon: '🧱', abilityLabel: 'Fortify' },
+  '🧞': { name: 'Barterer', desc: 'Haggle with merchants and appraise items', abilityIcon: '🪙', abilityLabel: 'Appraise' },
+  '🧚': { name: 'Bard', desc: 'Song of Rest heals more with each kill', abilityIcon: '🎵', abilityLabel: 'Song' },
+  '🦸': { name: 'Adventurer', desc: 'No special abilities — classic mode' },
+  '🏹': { name: 'Adventurer', desc: 'No special abilities — classic mode' },
+  '🐉': { name: 'Adventurer', desc: 'No special abilities — classic mode' }
+};
+
+function getPlayerClass() {
+  return CLASS_DEFS[settings.heroIcon] || CLASS_DEFS['🦸'];
+}
+
 // Potion/scroll name randomization for the run
 let potionNames = [];
 let scrollNames = [];
@@ -1332,6 +1349,15 @@ const GLYPH_RUNES = [
 
 // Rune tile type — we'll use a special entity, not a tile type, to avoid changing T constants
 // Rune entities: { type: 'rune', x, y, glyph: '✦', rune: GLYPH_RUNES[i] }
+
+// === SPECIALTY ITEMS ===
+const SPECIALTY_ITEMS = {
+  lantern: { name: 'Enchanted Lantern', glyph: '🔦', itemType: 'ring', special: 'lantern', value: 55, desc: 'Equip as ring. Use Oil Flasks to fuel (+3 FOV while lit)' },
+  oil: { name: 'Oil Flask', glyph: '🛢️', itemType: 'oil', value: 8, desc: 'Fuel for Enchanted Lantern (+20 turns of light)' },
+  soulAmulet: { name: 'Soul Amulet', glyph: '📿', itemType: 'ring', special: 'soul', value: 60, desc: 'Collect soul fragments from kills. Spend 5 to heal 10 HP' },
+  mortar: { name: "Alchemist's Mortar", glyph: '🧪', itemType: 'mortar', value: 40, desc: 'Combine 3 herbs to brew a random potion' },
+  herb: { name: 'Cave Herb', glyph: '🌿', itemType: 'herb', value: 3, desc: 'Ingredient for brewing. Collect 3 + mortar to brew a potion' }
+};
 
 // === ENEMY DEFINITIONS ===
 const ENEMY_TIERS = {
@@ -3065,7 +3091,7 @@ function applyFloorBonus(item, floor) {
 function generateRandomItem(floor) {
   const roll = Math.random();
   const tier = Math.ceil(floor / 3);
-  if (roll < 0.25) {
+  if (roll < 0.22) {
     // Weapon
     const pool = WEAPONS.filter(w => w.tier <= tier + (Math.random() < 0.15 ? 1 : 0));
     return maybeCurse(applyFloorBonus({ ...pool[Math.floor(Math.random() * pool.length)] }, floor), floor);
@@ -3077,7 +3103,7 @@ function generateRandomItem(floor) {
     // Potion
     const p = potionNames[Math.floor(Math.random() * potionNames.length)];
     return makePotion(p);
-  } else if (roll < 0.8) {
+  } else if (roll < 0.72) {
     // Scroll
     const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
     return makeScroll(s);
@@ -3720,6 +3746,17 @@ function killEnemy(enemy) {
       addMessage(`${enemy.name} drops ${drop.name}!`, 'gold');
     }
   }
+
+  // Bard: track kills for Song of Rest
+  if (state.player.playerClass === 'Bard') {
+    state.player.classState.floorKills++;
+  }
+
+  // Dark Wizard: necromancy chance
+  darkWizardNecromancy(enemy);
+
+  // Soul Amulet: collect fragment
+  soulAmuletCollect();
 
   addMessage(`${enemy.name} is destroyed! (+${enemy.xp} XP)`, 'good');
   removeEntity(enemy);
@@ -5154,6 +5191,15 @@ function playerDescend() {
   haptic(30);
   checkBadgesOnFloorChange();
 
+  // Reset per-floor class abilities
+  const cs = state.player.classState;
+  cs.haggledThisFloor = false;
+  cs.appraisedThisFloor = false;
+  cs.floorKills = 0;
+  cs.iceTraps = [];
+  cs.fortifiedThisFloor = false;
+  cs.illusionEntity = null;
+
   // Fade transition
   $('fade').classList.add('active');
   inputLocked = true;
@@ -5235,6 +5281,8 @@ function useItem(item, index) {
       else if (item.special === 'sight') addMessage('Your vision sharpens.', 'good');
       else if (item.special === 'haste') addMessage('You feel quicker on your feet.', 'good');
       else if (item.special === 'hunger') addMessage('Your hunger fades slightly.', 'good');
+      else if (item.special === 'lantern') addMessage('The lantern hums softly. Use Oil Flasks to fuel it.', 'good');
+      else if (item.special === 'soul') addMessage('The amulet pulses with dark energy.', 'good');
       Audio.useItem();
       break;
 
@@ -5560,6 +5608,307 @@ function applyScrollEffect(scroll) {
         addMessage('Your inventory is too full for food!', 'damage');
       }
       break;
+    }
+  }
+}
+
+// === CLASS ABILITIES ===
+function useClassAbility() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  switch (p.playerClass) {
+    case 'Conjurer': conjurerPlaceIllusion(); break;
+    case 'Escape Artist': escapeArtistPlaceTrap(); break;
+    case 'Dark Wizard': addMessage('Your dark power activates passively on kills.', ''); break;
+    case 'Brick Mason': brickMasonFortify(); break;
+    case 'Barterer': bartererAppraise(); break;
+    case 'Bard': bardSongOfRest(); break;
+    default: addMessage('No class ability.', ''); break;
+  }
+}
+
+// --- CONJURER: Place illusion with taunt radius ---
+function conjurerPlaceIllusion() {
+  const p = state.player;
+  const cs = p.classState;
+  // Remove old illusion if any
+  if (cs.illusionEntity) {
+    const old = state.entities.find(e => e === cs.illusionEntity);
+    if (old) removeEntity(old);
+    cs.illusionEntity = null;
+  }
+  // Place illusion on an adjacent walkable tile
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  let placed = false;
+  for (const [dx, dy] of dirs) {
+    const nx = p.x + dx, ny = p.y + dy;
+    if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
+      const illusion = {
+        type: 'illusion',
+        x: nx, y: ny,
+        glyph: p.glyph,
+        name: 'Illusion',
+        hp: 1, maxHp: 1,
+        tauntRadius: 3,
+        blocksMovement: true
+      };
+      state.entities.push(illusion);
+      cs.illusionEntity = illusion;
+      addMessage('You conjure an illusion!', 'good');
+      placed = true;
+      break;
+    }
+  }
+  if (!placed) { addMessage('No room for an illusion!', 'damage'); return; }
+  endTurn();
+}
+
+function getIllusionTauntTarget(enemy) {
+  if (!state.player.playerClass === 'Conjurer') return null;
+  const illusion = state.player.classState.illusionEntity;
+  if (!illusion || !state.entities.includes(illusion)) { state.player.classState.illusionEntity = null; return null; }
+  const dist = Math.abs(enemy.x - illusion.x) + Math.abs(enemy.y - illusion.y);
+  if (dist <= illusion.tauntRadius) return illusion;
+  return null;
+}
+
+// --- BARTERER: Appraise unknown item for free ---
+function bartererAppraise() {
+  const p = state.player;
+  const cs = p.classState;
+  if (cs.appraisedThisFloor) { addMessage('You already appraised this floor.', 'damage'); return; }
+  // Find first unidentified potion or scroll in inventory
+  const target = p.inventory.find(it => (it.itemType === 'potion' || it.itemType === 'scroll') && !it.identified);
+  if (!target) { addMessage('No unknown items to appraise.', ''); return; }
+  cs.appraisedThisFloor = true;
+  if (target.itemType === 'potion') {
+    potionIdentified[target.effectId] = true;
+  } else {
+    scrollIdentified[target.effectId] = true;
+  }
+  target.name = target.trueName;
+  target.identified = true;
+  // Identify matching items in inventory
+  for (const inv of p.inventory) {
+    if (inv.itemType === target.itemType && inv.effectId === target.effectId) {
+      inv.name = inv.trueName;
+      inv.identified = true;
+    }
+  }
+  addMessage(`You appraise it: ${target.trueName}!`, 'good');
+  updateUI();
+  render();
+}
+
+// --- BARTERER: Haggle (reroll merchant stock) ---
+function bartererHaggle(merchant) {
+  const cs = state.player.classState;
+  if (cs.haggledThisFloor) { addMessage('You already haggled this floor.', 'damage'); return; }
+  cs.haggledThisFloor = true;
+  merchant.shopItems = generateShopItems(state.floor);
+  addMessage('You haggle aggressively — the merchant restocks!', 'good');
+  // Re-render merchant UI
+  showMerchant(merchant);
+}
+
+// --- DARK WIZARD: Necromancy on kill (25% chance) ---
+function darkWizardNecromancy(enemy) {
+  if (state.player.playerClass !== 'Dark Wizard') return;
+  if (enemy.name === 'Mini Slime' || enemy.isAlly) return;
+  if (Math.random() >= 0.25) return;
+  // Raise as undead ally at enemy's position
+  const undead = createEnemy({
+    name: 'Undead ' + enemy.name, glyph: '💀', hp: Math.ceil(enemy.maxHp * 0.6),
+    attack: Math.max(1, enemy.attack - 1), defense: enemy.defense,
+    ai: 'chase', xp: 0, special: null, detect: 10
+  }, enemy.x, enemy.y);
+  undead.isAlly = true;
+  undead.allyTurns = 99999; // Persist until death
+  undead.alertness = 2;
+  state.entities.push(undead);
+  addMessage(`${enemy.name} rises as your undead servant!`, 'good');
+}
+
+// --- BRICK MASON: Fortify (place walls/doors) ---
+function brickMasonFortify() {
+  const p = state.player;
+  const cs = p.classState;
+  // Show a choice menu: Place Wall or Place Locked Door
+  inputLocked = true;
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  $('levelup-overlay').querySelector('h1').textContent = '🧱 FORTIFY';
+  $('levelup-label').textContent = 'Choose what to build:';
+
+  const options = [
+    { text: 'Place Wall (5 HP)', action: () => brickMasonPlaceWall() },
+    { text: 'Place Locked Door', action: () => brickMasonPlaceDoor() },
+    { text: 'Repair Sealed Door', action: () => brickMasonRepairDoor() },
+    { text: 'Cancel', action: () => { $('levelup-overlay').classList.remove('active'); $('levelup-overlay').querySelector('h1').textContent = '⬆️ LEVEL UP'; inputLocked = false; } }
+  ];
+
+  for (const opt of options) {
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    btn.innerHTML = `<div class="perk-name">${opt.text}</div>`;
+    btn.addEventListener('click', () => {
+      $('levelup-overlay').classList.remove('active');
+      $('levelup-overlay').querySelector('h1').textContent = '⬆️ LEVEL UP';
+      inputLocked = false;
+      opt.action();
+    });
+    container.appendChild(btn);
+  }
+  $('levelup-overlay').classList.add('active');
+}
+
+function brickMasonPlaceWall() {
+  const p = state.player;
+  // Place wall on first adjacent walkable tile (including corridors)
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  for (const [dx, dy] of dirs) {
+    const nx = p.x + dx, ny = p.y + dy;
+    const t = getTile(nx, ny);
+    if ((t === T.FLOOR || t === T.CORRIDOR) && !enemyAt(nx, ny)) {
+      // Place a destructible wall (tracked as hazard with wallHP)
+      state.entities.push({
+        type: 'wall_block',
+        x: nx, y: ny,
+        glyph: '🧱',
+        name: 'Mason Wall',
+        wallHP: 5
+      });
+      setTile(nx, ny, T.WALL);
+      addMessage('You build a sturdy wall!', 'good');
+      endTurn();
+      return;
+    }
+  }
+  addMessage('No room to build a wall!', 'damage');
+}
+
+function brickMasonPlaceDoor() {
+  const p = state.player;
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  for (const [dx, dy] of dirs) {
+    const nx = p.x + dx, ny = p.y + dy;
+    const t = getTile(nx, ny);
+    if ((t === T.FLOOR || t === T.CORRIDOR) && !enemyAt(nx, ny)) {
+      setTile(nx, ny, T.DOOR_CLOSED);
+      addMessage('You construct a locked door!', 'good');
+      endTurn();
+      return;
+    }
+  }
+  addMessage('No room to place a door!', 'damage');
+}
+
+function brickMasonRepairDoor() {
+  const p = state.player;
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  for (const [dx, dy] of dirs) {
+    const nx = p.x + dx, ny = p.y + dy;
+    if (getTile(nx, ny) === T.DOOR_SEALED) {
+      setTile(nx, ny, T.DOOR_CLOSED);
+      addMessage('You repair the sealed door!', 'good');
+      endTurn();
+      return;
+    }
+  }
+  addMessage('No sealed doors nearby to repair.', '');
+}
+
+// --- ESCAPE ARTIST: Place visible ice trap ---
+function escapeArtistPlaceTrap() {
+  const p = state.player;
+  const cs = p.classState;
+  if (cs.iceTraps.length >= 3) { addMessage('Maximum 3 ice traps active!', 'damage'); return; }
+  // Place on player's current tile
+  const trap = { type: 'ice_trap', x: p.x, y: p.y, glyph: '❄️', name: 'Ice Trap' };
+  state.entities.push(trap);
+  cs.iceTraps.push(trap);
+  addMessage('You set an ice trap!', 'good');
+  endTurn();
+}
+
+function checkIceTraps(enemy) {
+  if (state.player.playerClass !== 'Escape Artist') return;
+  const cs = state.player.classState;
+  for (let i = cs.iceTraps.length - 1; i >= 0; i--) {
+    const trap = cs.iceTraps[i];
+    if (enemy.x === trap.x && enemy.y === trap.y) {
+      addStatusEffect(enemy, 'frozen', 2);
+      addMessage(`${enemy.name} triggers an ice trap!`, 'good');
+      removeEntity(trap);
+      cs.iceTraps.splice(i, 1);
+      return;
+    }
+  }
+}
+
+// --- BARD: Song of Rest ---
+function bardSongOfRest() {
+  const p = state.player;
+  const cs = p.classState;
+  const baseHeal = 3;
+  const bonusHeal = Math.min(cs.floorKills, state.floor); // +1 per kill, capped at floor #
+  const totalHeal = baseHeal + bonusHeal;
+  p.hp = Math.min(p.maxHp, p.hp + totalHeal);
+  addMessage(`Song of Rest heals ${totalHeal} HP! (${cs.floorKills} kill bonus)`, 'good');
+  Audio.useItem();
+  endTurn();
+}
+
+// === SPECIALTY ITEM MECHANICS ===
+
+// Alchemist's Mortar: brew 3 herbs into a random potion
+function brewWithMortar(mortarIndex) {
+  const p = state.player;
+  const herbIndices = [];
+  for (let i = 0; i < p.inventory.length; i++) {
+    if (p.inventory[i].itemType === 'herb') herbIndices.push(i);
+  }
+  if (herbIndices.length < 3) {
+    addMessage(`Need 3 herbs to brew (have ${herbIndices.length}).`, 'damage');
+    return;
+  }
+  // Remove 3 herbs (from end to preserve indices)
+  herbIndices.slice(0, 3).sort((a, b) => b - a).forEach(i => p.inventory.splice(i, 1));
+  // Brew a random identified potion
+  const randomPotion = potionNames[Math.floor(Math.random() * potionNames.length)];
+  const brewed = makePotion(randomPotion);
+  brewed.identified = true;
+  brewed.name = brewed.trueName;
+  potionIdentified[randomPotion.id] = true;
+  p.inventory.push(brewed);
+  addMessage(`You brew a ${brewed.name}!`, 'good');
+  Audio.useItem();
+}
+
+// Soul Amulet: collect fragments on kill, spend to heal
+function soulAmuletCollect() {
+  if (state.player.equipped.ring?.special !== 'soul') return;
+  state.player.soulFragments++;
+  addMessage(`Soul fragment collected! (${state.player.soulFragments})`, 'good');
+}
+
+function soulAmuletSpend() {
+  const p = state.player;
+  if (p.equipped.ring?.special !== 'soul') { addMessage('Equip the Soul Amulet first!', 'damage'); return; }
+  if (p.soulFragments < 5) { addMessage(`Need 5 soul fragments (have ${p.soulFragments}).`, 'damage'); return; }
+  p.soulFragments -= 5;
+  p.hp = Math.min(p.maxHp, p.hp + 10);
+  addMessage('You channel soul energy! (+10 HP)', 'good');
+  Audio.useItem();
+}
+
+// Lantern fuel tick — consume 1 fuel per turn when equipped
+function tickLanternFuel() {
+  const p = state.player;
+  if (p.equipped.ring?.special === 'lantern' && p.lanternFuel > 0) {
+    p.lanternFuel--;
+    if (p.lanternFuel === 0) {
+      addMessage('Your lantern sputters out!', 'damage');
     }
   }
 }
@@ -5935,6 +6284,9 @@ function endTurn() {
       addMessage('More creatures are drawn to your presence!', 'damage');
     }
   }
+
+  // Lantern fuel tick
+  tickLanternFuel();
 
   // Enemy turns
   processEnemies();
@@ -7325,13 +7677,30 @@ function render() {
 
   // Draw items (only visible ones)
   for (const e of state.entities) {
-    if (e.type !== 'item' && e.type !== 'hazard') continue;
+    if (e.type !== 'item' && e.type !== 'hazard' && e.type !== 'ice_trap' && e.type !== 'illusion' && e.type !== 'wall_block') continue;
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
 
     const sx = (e.x - camX) * ts + ts / 2;
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+
+    // Ice traps render in cyan
+    if (e.type === 'ice_trap') {
+      ctx.fillStyle = '#00ffff';
+      ctx.font = `${Math.floor(ts * 0.6)}px serif`;
+      ctx.fillText('❄️', sx, sy);
+      continue;
+    }
+
+    // Illusion renders semi-transparent
+    if (e.type === 'illusion') {
+      ctx.globalAlpha = 0.5;
+      ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+      ctx.fillText(e.glyph, sx, sy);
+      ctx.globalAlpha = 1.0;
+      continue;
+    }
 
     ctx.font = `${Math.floor(ts * 0.65)}px serif`;
     if (e.item?.itemType === 'arrows') {
@@ -7612,6 +7981,16 @@ function updateUI() {
     hpColor = hpPct > 60 ? 'var(--hp-high)' : hpPct > 30 ? 'var(--hp-mid)' : 'var(--hp-low)';
   }
   $('hp-bar').style.backgroundColor = hpColor;
+
+  // Class ability button
+  const classDef = getPlayerClass();
+  if (classDef.abilityIcon) {
+    $('btn-ability').style.display = '';
+    $('ability-icon').textContent = classDef.abilityIcon;
+    $('ability-label').textContent = classDef.abilityLabel;
+  } else {
+    $('btn-ability').style.display = 'none';
+  }
 
   // Messages
   const msgLog = $('msg-log');
@@ -8085,6 +8464,24 @@ function showEquippedMenu(eq, event) {
     render();
     closeItemMenu();
   };
+
+  // Soul Amulet: spend fragments
+  if (item.special === 'soul') {
+    const soulBtn = document.createElement('button');
+    soulBtn.textContent = `Channel Souls (5 → +10 HP) [${state.player.soulFragments}]`;
+    const soulFn = () => { soulAmuletSpend(); updateUI(); render(); closeItemMenu(); };
+    soulBtn.addEventListener('click', (e) => { e.stopPropagation(); soulFn(); });
+    soulBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); soulFn(); }, { passive: false });
+    menu.appendChild(soulBtn);
+  }
+
+  // Lantern: show fuel status
+  if (item.special === 'lantern') {
+    const fuelDiv = document.createElement('div');
+    fuelDiv.style.cssText = 'font-size:11px;color:var(--text-dim);padding:4px 0;';
+    fuelDiv.textContent = `Fuel: ${state.player.lanternFuel} turns remaining`;
+    menu.appendChild(fuelDiv);
+  }
 
   const unequipBtn = document.createElement('button');
   unequipBtn.textContent = 'Unequip';
@@ -9051,7 +9448,8 @@ function showSettings() {
   for (const icon of HERO_ICONS) {
     const btn = document.createElement('div');
     btn.className = 'hero-choice' + (settings.heroIcon === icon ? ' selected' : '');
-    btn.textContent = icon;
+    const cd = CLASS_DEFS[icon] || {};
+    btn.innerHTML = `${icon}<div style="font-size:8px;margin-top:2px;color:var(--text-dim)">${cd.name || ''}</div>`;
     btn.setAttribute('role', 'button');
     const selectIcon = () => {
       settings.heroIcon = icon;
