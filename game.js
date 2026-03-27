@@ -963,6 +963,7 @@ function newRun(classId = 'adventurer') {
   }
   addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
+  Audio.startAmbient(getBiomeKey(state.floor));
   updateUI();
   render();
 }
@@ -3738,6 +3739,7 @@ function killEnemy(enemy) {
 function playerDeath(killerName, killerGlyph) {
   state.gameOver = true;
   state.score += state.player.gold + state.floor * 50 + state.player.level * 20;
+  Audio.stopAmbient();
   Audio.death();
   haptic(100);
 
@@ -3831,6 +3833,7 @@ function playerDeath(killerName, killerGlyph) {
 function showVictory() {
   state.victory = true;
   state.score += state.player.gold + 500 + state.player.hp * 5 + state.player.level * 50;
+  Audio.stopAmbient();
   Audio.victory();
   haptic(100);
 
@@ -5146,6 +5149,7 @@ function playerDescend() {
   }
 
   state.floor++;
+  Audio.stopAmbient();
   Audio.descend();
   haptic(30);
   checkBadgesOnFloorChange();
@@ -5168,6 +5172,7 @@ function playerDescend() {
     computeFOV();
     updateUI();
     render();
+    Audio.startAmbient(getBiomeKey(state.floor));
     $('fade').classList.remove('active');
     inputLocked = false;
   }, 400);
@@ -6230,6 +6235,7 @@ function loadFromRaw(raw) {
     Audio.setEnabled(settings.sound);
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
+    Audio.startAmbient(getBiomeKey(state.floor));
     computeFOV();
     render();
     updateUI();
@@ -6294,6 +6300,7 @@ function loadGameFromSlot(slot) {
     // Ensure audio is initialized (in case loading from title)
     Audio.init();
     Audio.setEnabled(settings.sound);
+    Audio.startAmbient(getBiomeKey(state.floor));
 
     // Track which save slot was loaded (for auto-delete on death)
     state._loadedFromSlot = slot;
@@ -9070,6 +9077,7 @@ function showSettings() {
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
     Audio.setEnabled(settings.sound);
+    Audio.setAmbientMuted(!settings.sound);
     $('toggle-sound').classList.toggle('on', settings.sound);
     saveSettings();
   };
@@ -9837,6 +9845,15 @@ function showQuickThrow() {
 }
 
 // === FLOOR BIOMES ===
+function getBiomeKey(floor) {
+  if (floor >= 20) return 'boss';
+  if (floor >= 17) return 'sanctum';
+  if (floor >= 13) return 'abyss';
+  if (floor >= 9)  return 'citadel';
+  if (floor >= 5)  return 'crypt';
+  return 'sewers';
+}
+
 function getFloorBiome(floor) {
   if (floor <= 4) return {
     name: 'The Sewers',
