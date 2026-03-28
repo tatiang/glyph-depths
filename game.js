@@ -722,10 +722,11 @@ function showTitle() {
     badgeCountEl.textContent = count > 0 ? `🏆 ${count}/${BADGE_DEFS.length}` : '';
   }
 
-  // Show/hide continue button based on saved games
-  const loadBtn = $('btn-load-from-title');
-  if (loadBtn) {
-    loadBtn.style.display = hasSavedGames() ? '' : 'none';
+  // Show "Saved Games" button — always visible when Firebase is configured,
+  // otherwise only when local saves exist.
+  const savesBtn = $('btn-saves-from-title');
+  if (savesBtn) {
+    savesBtn.style.display = (hasSavedGames() || isFirebaseConfigured()) ? '' : 'none';
   }
 }
 
@@ -6718,413 +6719,376 @@ function getSaveSlotInfo(slot) {
   } catch { return null; }
 }
 
-function showSaveOverlay() {
-  const overlay = $('save-overlay');
-  const slotsEl = $('save-slots');
-  slotsEl.innerHTML = '';
+function showSavesOverlay(fromTitle) {
+  const overlay = $('saves-overlay');
+  const inner = $('saves-overlay-inner');
+  inner.innerHTML = '';
 
-  // Find if current hero already has a save slot (match by name + class)
+  // Title row with inline close button
+  const titleRow = document.createElement('div');
+  titleRow.className = 'saves-title-row';
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:20px;font-weight:800;letter-spacing:0.08em;color:var(--gold);';
+  titleEl.textContent = 'Saved Games';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'big-btn';
+  closeBtn.style.cssText = 'padding:6px 16px;font-size:13px;min-width:0;margin:0;';
+  closeBtn.textContent = 'Close';
+  const closeFn = () => closeSavesOverlay();
+  closeBtn.addEventListener('click', closeFn);
+  closeBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
+  titleRow.appendChild(titleEl);
+  titleRow.appendChild(closeBtn);
+  inner.appendChild(titleRow);
+
+  // Auth bar (Google sign-in status)
+  const authBar = document.createElement('div');
+  authBar.id = 'saves-auth-bar';
+  inner.appendChild(authBar);
+
+  // Current game save section (shown only when a run is in progress)
+  const gameSection = document.createElement('div');
+  gameSection.id = 'saves-game-section';
+  inner.appendChild(gameSection);
+  _renderSavesGameSection(gameSection);
+
+  // Saves list -- local saves rendered immediately; cloud added async
+  const listEl = document.createElement('div');
+  listEl.id = 'saves-list';
+  inner.appendChild(listEl);
+  _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+
+  inputLocked = true;
+  overlay.classList.add('active');
+
+  // Load Firebase asynchronously, then populate auth bar and cloud saves
+  if (isFirebaseConfigured()) {
+    loadFirebaseSDK().then(() => initFirebase()).then(() => {
+      _renderSavesAuthBar(authBar, listEl, fromTitle);
+      if (firebaseUser) {
+        _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
+        cloudListSaves().then(cloudSaves => {
+          _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
+        }).catch(() => {
+          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        });
+      }
+    }).catch(() => {
+      _renderSavesAuthBar(authBar, listEl, fromTitle);
+    });
+  }
+}
+
+function closeSavesOverlay() {
+  $('saves-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function _getLocalSaves() {
+  const saves = [];
+  for (let i = 1; i <= SAVE_SLOTS; i++) {
+    const info = getSaveSlotInfo(i);
+    if (info) saves.push({ ...info, storage: 'local', slotKey: i });
+  }
+  return saves;
+}
+
+function _renderSavesAuthBar(barEl, listEl, fromTitle) {
+  barEl.innerHTML = '';
+  if (!isFirebaseConfigured()) return;
+
+  const bar = document.createElement('div');
+  bar.className = 'saves-auth-bar';
+
+  if (firebaseUser) {
+    const icon = document.createElement('span');
+    icon.className = 'saves-auth-bar-icon';
+    icon.textContent = '\u2601\uFE0F';
+    const textDiv = document.createElement('div');
+    textDiv.className = 'saves-auth-bar-text';
+    textDiv.innerHTML = '<strong>' + (firebaseUser.displayName || firebaseUser.email) + '</strong>Cloud sync active';
+    const signOutBtn = document.createElement('button');
+    signOutBtn.className = 'saves-auth-btn sign-out';
+    signOutBtn.textContent = 'Sign Out';
+    const fn = () => {
+      cloudSignOut();
+      barEl.innerHTML = '';
+      _renderSavesAuthBar(barEl, listEl, fromTitle);
+      _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+    };
+    signOutBtn.addEventListener('click', fn);
+    signOutBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
+    bar.appendChild(icon);
+    bar.appendChild(textDiv);
+    bar.appendChild(signOutBtn);
+  } else {
+    const icon = document.createElement('span');
+    icon.className = 'saves-auth-bar-icon';
+    icon.textContent = '\uD83D\uDD11';
+    const textDiv = document.createElement('div');
+    textDiv.className = 'saves-auth-bar-text';
+    textDiv.innerHTML = '<strong>Cloud Sync</strong>Sign in with Google to sync saves across devices';
+    const signInBtn = document.createElement('button');
+    signInBtn.className = 'saves-auth-btn';
+    signInBtn.textContent = 'Sign In';
+    const fn = () => {
+      signInBtn.textContent = '...';
+      signInBtn.disabled = true;
+      cloudSignIn().then(() => {
+        barEl.innerHTML = '';
+        _renderSavesAuthBar(barEl, listEl, fromTitle);
+        _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
+        cloudListSaves().then(cloudSaves => {
+          _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
+        }).catch(() => {
+          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        });
+      }).catch(() => {
+        barEl.innerHTML = '';
+        const errBar = document.createElement('div');
+        errBar.className = 'saves-auth-bar';
+        errBar.style.borderColor = '#944';
+        const errText = document.createElement('div');
+        errText.className = 'saves-auth-bar-text';
+        errText.style.color = '#f64';
+        errText.textContent = 'Sign-in failed. Try again or use a different browser on iOS.';
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'saves-auth-btn';
+        retryBtn.textContent = 'Retry';
+        const retryFn = () => { barEl.innerHTML = ''; _renderSavesAuthBar(barEl, listEl, fromTitle); };
+        retryBtn.addEventListener('click', retryFn);
+        retryBtn.addEventListener('touchend', (e) => { e.preventDefault(); retryFn(); }, { passive: false });
+        errBar.appendChild(errText);
+        errBar.appendChild(retryBtn);
+        barEl.appendChild(errBar);
+      });
+    };
+    signInBtn.addEventListener('click', fn);
+    signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
+    bar.appendChild(icon);
+    bar.appendChild(textDiv);
+    bar.appendChild(signInBtn);
+  }
+
+  barEl.appendChild(bar);
+}
+
+function _renderSavesGameSection(sectionEl) {
+  sectionEl.innerHTML = '';
+  if (!state || state.gameOver || state.victory) return;
+
+  const card = document.createElement('div');
+  card.className = 'saves-current-game';
+
+  const label = document.createElement('div');
+  label.className = 'saves-current-game-label';
+  label.textContent = 'Current Run';
+  card.appendChild(label);
+
+  const cls = CLASS_DEFS.find(c => c.id === state.player.classId);
+  const charInfo = document.createElement('div');
+  charInfo.style.cssText = 'font-size:12px;margin-bottom:10px;';
+  charInfo.innerHTML =
+    '<span style="color:var(--gold);font-weight:700;">'
+    + (cls ? cls.icon + ' ' : '') + state.playerName + (state.playerEpithet ? ' ' + state.playerEpithet : '')
+    + '</span> <span style="color:var(--text-dim);">'
+    + (cls ? cls.name : '') + ' \u00B7 Floor ' + state.floor + ' \u00B7 Lv.' + state.player.level + ' \u00B7 ' + state.player.hp + '/' + state.player.maxHp + ' HP'
+    + '</span>';
+  card.appendChild(charInfo);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'saves-save-btn';
+  saveBtn.textContent = '\uD83D\uDCBE Save Current Game';
+  const saveFn = () => {
+    saveBtn.textContent = 'Saving\u2026';
+    saveBtn.disabled = true;
+    _doSaveCurrentGame(saveBtn, sectionEl);
+  };
+  saveBtn.addEventListener('click', saveFn);
+  saveBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
+  card.appendChild(saveBtn);
+
+  sectionEl.appendChild(card);
+}
+
+function _doSaveCurrentGame(saveBtn, sectionEl) {
   const curName = state.playerName || '';
   const curClass = state.player ? state.player.classId : '';
-  let matchedSlot = state._loadedFromSlot || null;
-  if (!matchedSlot) {
+
+  // Find matching local slot (by previous load, then by name+class, then first empty, then slot 1)
+  let localSlot = state._loadedFromSlot || null;
+  if (!localSlot) {
     for (let j = 1; j <= SAVE_SLOTS; j++) {
       const si = getSaveSlotInfo(j);
       if (si && si.playerName === curName) {
         const cls = CLASS_DEFS.find(c => c.name === si.className);
-        if (cls && cls.id === curClass) { matchedSlot = j; break; }
+        if (cls && cls.id === curClass) { localSlot = j; break; }
       }
     }
   }
-
-  // If we found the current hero's slot, prompt to overwrite immediately
-  if (matchedSlot) {
-    const mInfo = getSaveSlotInfo(matchedSlot);
-    if (mInfo) {
-      const promptDiv = document.createElement('div');
-      promptDiv.className = 'save-slot';
-      promptDiv.style.borderColor = 'var(--gold)';
-      const age = timeSince(mInfo.timestamp);
-      promptDiv.innerHTML =
-        `<div style="color:var(--gold);font-weight:700;font-size:12px;margin-bottom:6px;">Update existing save?</div>`
-        + `<div class="save-slot-header">`
-        + `<span class="save-slot-name">${mInfo.classIcon} ${mInfo.playerName} ${mInfo.playerEpithet}</span>`
-        + `<span class="save-slot-meta">${mInfo.className}</span>`
-        + `</div>`
-        + `<div class="save-slot-details">`
-        + `Floor ${mInfo.floor} · Lv.${mInfo.level} · ${mInfo.hp}/${mInfo.maxHp} HP`
-        + `<span class="save-slot-time">${age}</span>`
-        + `</div>`;
-      const btnRow = document.createElement('div');
-      btnRow.className = 'save-slot-actions';
-      const overwriteBtn = document.createElement('button');
-      overwriteBtn.className = 'save-action-btn save-overwrite';
-      overwriteBtn.textContent = '💾 Overwrite';
-      overwriteBtn.style.background = '#2a5a3a';
-      const mSlot = matchedSlot;
-      const mSaveFn = () => {
-        if (saveGameToSlot(mSlot)) {
-          addMessage(`Game saved to slot ${mSlot}.`, 'good');
-          closeSaveOverlay();
-        }
-      };
-      overwriteBtn.addEventListener('click', mSaveFn);
-      overwriteBtn.addEventListener('touchend', (e) => { e.preventDefault(); mSaveFn(); }, { passive: false });
-      btnRow.appendChild(overwriteBtn);
-      promptDiv.appendChild(btnRow);
-      slotsEl.appendChild(promptDiv);
-
-      // Separator
-      const sep = document.createElement('div');
-      sep.style.cssText = 'text-align:center;color:var(--text-dim);font-size:11px;margin:8px 0;';
-      sep.textContent = '— or choose another slot —';
-      slotsEl.appendChild(sep);
+  if (!localSlot) {
+    for (let j = 1; j <= SAVE_SLOTS; j++) {
+      if (!getSaveSlotInfo(j)) { localSlot = j; break; }
     }
   }
+  if (!localSlot) localSlot = 1;
 
-  for (let i = 1; i <= SAVE_SLOTS; i++) {
-    const info = getSaveSlotInfo(i);
-    const slotDiv = document.createElement('div');
-    slotDiv.className = 'save-slot';
-    if (info) {
-      const age = timeSince(info.timestamp);
-      slotDiv.innerHTML =
-        `<div class="save-slot-header">`
-        + `<span class="save-slot-name">${info.classIcon} ${info.playerName} ${info.playerEpithet}</span>`
-        + `<span class="save-slot-meta">${info.className}</span>`
-        + `</div>`
-        + `<div class="save-slot-details">`
-        + `Floor ${info.floor} · Lv.${info.level} · ${info.hp}/${info.maxHp} HP`
-        + `<span class="save-slot-time">${age}</span>`
-        + `</div>`;
-      const btnRow = document.createElement('div');
-      btnRow.className = 'save-slot-actions';
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'save-action-btn save-overwrite';
-      saveBtn.textContent = '💾 Overwrite';
-      const slot = i;
-      const saveFn = () => {
-        if (saveGameToSlot(slot)) {
-          addMessage(`Game saved to slot ${slot}.`, 'good');
-          closeSaveOverlay();
-        }
-      };
-      saveBtn.addEventListener('click', saveFn);
-      saveBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
-      btnRow.appendChild(saveBtn);
+  const localOk = saveGameToSlot(localSlot);
 
-      const delBtn = document.createElement('button');
-      delBtn.className = 'save-action-btn save-delete';
-      delBtn.textContent = '🗑️ Delete';
-      const delFn = () => { deleteSaveSlot(slot); showSaveOverlay(); };
-      delBtn.addEventListener('click', delFn);
-      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
-      btnRow.appendChild(delBtn);
-
-      slotDiv.appendChild(btnRow);
-    } else {
-      slotDiv.innerHTML = `<div class="save-slot-empty">— Empty Slot ${i} —</div>`;
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'save-action-btn save-new';
-      saveBtn.textContent = '💾 Save Here';
-      const slot = i;
-      const saveFn = () => {
-        if (saveGameToSlot(slot)) {
-          addMessage(`Game saved to slot ${slot}.`, 'good');
-          closeSaveOverlay();
-        }
-      };
-      saveBtn.addEventListener('click', saveFn);
-      saveBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
-      slotDiv.appendChild(saveBtn);
-    }
-    slotsEl.appendChild(slotDiv);
+  if (firebaseUser) {
+    const safeKey = curName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20);
+    const cloudSlot = state._cloudLoadedSlot || ('slot_' + safeKey + '_' + curClass);
+    cloudSaveGame(cloudSlot).then(() => {
+      state._cloudLoadedSlot = cloudSlot;
+      addMessage('Game saved locally & to cloud.', 'good');
+      _renderSavesGameSection(sectionEl);
+      const listEl = $('saves-list');
+      if (listEl) {
+        cloudListSaves().then(cloudSaves => {
+          _renderSavesList(listEl, _getLocalSaves(), cloudSaves, false, false);
+        }).catch(() => {
+          _renderSavesList(listEl, _getLocalSaves(), [], false, false);
+        });
+      }
+    }).catch(err => {
+      if (localOk) addMessage('Saved locally. Cloud error: ' + (err.message || err), 'damage');
+      _renderSavesGameSection(sectionEl);
+    });
+  } else {
+    if (localOk) addMessage('Game saved to slot ' + localSlot + '.', 'good');
+    _renderSavesGameSection(sectionEl);
+    const listEl = $('saves-list');
+    if (listEl) _renderSavesList(listEl, _getLocalSaves(), [], false, false);
   }
-
-  // Cloud save section (only if Firebase is configured)
-  if (isFirebaseConfigured()) {
-    showCloudSaveOverlay();
-  }
-
-  inputLocked = true;
-  overlay.classList.add('active');
 }
 
-function showLoadOverlay(fromTitle) {
-  const overlay = $('load-overlay');
-  const slotsEl = $('load-slots');
-  slotsEl.innerHTML = '';
-  let hasSaves = false;
+function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingCloud) {
+  listEl.innerHTML = '';
 
-  for (let i = 1; i <= SAVE_SLOTS; i++) {
-    const info = getSaveSlotInfo(i);
-    const slotDiv = document.createElement('div');
-    slotDiv.className = 'save-slot';
-    if (info) {
-      hasSaves = true;
-      const age = timeSince(info.timestamp);
-      slotDiv.innerHTML =
-        `<div class="save-slot-header">`
-        + `<span class="save-slot-name">${info.classIcon} ${info.playerName} ${info.playerEpithet}</span>`
-        + `<span class="save-slot-meta">${info.className}</span>`
-        + `</div>`
-        + `<div class="save-slot-details">`
-        + `Floor ${info.floor} · Lv.${info.level} · ${info.hp}/${info.maxHp} HP`
-        + `<span class="save-slot-time">${age}</span>`
-        + `</div>`;
-      const loadBtn = document.createElement('button');
-      loadBtn.className = 'save-action-btn save-new';
-      loadBtn.textContent = '▶️ Load';
-      const slot = i;
-      const loadFn = () => {
-        if (loadGameFromSlot(slot)) {
-          closeLoadOverlay();
-          if (fromTitle) {
-            $('title-screen').classList.remove('active');
-          }
+  // Merge local and cloud saves, sort by timestamp descending
+  const allSaves = [];
+  for (const s of (localSaves || [])) {
+    allSaves.push({ ...s, storage: 'local' });
+  }
+  if (Array.isArray(cloudSaves)) {
+    for (const s of cloudSaves) {
+      const info = s.playerInfo || {};
+      allSaves.push({
+        storage: 'cloud',
+        slotKey: s.slotName,
+        playerName: info.name || 'Unknown',
+        playerEpithet: info.epithet || '',
+        className: info.className || '',
+        classIcon: info.classIcon || '',
+        floor: info.floor || '?',
+        level: info.level || '?',
+        hp: info.hp || '?',
+        maxHp: info.maxHp || '?',
+        timestamp: s.timestamp
+      });
+    }
+  }
+
+  allSaves.sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tb - ta;
+  });
+
+  if (allSaves.length === 0 && !loadingCloud) {
+    const empty = document.createElement('div');
+    empty.className = 'saves-empty';
+    empty.innerHTML = 'No saved games found.<br><span style="font-size:11px;opacity:0.7;">Start a game and save your progress to see it here.</span>';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  if (allSaves.length > 0) {
+    const secLabel = document.createElement('div');
+    secLabel.className = 'saves-section-label';
+    secLabel.textContent = 'Your Saves';
+    listEl.appendChild(secLabel);
+  }
+
+  for (const save of allSaves) {
+    const card = document.createElement('div');
+    card.className = 'save-slot';
+    const age = timeSince(save.timestamp);
+    const badge = save.storage === 'cloud'
+      ? '<span class="save-slot-badge cloud">\u2601 CLOUD</span>'
+      : '<span class="save-slot-badge local">LOCAL</span>';
+    card.innerHTML =
+      '<div class="save-slot-header">'
+      + '<span class="save-slot-name">' + (save.classIcon || '') + ' ' + save.playerName + (save.playerEpithet ? ' ' + save.playerEpithet : '') + badge + '</span>'
+      + '<span class="save-slot-meta">' + (save.className || '') + '</span>'
+      + '</div>'
+      + '<div class="save-slot-details">'
+      + 'Floor ' + save.floor + ' \u00B7 Lv.' + save.level + ' \u00B7 ' + save.hp + '/' + save.maxHp + ' HP'
+      + '<span class="save-slot-time">' + age + '</span>'
+      + '</div>';
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'save-slot-actions';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'save-action-btn save-new';
+    loadBtn.textContent = '\u25B6 Load';
+    const loadFn = () => {
+      if (save.storage === 'local') {
+        if (loadGameFromSlot(save.slotKey)) {
+          closeSavesOverlay();
+          if (fromTitle) $('title-screen').classList.remove('active');
         } else {
           addMessage('Failed to load save.', 'damage');
         }
-      };
-      loadBtn.addEventListener('click', loadFn);
-      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
-      slotDiv.appendChild(loadBtn);
-    } else {
-      slotDiv.innerHTML = `<div class="save-slot-empty">— Empty Slot ${i} —</div>`;
-    }
-    slotsEl.appendChild(slotDiv);
-  }
-
-  if (!hasSaves) {
-    slotsEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No saved games found.</div>';
-  }
-
-  // Cloud load section
-  if (isFirebaseConfigured()) {
-    const cloudSection = document.createElement('div');
-    cloudSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--text-dim);padding-top:12px;';
-    cloudSection.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;">Loading cloud saves...</div>';
-    slotsEl.appendChild(cloudSection);
-    loadFirebaseSDK().then(() => initFirebase()).then(() => {
-      if (!firebaseUser) {
-        cloudSection.innerHTML = '';
-        const signInBtn = document.createElement('button');
-        signInBtn.className = 'save-action-btn save-new';
-        signInBtn.textContent = '🔑 Sign in for Cloud Saves';
-        signInBtn.style.cssText = 'width:100%;margin:8px 0;';
-        const signInFn = () => {
-          cloudSignIn().then(() => renderCloudLoadSection(cloudSection, fromTitle)).catch(err => {
-            cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;font-size:11px;">Sign-in failed: ${err.message || err}</div>`;
-          });
-        };
-        signInBtn.addEventListener('click', signInFn);
-        signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
-        cloudSection.appendChild(signInBtn);
       } else {
-        renderCloudLoadSection(cloudSection, fromTitle);
+        cloudLoadGame(save.slotKey).then(ok => {
+          if (ok) {
+            closeSavesOverlay();
+            if (fromTitle) $('title-screen').classList.remove('active');
+          }
+        });
       }
-    }).catch(err => {
-      cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;font-size:11px;">Could not load: ${err.message || err}</div>`;
-    });
-  }
-
-  inputLocked = true;
-  overlay.classList.add('active');
-}
-
-function renderCloudLoadSection(container, fromTitle) {
-  container.innerHTML = '';
-  const header = document.createElement('div');
-  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
-  header.innerHTML = `<span style="color:var(--accent);font-size:12px;">☁️ ${firebaseUser.displayName || firebaseUser.email}</span>`;
-  container.appendChild(header);
-  cloudListSaves().then(saves => {
-    if (saves.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'text-align:center;color:var(--text-dim);padding:10px;font-size:11px;';
-      empty.textContent = 'No cloud saves found.';
-      container.appendChild(empty);
-      return;
-    }
-    for (const save of saves) {
-      const info = save.playerInfo || {};
-      const div = document.createElement('div');
-      div.className = 'save-slot';
-      div.innerHTML = `<div class="save-slot-header"><span class="save-slot-name">${info.classIcon || ''} ${info.name || 'Unknown'}</span><span class="save-slot-meta">${info.className || ''}</span></div><div class="save-slot-details">Floor ${info.floor || '?'} · Lv.${info.level || '?'} · ${info.hp || '?'}/${info.maxHp || '?'} HP<span class="save-slot-time">${timeSince(save.timestamp)}</span></div>`;
-      const loadBtn = document.createElement('button');
-      loadBtn.className = 'save-action-btn save-new';
-      loadBtn.textContent = '▶️ Load';
-      const loadFn = () => {
-        cloudLoadGame(save.slotName).then(ok => {
-          if (ok) {
-            closeLoadOverlay();
-            if (fromTitle) $('title-screen').classList.remove('active');
-          }
-        });
-      };
-      loadBtn.addEventListener('click', loadFn);
-      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
-      div.appendChild(loadBtn);
-      container.appendChild(div);
-    }
-  }).catch(err => {
-    container.innerHTML = `<div style="color:#ff6040;padding:6px;text-align:center;font-size:11px;">Could not list cloud saves: ${err.message || err}</div>`;
-  });
-}
-
-function closeSaveOverlay() {
-  $('save-overlay').classList.remove('active');
-  inputLocked = false;
-}
-
-function closeLoadOverlay() {
-  $('load-overlay').classList.remove('active');
-  inputLocked = false;
-}
-
-function showCloudOverlay(fromTitle) {
-  if (!isFirebaseConfigured()) {
-    addMessage('Cloud saves not configured.', 'damage');
-    return;
-  }
-  const overlay = $('cloud-overlay');
-  const slotsEl = $('cloud-slots');
-  slotsEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">Loading cloud saves...</div>';
-
-  inputLocked = true;
-  overlay.classList.add('active');
-
-  loadFirebaseSDK().then(() => {
-    initFirebase();
-    if (!firebaseUser) {
-      slotsEl.innerHTML = '';
-      const signInBtn = document.createElement('button');
-      signInBtn.className = 'save-action-btn save-new';
-      signInBtn.textContent = '🔑 Sign in with Google';
-      signInBtn.style.cssText = 'width:100%;margin:8px 0;padding:12px;font-size:14px;';
-      const signInFn = () => {
-        cloudSignIn().then(() => renderCloudSlots(slotsEl, fromTitle)).catch(err => {
-          slotsEl.innerHTML = '<div style="color:#ff6040;padding:10px;text-align:center;">Sign-in failed: ' + (err.message || err) + '</div>';
-        });
-      };
-      signInBtn.addEventListener('click', signInFn);
-      signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
-      slotsEl.appendChild(signInBtn);
-    } else {
-      renderCloudSlots(slotsEl, fromTitle);
-    }
-  }).catch(err => {
-    slotsEl.innerHTML = '<div style="color:#ff6040;padding:10px;text-align:center;">Could not load: ' + (err.message || err) + '</div>';
-  });
-}
-
-function renderCloudSlots(container, fromTitle) {
-  container.innerHTML = '';
-
-  // Header with user info and sign out
-  const header = document.createElement('div');
-  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
-  header.innerHTML = '<span style="color:var(--accent);font-size:12px;">☁️ ' + (firebaseUser.displayName || firebaseUser.email) + '</span>';
-  const signOutBtn = document.createElement('button');
-  signOutBtn.textContent = 'Sign Out';
-  signOutBtn.style.cssText = 'font-size:10px;padding:2px 8px;background:var(--bg);color:var(--text-dim);border:1px solid var(--text-dim);border-radius:4px;';
-  const signOutFn = () => { cloudSignOut(); container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:10px;">Signed out.</div>'; };
-  signOutBtn.addEventListener('click', signOutFn);
-  signOutBtn.addEventListener('touchend', (e) => { e.preventDefault(); signOutFn(); }, { passive: false });
-  header.appendChild(signOutBtn);
-  container.appendChild(header);
-
-  // Save to cloud button (only if there's a game in progress)
-  if (state && !state.gameOver) {
-    const saveCloudBtn = document.createElement('button');
-    saveCloudBtn.className = 'save-action-btn save-new';
-    saveCloudBtn.textContent = '☁️ Save Current Game to Cloud';
-    saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;padding:10px;';
-    const saveCloudFn = () => {
-      // Check for existing cloud save matching this character (name + class)
-      const curName = state.playerName || '';
-      const curClass = state.player ? state.player.classId : '';
-      cloudListSaves().then(saves => {
-        let matchedSlot = state._cloudLoadedSlot || null;
-        if (!matchedSlot) {
-          for (const save of saves) {
-            const info = save.playerInfo || {};
-            const cls = CLASS_DEFS.find(c => c.name === info.className);
-            if (info.name === curName && cls && cls.id === curClass) {
-              matchedSlot = save.slotName;
-              break;
-            }
-          }
-        }
-        const slotName = matchedSlot || ('slot_' + (Date.now() % 100000));
-        cloudSaveGame(slotName).then(() => {
-          state._cloudLoadedSlot = slotName;
-          renderCloudSlots(container, fromTitle);
-        }).catch(err => {
-          addMessage('Cloud save failed: ' + (err.message || err), 'damage');
-        });
-      }).catch(() => {
-        // Fallback: save with new slot name
-        const name = 'slot_' + (Date.now() % 100000);
-        cloudSaveGame(name).then(() => { renderCloudSlots(container, fromTitle); }).catch(err => {
-          addMessage('Cloud save failed: ' + (err.message || err), 'damage');
-        });
-      });
     };
-    saveCloudBtn.addEventListener('click', saveCloudFn);
-    saveCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveCloudFn(); }, { passive: false });
-    container.appendChild(saveCloudBtn);
+    loadBtn.addEventListener('click', loadFn);
+    loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
+    btnRow.appendChild(loadBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'save-action-btn save-delete';
+    delBtn.textContent = '\uD83D\uDDD1';
+    const capturedCloud = Array.isArray(cloudSaves) ? cloudSaves : [];
+    const delFn = () => {
+      if (save.storage === 'local') {
+        deleteSaveSlot(save.slotKey);
+        _renderSavesList(listEl, _getLocalSaves(), capturedCloud, fromTitle, false);
+      } else {
+        cloudDeleteSave(save.slotKey).then(() => {
+          cloudListSaves().then(newCloud => {
+            _renderSavesList(listEl, _getLocalSaves(), newCloud, fromTitle, false);
+          }).catch(() => {
+            _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+          });
+        });
+      }
+    };
+    delBtn.addEventListener('click', delFn);
+    delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
+    btnRow.appendChild(delBtn);
+
+    card.appendChild(btnRow);
+    listEl.appendChild(card);
   }
 
-  // List existing cloud saves
-  const listEl = document.createElement('div');
-  listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;font-size:11px;">Loading saves...</div>';
-  container.appendChild(listEl);
-
-  cloudListSaves().then(saves => {
-    listEl.innerHTML = '';
-    if (saves.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;font-size:11px;">No cloud saves yet.</div>';
-      return;
-    }
-    for (const save of saves) {
-      const info = save.playerInfo || {};
-      const div = document.createElement('div');
-      div.className = 'save-slot';
-      div.innerHTML = '<div class="save-slot-header"><span class="save-slot-name">' + (info.classIcon || '') + ' ' + (info.name || 'Unknown') + (info.epithet ? ' ' + info.epithet : '') + '</span><span class="save-slot-meta">' + (info.className || '') + '</span></div><div class="save-slot-details">Floor ' + (info.floor || '?') + ' · Lv.' + (info.level || '?') + ' · ' + (info.hp || '?') + '/' + (info.maxHp || '?') + ' HP<span class="save-slot-time">' + timeSince(save.timestamp) + '</span></div>';
-      const btnRow = document.createElement('div');
-      btnRow.className = 'save-slot-actions';
-      const loadBtn = document.createElement('button');
-      loadBtn.className = 'save-action-btn save-new';
-      loadBtn.textContent = '▶️ Load';
-      const loadFn = () => {
-        cloudLoadGame(save.slotName).then(ok => {
-          if (ok) {
-            closeCloudOverlay();
-            if (fromTitle) $('title-screen').classList.remove('active');
-          }
-        });
-      };
-      loadBtn.addEventListener('click', loadFn);
-      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
-      btnRow.appendChild(loadBtn);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'save-action-btn save-delete';
-      delBtn.textContent = '🗑️';
-      const delFn = () => { cloudDeleteSave(save.slotName).then(() => renderCloudSlots(container, fromTitle)); };
-      delBtn.addEventListener('click', delFn);
-      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
-      btnRow.appendChild(delBtn);
-      div.appendChild(btnRow);
-      listEl.appendChild(div);
-    }
-  });
+  if (loadingCloud) {
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'saves-loading';
+    loadingEl.textContent = '\u2601\uFE0F Loading cloud saves\u2026';
+    listEl.appendChild(loadingEl);
+  }
 }
 
-function closeCloudOverlay() {
-  $('cloud-overlay').classList.remove('active');
-  inputLocked = false;
-}
+
 
 function timeSince(isoStr) {
   try {
@@ -7320,138 +7284,6 @@ function cloudDeleteSave(slotName) {
   const docId = `${firebaseUser.uid}_${slotName}`;
   return firestoreTimeout(firebaseDb.collection('saves').doc(docId).delete()).then(() => {
     addMessage(`☁️ Cloud save deleted: ${slotName}`, '');
-  });
-}
-
-function showCloudSaveOverlay() {
-  if (!isFirebaseConfigured()) {
-    addMessage('Cloud saves not configured. Set Firebase config in game.js.', 'damage');
-    return;
-  }
-
-  const overlay = $('save-overlay');
-  const slotsEl = $('save-slots');
-
-  // Show a loading message while Firebase loads
-  const cloudSection = document.createElement('div');
-  cloudSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--text-dim);padding-top:12px;';
-  cloudSection.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:10px;">Loading cloud saves...</div>';
-  slotsEl.appendChild(cloudSection);
-
-  const doCloud = () => {
-    loadFirebaseSDK().then(() => {
-      return initFirebase();
-    }).then(() => {
-      if (!firebaseUser) {
-        cloudSection.innerHTML = '';
-        const signInBtn = document.createElement('button');
-        signInBtn.className = 'save-action-btn save-new';
-        signInBtn.textContent = '🔑 Sign in with Google';
-        signInBtn.style.cssText = 'width:100%;margin:8px 0;';
-        const signInFn = () => {
-          signInBtn.disabled = true;
-          signInBtn.textContent = '🔑 Signing in...';
-          // Remove previous error if retrying
-          const prevErr = cloudSection.querySelector('.cloud-sign-in-error');
-          if (prevErr) prevErr.remove();
-          cloudSignIn().then(() => showCloudSaveUI(cloudSection)).catch(err => {
-            signInBtn.disabled = false;
-            signInBtn.textContent = '🔑 Sign in with Google';
-            const errDiv = document.createElement('div');
-            errDiv.className = 'cloud-sign-in-error';
-            errDiv.style.cssText = 'color:#ff6040;padding:8px;text-align:center;font-size:11px;';
-            errDiv.textContent = 'Sign-in failed: ' + (err.message || err);
-            cloudSection.appendChild(errDiv);
-          });
-        };
-        signInBtn.addEventListener('click', signInFn);
-        signInBtn.addEventListener('touchend', (e) => { e.preventDefault(); signInFn(); }, { passive: false });
-        cloudSection.appendChild(signInBtn);
-      } else {
-        showCloudSaveUI(cloudSection);
-      }
-    }).catch(err => {
-      cloudSection.innerHTML = `<div style="color:#ff6040;padding:10px;text-align:center;">Could not load cloud saves: ${err.message || err}</div>`;
-    });
-  };
-
-  doCloud();
-}
-
-function showCloudSaveUI(container) {
-  container.innerHTML = '';
-  const header = document.createElement('div');
-  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
-  header.innerHTML = `<span style="color:var(--accent);font-size:12px;">☁️ ${firebaseUser.displayName || firebaseUser.email}</span>`;
-  const signOutBtn = document.createElement('button');
-  signOutBtn.textContent = 'Sign Out';
-  signOutBtn.style.cssText = 'font-size:10px;padding:2px 8px;background:var(--bg);color:var(--text-dim);border:1px solid var(--text-dim);border-radius:4px;';
-  const signOutFn = () => { cloudSignOut(); container.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:10px;">Signed out.</div>'; };
-  signOutBtn.addEventListener('click', signOutFn);
-  signOutBtn.addEventListener('touchend', (e) => { e.preventDefault(); signOutFn(); }, { passive: false });
-  header.appendChild(signOutBtn);
-  container.appendChild(header);
-
-  // Save to cloud button
-  const saveCloudBtn = document.createElement('button');
-  saveCloudBtn.className = 'save-action-btn save-new';
-  saveCloudBtn.textContent = '☁️ Save to Cloud';
-  saveCloudBtn.style.cssText = 'width:100%;margin:4px 0;';
-  const saveCloudFn = () => {
-    saveCloudBtn.disabled = true;
-    saveCloudBtn.textContent = '☁️ Saving...';
-    const name = 'slot_' + (Date.now() % 100000);
-    cloudSaveGame(name).then(() => { showCloudSaveUI(container); }).catch(err => {
-      saveCloudBtn.disabled = false;
-      saveCloudBtn.textContent = '☁️ Save to Cloud';
-      const errDiv = document.createElement('div');
-      errDiv.style.cssText = 'color:#ff6040;padding:6px;text-align:center;font-size:11px;';
-      errDiv.textContent = `Save failed: ${err.message || err}`;
-      container.appendChild(errDiv);
-    });
-  };
-  saveCloudBtn.addEventListener('click', saveCloudFn);
-  saveCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveCloudFn(); }, { passive: false });
-  container.appendChild(saveCloudBtn);
-
-  // List existing cloud saves
-  cloudListSaves().then(saves => {
-    if (saves.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'text-align:center;color:var(--text-dim);padding:10px;font-size:11px;';
-      empty.textContent = 'No cloud saves yet.';
-      container.appendChild(empty);
-      return;
-    }
-    for (const save of saves) {
-      const info = save.playerInfo || {};
-      const div = document.createElement('div');
-      div.className = 'save-slot';
-      div.innerHTML = `<div class="save-slot-header"><span class="save-slot-name">${info.classIcon || ''} ${info.name || 'Unknown'}</span><span class="save-slot-meta">${info.className || ''}</span></div><div class="save-slot-details">Floor ${info.floor || '?'} · Lv.${info.level || '?'} · ${info.hp || '?'}/${info.maxHp || '?'} HP<span class="save-slot-time">${timeSince(save.timestamp)}</span></div>`;
-      const btnRow = document.createElement('div');
-      btnRow.className = 'save-slot-actions';
-      const loadBtn = document.createElement('button');
-      loadBtn.className = 'save-action-btn save-new';
-      loadBtn.textContent = '▶️ Load';
-      const loadFn = () => { cloudLoadGame(save.slotName).then(ok => { if (ok) closeSaveOverlay(); }); };
-      loadBtn.addEventListener('click', loadFn);
-      loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
-      btnRow.appendChild(loadBtn);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'save-action-btn save-delete';
-      delBtn.textContent = '🗑️';
-      const delFn = () => { cloudDeleteSave(save.slotName).then(() => showCloudSaveUI(container)); };
-      delBtn.addEventListener('click', delFn);
-      delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
-      btnRow.appendChild(delBtn);
-      div.appendChild(btnRow);
-      container.appendChild(div);
-    }
-  }).catch(err => {
-    const errDiv = document.createElement('div');
-    errDiv.style.cssText = 'color:#ff6040;padding:6px;text-align:center;font-size:11px;';
-    errDiv.textContent = `Could not list cloud saves: ${err.message || err}`;
-    container.appendChild(errDiv);
   });
 }
 
@@ -8597,10 +8429,8 @@ function setupInput() {
 
     // ESC: close any open overlay, menu, or cancel throw mode
     if (e.key === 'Escape') {
-      // Save/Load overlays
-      if ($('save-overlay').classList.contains('active')) { closeSaveOverlay(); return; }
-      if ($('load-overlay').classList.contains('active')) { closeLoadOverlay(); return; }
-      if ($('cloud-overlay').classList.contains('active')) { closeCloudOverlay(); return; }
+      // Saves overlay
+      if ($('saves-overlay').classList.contains('active')) { closeSavesOverlay(); return; }
       // Item menu
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
@@ -9081,41 +8911,20 @@ function setupUI() {
     closeUpdateLogTopBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeFn(); }, { passive: false });
   }
 
-  // Save/Load buttons in settings
-  const saveGameBtn = $('btn-save-game');
-  if (saveGameBtn) {
-    const saveFn = () => { $('settings-overlay').classList.remove('active'); showSaveOverlay(); };
-    saveGameBtn.addEventListener('click', saveFn);
-    saveGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); saveFn(); }, { passive: false });
-  }
-  const loadGameBtn = $('btn-load-game');
-  if (loadGameBtn) {
-    const loadFn = () => { $('settings-overlay').classList.remove('active'); showLoadOverlay(false); };
-    loadGameBtn.addEventListener('click', loadFn);
-    loadGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
-  }
-  const closeSaveBtn = $('btn-close-save');
-  if (closeSaveBtn) {
-    closeSaveBtn.addEventListener('click', closeSaveOverlay);
-    closeSaveBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeSaveOverlay(); }, { passive: false });
-  }
-  const closeLoadBtn = $('btn-close-load');
-  if (closeLoadBtn) {
-    closeLoadBtn.addEventListener('click', closeLoadOverlay);
-    closeLoadBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLoadOverlay(); }, { passive: false });
-  }
-  const closeCloudBtn = $('btn-close-cloud');
-  if (closeCloudBtn) {
-    closeCloudBtn.addEventListener('click', closeCloudOverlay);
-    closeCloudBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeCloudOverlay(); }, { passive: false });
+  // Saved Games button in settings (replaces separate Save + Load buttons)
+  const savesGameBtn = $('btn-saves-game');
+  if (savesGameBtn) {
+    const fn = () => { $('settings-overlay').classList.remove('active'); showSavesOverlay(false); };
+    savesGameBtn.addEventListener('click', fn);
+    savesGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
   }
 
-  // Load from title screen
-  const loadFromTitle = $('btn-load-from-title');
-  if (loadFromTitle) {
-    const loadTitleFn = () => { Audio.resume(); showLoadOverlay(true); };
-    loadFromTitle.addEventListener('click', loadTitleFn);
-    loadFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); loadTitleFn(); }, { passive: false });
+  // Saved Games from title screen
+  const savesFromTitle = $('btn-saves-from-title');
+  if (savesFromTitle) {
+    const fn = () => { Audio.resume(); showSavesOverlay(true); };
+    savesFromTitle.addEventListener('click', fn);
+    savesFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
   }
 
   // Give Up button
@@ -9168,13 +8977,6 @@ function setupUI() {
     giveUpBtn.addEventListener('touchend', (e) => { e.preventDefault(); giveUpFn(); }, { passive: false });
   }
 
-  // Cloud save/load from title screen
-  const cloudFromTitle = $('btn-cloud-from-title');
-  if (cloudFromTitle) {
-    const cloudTitleFn = () => { Audio.resume(); showCloudOverlay(true); };
-    cloudFromTitle.addEventListener('click', cloudTitleFn);
-    cloudFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); cloudTitleFn(); }, { passive: false });
-  }
 }
 
 function showSettings() {
