@@ -895,6 +895,7 @@ function showClassSelect() {
 
   const startRun = () => {
     if (!selectedClass) return;
+    Audio.resume();
     $('title-screen').classList.remove('active');
     $('title-screen').classList.remove('class-mode');
     newRun(selectedClass);
