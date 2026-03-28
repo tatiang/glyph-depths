@@ -294,37 +294,43 @@ const Audio = (() => {
 
   const BIOME_AUDIO = {
     sewers: [
-      { type: 'sine', freq: 55, gain: 0.04 },
-      { type: 'sine', freq: 82.5, gain: 0.025, detune: -6 },
-      { type: 'noise', freq: 400, gain: 0.015, filter: 'bandpass' }
+      { type: 'sine', freq: 55, gain: 0.10 },
+      { type: 'sine', freq: 110, gain: 0.08, detune: -6 },
+      { type: 'sine', freq: 220, gain: 0.05 },
+      { type: 'noise', freq: 400, gain: 0.05, filter: 'bandpass' }
     ],
     crypt: [
-      { type: 'sine', freq: 73.4, gain: 0.04 },
-      { type: 'triangle', freq: 110, gain: 0.02, detune: 5 },
-      { type: 'sine', freq: 146.8, gain: 0.012, detune: -10 },
-      { type: 'noise', freq: 200, gain: 0.01, filter: 'bandpass' }
+      { type: 'sine', freq: 73.4, gain: 0.10 },
+      { type: 'triangle', freq: 110, gain: 0.07, detune: 5 },
+      { type: 'triangle', freq: 220, gain: 0.05, detune: -10 },
+      { type: 'sine', freq: 146.8, gain: 0.04 },
+      { type: 'noise', freq: 200, gain: 0.04, filter: 'bandpass' }
     ],
     citadel: [
-      { type: 'sawtooth', freq: 49, gain: 0.02 },
-      { type: 'sine', freq: 98, gain: 0.035, detune: 3 },
-      { type: 'triangle', freq: 130.8, gain: 0.015, detune: -5 },
-      { type: 'noise', freq: 600, gain: 0.008, filter: 'bandpass' }
+      { type: 'sawtooth', freq: 49, gain: 0.07 },
+      { type: 'sine', freq: 98, gain: 0.10, detune: 3 },
+      { type: 'triangle', freq: 196, gain: 0.06, detune: -5 },
+      { type: 'triangle', freq: 130.8, gain: 0.05 },
+      { type: 'noise', freq: 600, gain: 0.03, filter: 'bandpass' }
     ],
     abyss: [
-      { type: 'sine', freq: 41.2, gain: 0.045 },
-      { type: 'sine', freq: 61.7, gain: 0.025, detune: -12 },
-      { type: 'noise', freq: 150, gain: 0.02, filter: 'lowpass' }
+      { type: 'sine', freq: 41.2, gain: 0.12 },
+      { type: 'sine', freq: 82.4, gain: 0.08, detune: -12 },
+      { type: 'sine', freq: 164.8, gain: 0.05 },
+      { type: 'noise', freq: 150, gain: 0.06, filter: 'lowpass' }
     ],
     sanctum: [
-      { type: 'sine', freq: 65.4, gain: 0.035 },
-      { type: 'sine', freq: 98, gain: 0.02, detune: 4 },
-      { type: 'triangle', freq: 130.8, gain: 0.015 },
-      { type: 'sine', freq: 523, gain: 0.006, lfo: { rate: 0.3, depth: 8 } }
+      { type: 'sine', freq: 65.4, gain: 0.09 },
+      { type: 'sine', freq: 131, gain: 0.07, detune: 4 },
+      { type: 'sine', freq: 98, gain: 0.05 },
+      { type: 'triangle', freq: 262, gain: 0.04 },
+      { type: 'sine', freq: 523, gain: 0.025, lfo: { rate: 0.3, depth: 8 } }
     ],
     boss: [
-      { type: 'sawtooth', freq: 36.7, gain: 0.025 },
-      { type: 'sine', freq: 55, gain: 0.03, detune: 15 },
-      { type: 'noise', freq: 300, gain: 0.012, filter: 'bandpass', Q: 2.0 }
+      { type: 'sawtooth', freq: 36.7, gain: 0.09 },
+      { type: 'sine', freq: 55, gain: 0.09, detune: 15 },
+      { type: 'sine', freq: 110, gain: 0.06 },
+      { type: 'noise', freq: 300, gain: 0.05, filter: 'bandpass', Q: 2.0 }
     ]
   };
 
