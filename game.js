@@ -27,6 +27,30 @@ const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '�
 const GAME_VERSION = 'v0.9.7 — identification persistence, instrument loot, sage DEF'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
 
+// === FLOOR TRANSITION CARD TEXT ===
+const FLOOR_CARD_TEXT = {
+  1:  'The drowned foundations of Erathis. Water drips from stone that remembers sunlight.',
+  2:  'The water rises.',
+  3:  'Something stirs in the deep channels.',
+  4:  'The last light fades above.',
+  5:  'The air turns cold. Corridors stretch in directions the dead have chosen.',
+  6:  'The dead do not rest easy here.',
+  7:  'Whispers echo from walls that should not speak.',
+  8:  'The deepest crypts hold the oldest bones.',
+  9:  'Runed armor lines the walls. The Citadel\'s knights still remember their orders.',
+  10: 'Steel and stone. The fortress remembers war.',
+  11: 'Banners hang in tatters. The knights march still.',
+  12: 'The final gate. Beyond lies only darkness.',
+  13: 'Reality thins. The darkness here is not empty \u2014 it watches.',
+  14: 'The walls breathe.',
+  15: 'You are not alone in the dark.',
+  16: 'The abyss stares back.',
+  17: 'Crystalline walls hum with glyph energy. The Sanctum is beautiful. It is also a trap.',
+  18: 'The crystals sing a frequency that hurts.',
+  19: 'So close to the throne. The glyphs pulse faster.',
+  20: 'The throne room. The Glyph King waits in perfect silence.',
+};
+
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
   // Combat Mastery
@@ -1417,17 +1441,9 @@ function generateFloor() {
   }
 
   // Announce biome when entering a new region — lore-flavored messages
-  const BIOME_ENTRY = {
-    1: 'The drowned foundations of Erathis. Water drips from stone that remembers sunlight.',
-    5: 'The air turns cold. Corridors stretch in directions the dead have chosen.',
-    9: 'Runed armor lines the walls. The Citadel\'s knights still remember their orders.',
-    13: 'Reality thins. The darkness here is not empty — it watches.',
-    17: 'Crystalline walls hum with glyph energy. The Sanctum is beautiful. It is also a trap.',
-  };
-  BIOME_ENTRY[MAX_FLOOR] = 'The throne room. The Glyph King waits in perfect silence.';
-  if (BIOME_ENTRY[state.floor]) {
+  if (FLOOR_CARD_TEXT[state.floor] && [1, 5, 9, 13, 17, MAX_FLOOR].includes(state.floor)) {
     const biome = getFloorBiome(state.floor);
-    addMessage(`${biome.name}: ${BIOME_ENTRY[state.floor]}`, 'gold');
+    addMessage(biome.name + ': ' + FLOOR_CARD_TEXT[state.floor], 'gold');
   }
 
   // Place stairs down (except boss floor)
@@ -5149,6 +5165,40 @@ function tryAutoEquip(item) {
   }
 }
 
+function showFloorCard(floor, callback) {
+  const biome = getFloorBiome(floor);
+  const isBiomeChange = [1, 5, 9, 13, 17, MAX_FLOOR].includes(floor);
+  const text = FLOOR_CARD_TEXT[floor] || '';
+
+  $('floor-card-biome').textContent = biome.name;
+  $('floor-card-floor').textContent = floor === MAX_FLOOR ? 'The Final Floor' : 'Floor ' + floor;
+  $('floor-card-text').textContent = text;
+  $('floor-card').classList.add('active');
+
+  const duration = isBiomeChange ? 1800 : 1200;
+  let dismissed = false;
+
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    $('floor-card').removeEventListener('click', tapDismiss);
+    $('floor-card').removeEventListener('touchend', tapDismiss);
+    $('floor-card').classList.remove('active');
+    setTimeout(callback, 200);
+  }
+
+  const timer = setTimeout(dismiss, duration);
+
+  function tapDismiss(e) {
+    e.preventDefault();
+    clearTimeout(timer);
+    dismiss();
+  }
+
+  $('floor-card').addEventListener('click', tapDismiss);
+  $('floor-card').addEventListener('touchend', tapDismiss, { passive: false });
+}
+
 function playerDescend() {
   if (inputLocked || state.gameOver || state.victory) return;
   if (state.throwMode) {
@@ -5201,17 +5251,20 @@ function playerDescend() {
       const firstRoom = state.rooms[0];
       state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
       state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
-      // Player starts on regular floor (no upstairs in this game)
     }
-    addMessage(`You descend to floor ${state.floor}...`, '');
+    addMessage('You descend to floor ' + state.floor + '...', '');
     if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
     computeFOV();
     updateUI();
     render();
     Audio.startAmbient(getBiomeKey(state.floor));
-    $('fade').classList.remove('active');
-    inputLocked = false;
-  }, 400);
+
+    // Show floor transition card, then fade back in
+    showFloorCard(state.floor, function() {
+      $('fade').classList.remove('active');
+      inputLocked = false;
+    });
+  }, 200);
 }
 
 function useItem(item, index) {

@@ -932,6 +932,51 @@
 
     #fade.active { opacity: 1; pointer-events: all; }
 
+    /* Floor transition card */
+    #floor-card {
+      position: fixed;
+      inset: 0;
+      z-index: 210;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      padding: 24px;
+      text-align: center;
+    }
+    #floor-card.active { opacity: 1; pointer-events: all; }
+    #floor-card-biome {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    #floor-card-floor {
+      font-size: 15px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+    }
+    #floor-card-text {
+      font-size: 15px;
+      color: var(--text);
+      max-width: 300px;
+      line-height: 1.6;
+      font-style: italic;
+      opacity: 0.85;
+    }
+    #floor-card-hint {
+      position: absolute;
+      bottom: calc(60px + var(--safe-bottom));
+      font-size: 12px;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
     /* Level up flash */
     #canvas-wrap.levelup-flash {
       box-shadow: inset 0 0 40px rgba(240, 192, 64, 0.3);
@@ -1751,6 +1796,12 @@
     <div class="tip-desc" id="tip-desc"></div>
   </div>
 
+  <div id="floor-card">
+    <div id="floor-card-biome"></div>
+    <div id="floor-card-floor"></div>
+    <div id="floor-card-text"></div>
+    <div id="floor-card-hint">tap to continue</div>
+  </div>
   <div id="fade"></div>
 
   <!-- Badge Toast -->
