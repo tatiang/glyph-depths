@@ -22,7 +22,7 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
-let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
+let settings = { sound: true, music: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.7 — identification persistence, instrument loot, sage DEF'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
@@ -968,6 +968,7 @@ function newRun(classId = 'adventurer') {
   addMessage('Bump enemies to attack. Tap items in the bar to Equip/Use/Drop.', '');
   generateFloor();
   Audio.startAmbient(getBiomeKey(state.floor));
+  if (!settings.music) Audio.setAmbientMuted(true);
   updateUI();
   render();
 }
@@ -5210,6 +5211,7 @@ function playerDescend() {
     updateUI();
     render();
     Audio.startAmbient(getBiomeKey(state.floor));
+    if (!settings.music) Audio.setAmbientMuted(true);
     $('fade').classList.remove('active');
     inputLocked = false;
   }, 400);
@@ -6610,6 +6612,7 @@ function loadFromRaw(raw) {
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
     Audio.startAmbient(getBiomeKey(state.floor));
+    if (!settings.music) Audio.setAmbientMuted(true);
     computeFOV();
     render();
     updateUI();
@@ -6675,6 +6678,7 @@ function loadGameFromSlot(slot) {
     Audio.init();
     Audio.setEnabled(settings.sound);
     Audio.startAmbient(getBiomeKey(state.floor));
+    if (!settings.music) Audio.setAmbientMuted(true);
 
     // Track which save slot was loaded (for auto-delete on death)
     state._loadedFromSlot = slot;
@@ -9281,6 +9285,7 @@ function showSettings() {
 
   // Update toggles
   $('toggle-sound').classList.toggle('on', settings.sound);
+  $('toggle-music').classList.toggle('on', settings.music);
   $('toggle-haptics').classList.toggle('on', settings.haptics);
   $('toggle-dpad').classList.toggle('on', settings.dpad);
   $('toggle-autopickup').classList.toggle('on', settings.autopickup);
@@ -9289,8 +9294,19 @@ function showSettings() {
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
     Audio.setEnabled(settings.sound);
-    Audio.setAmbientMuted(!settings.sound);
+    if (!settings.sound) {
+      Audio.setAmbientMuted(true);
+    } else {
+      Audio.setAmbientMuted(!settings.music);
+    }
     $('toggle-sound').classList.toggle('on', settings.sound);
+    saveSettings();
+  };
+
+  $('toggle-music').onclick = () => {
+    settings.music = !settings.music;
+    Audio.setAmbientMuted(!settings.music || !settings.sound);
+    $('toggle-music').classList.toggle('on', settings.music);
     saveSettings();
   };
 
