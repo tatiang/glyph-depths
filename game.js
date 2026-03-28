@@ -1410,12 +1410,16 @@ function generateFloor() {
   p.enrageActive = false;
   p.engageTurnsLeft = 0;
   state.rooms = [];
+  let startX = Math.floor(MAP_W / 2);
+  let startY = Math.floor(MAP_H / 2);
 
   if (state.floor === MAX_FLOOR) {
-    generateBossFloor();
+    ({ x: startX, y: startY } = generateBossFloor());
   } else {
-    generateBSP();
+    ({ x: startX, y: startY } = generateBSP());
   }
+  p.x = startX;
+  p.y = startY;
 
   // Announce biome when entering a new region — lore-flavored messages
   const BIOME_ENTRY = {
@@ -1433,10 +1437,12 @@ function generateFloor() {
 
   // Place stairs down (except boss floor)
   if (state.floor < MAX_FLOOR) {
-    const farthestRoom = getFarthestRoom(p.x, p.y);
-    const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
-    const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
-    setTile(sx, sy, T.STAIRS_DOWN);
+    const farthestRoom = getFarthestRoom(startX, startY);
+    if (farthestRoom) {
+      const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
+      const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+      setTile(sx, sy, T.STAIRS_DOWN);
+    }
   }
 
   // Spawn enemies
@@ -1545,13 +1551,13 @@ function generateBSP() {
   createRooms(root);
   connectRooms(root);
 
-  // Place player in first room
   const firstRoom = state.rooms[0];
-  state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
-  state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
+  const startX = firstRoom ? firstRoom.x + Math.floor(firstRoom.w / 2) : Math.floor(MAP_W / 2);
+  const startY = firstRoom ? firstRoom.y + Math.floor(firstRoom.h / 2) : Math.floor(MAP_H / 2);
 
   // Add some doors
   addDoors();
+  return { x: startX, y: startY };
 }
 
 function splitNode(node, depth) {
@@ -1818,13 +1824,13 @@ function generateBossFloor() {
     }
   }
   // No upstairs — player can only descend
-  // Player start
-  state.player.x = 5;
-  state.player.y = room.y + Math.floor(room.h / 2);
+  const startX = 5;
+  const startY = room.y + Math.floor(room.h / 2);
   // Boss in center
   const boss = createEnemy(BOSS, 25, 25);
   state.entities.push(boss);
   Audio.boss();
+  return { x: startX, y: startY };
 }
 
 // === TILE HELPERS ===
@@ -1851,6 +1857,7 @@ function isTransparent(x, y) {
 }
 
 function getFarthestRoom(fromX, fromY) {
+  if (!state.rooms || state.rooms.length === 0) return null;
   let best = state.rooms[0];
   let bestDist = 0;
   for (const room of state.rooms) {
@@ -5197,18 +5204,9 @@ function playerDescend() {
   setTimeout(() => {
     activeAnimations.length = 0;
     generateFloor();
-    // Place player at stairs up position or first room
-    if (state.floor < MAX_FLOOR) {
-      const firstRoom = state.rooms[0];
-      state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
-      state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
-      // Player starts on regular floor (no upstairs in this game)
-    }
     addMessage(`You descend to floor ${state.floor}...`, '');
     if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
-    computeFOV();
     updateUI();
-    render();
     Audio.startAmbient(getBiomeKey(state.floor));
     $('fade').classList.remove('active');
     inputLocked = false;
