@@ -5215,7 +5215,9 @@ function playerDescend() {
     render();
     Audio.startAmbient(getBiomeKey(state.floor));
     $('fade').classList.remove('active');
-    inputLocked = false;
+    showFloorCard(state.floor, getBiomeKey(state.floor), () => {
+      inputLocked = false;
+    });
   }, 400);
 }
 
@@ -10062,6 +10064,61 @@ function showQuickThrow() {
 }
 
 // === FLOOR BIOMES ===
+// === FLOOR TRANSITION CARD ===
+const FLOOR_CARD_DATA = {
+  sewers: {
+    atmo: 'Water drips from stone that once knew sunlight. The drowned foundations of Erathis swallow every sound you make.'
+  },
+  crypt: {
+    atmo: 'The air turns cold and motionless. These corridors stretch in directions the dead chose for themselves — and now for you.'
+  },
+  citadel: {
+    atmo: 'Runed armor lines the walls in silent rows. The Citadel\'s knights have forgotten their names, but not their orders.'
+  },
+  abyss: {
+    atmo: 'Reality thins at the edges down here. The darkness is not empty — it has been watching you descend from the very first step.'
+  },
+  sanctum: {
+    atmo: 'Crystalline walls hum with concentrated glyph energy. Beautiful, intricate, and engineered to kill you slowly.'
+  },
+  boss: {
+    atmo: 'Perfect silence. The Glyph King has waited an eternity for a worthy end. He does not look afraid.'
+  }
+};
+
+function showFloorCard(floor, biomeKey, onDone) {
+  const card = $('floor-card');
+  const biome = getFloorBiome(floor);
+  const data  = FLOOR_CARD_DATA[biomeKey] || FLOOR_CARD_DATA.sewers;
+
+  $('floor-card-floor').textContent = 'Floor ' + floor;
+  $('floor-card-name').textContent  = biome.name;
+  $('floor-card-atmo').textContent  = data.atmo;
+
+  const HOLD_MS   = 2200;
+  const EXIT_MS   =  350;
+  const SAFETY_MS = EXIT_MS + 400;
+
+  card.classList.remove('fc-exit');
+  card.classList.add('fc-enter');
+
+  setTimeout(function() {
+    card.classList.remove('fc-enter');
+    card.classList.add('fc-exit');
+
+    var finished = false;
+    var finish = function() {
+      if (finished) return;
+      finished = true;
+      card.classList.remove('fc-exit');
+      onDone();
+    };
+
+    card.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, SAFETY_MS);
+  }, HOLD_MS);
+}
+
 function getBiomeKey(floor) {
   if (floor >= 20) return 'boss';
   if (floor >= 17) return 'sanctum';
