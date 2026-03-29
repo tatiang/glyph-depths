@@ -944,14 +944,28 @@
       z-index: 210;
       pointer-events: none;
       opacity: 0;
+      background: transparent;
     }
 
     #floor-card.fc-enter {
       animation: fc-slide-in 0.4s ease-out forwards;
+      pointer-events: all;
+      background: rgba(0, 0, 0, 0.78);
     }
 
     #floor-card.fc-exit {
       animation: fc-slide-out 0.35s ease-in forwards;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.78);
+    }
+
+    .floor-card-tap {
+      margin-top: 20px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      opacity: 0.7;
     }
 
     .floor-card-inner {
@@ -1831,6 +1845,7 @@
       <div class="floor-card-floor" id="floor-card-floor"></div>
       <div class="floor-card-name" id="floor-card-name"></div>
       <div class="floor-card-atmo" id="floor-card-atmo"></div>
+      <div class="floor-card-tap">Tap to continue</div>
     </div>
   </div>
 

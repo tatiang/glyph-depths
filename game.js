@@ -1076,7 +1076,16 @@ function createPlayer(classId = 'adventurer') {
     ancientTongue: false,
     // Soul Amulet
     soulFragments: 0,
-    defPurchases: 0  // Sage shop: tracks escalating +1 DEF cost
+    defPurchases: 0, // Sage shop: tracks escalating +1 DEF cost
+    // Per-floor class ability state (reset each floor in playerDescend)
+    classState: {
+      haggledThisFloor: false,
+      appraisedThisFloor: false,
+      floorKills: 0,
+      iceTraps: [],
+      fortifiedThisFloor: false,
+      illusionEntity: null
+    }
   };
 }
 
@@ -10098,14 +10107,20 @@ function showFloorCard(floor, biomeKey, onDone) {
   $('floor-card-name').textContent  = biome.name;
   $('floor-card-atmo').textContent  = data.atmo;
 
-  const HOLD_MS   = 2200;
   const EXIT_MS   =  350;
   const SAFETY_MS = EXIT_MS + 400;
+  // Minimum display time before tap is accepted (prevents accidental instant-dismiss)
+  const MIN_MS = 600;
 
   card.classList.remove('fc-exit');
   card.classList.add('fc-enter');
 
-  setTimeout(function() {
+  var dismissed = false;
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    card.removeEventListener('click', onTap);
+    card.removeEventListener('touchend', onTap);
     card.classList.remove('fc-enter');
     card.classList.add('fc-exit');
 
@@ -10116,10 +10131,20 @@ function showFloorCard(floor, biomeKey, onDone) {
       card.classList.remove('fc-exit');
       onDone();
     };
-
     card.addEventListener('animationend', finish, { once: true });
     setTimeout(finish, SAFETY_MS);
-  }, HOLD_MS);
+  }
+
+  function onTap(e) {
+    if (e.type === 'touchend') e.preventDefault();
+    dismiss();
+  }
+
+  // Accept tap after minimum display time
+  setTimeout(function() {
+    card.addEventListener('click', onTap);
+    card.addEventListener('touchend', onTap, { passive: false });
+  }, MIN_MS);
 }
 
 function getBiomeKey(floor) {
