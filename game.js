@@ -5207,7 +5207,9 @@ function playerDescend() {
     generateFloor();
     addMessage(`You descend to floor ${state.floor}...`, '');
     if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
+    computeFOV();
     updateUI();
+    render();
     Audio.startAmbient(getBiomeKey(state.floor));
     $('fade').classList.remove('active');
     inputLocked = false;
@@ -8527,6 +8529,7 @@ function setupInput() {
   // Action buttons
   $('btn-pickup').addEventListener('click', () => { Audio.resume(); playerPickup(); });
   $('btn-stairs').addEventListener('click', () => { Audio.resume(); playerDescend(); });
+  $('btn-stairs').addEventListener('touchend', (e) => { e.preventDefault(); Audio.resume(); playerDescend(); }, { passive: false });
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
   $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
