@@ -6788,11 +6788,13 @@ function showSavesOverlay(fromTitle) {
         _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (showSavesOverlay):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', fromTitle, false);
         });
       }
-    }).catch(() => {
+    }).catch(err => {
+      console.error('[Glyph Depths] Firebase init error:', err);
       _renderSavesAuthBar(authBar, listEl, fromTitle);
     });
   }
@@ -6859,8 +6861,9 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
         _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (after sign-in):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', fromTitle, false);
         });
       }).catch(() => {
         barEl.innerHTML = '';
@@ -6965,8 +6968,9 @@ function _doSaveCurrentGame(saveBtn, sectionEl) {
       if (listEl) {
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, false, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], false, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (after save):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', false, false);
         });
       }
     }).catch(err => {
@@ -7014,7 +7018,7 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     return tb - ta;
   });
 
-  if (allSaves.length === 0 && !loadingCloud) {
+  if (allSaves.length === 0 && !loadingCloud && cloudSaves !== 'error') {
     const empty = document.createElement('div');
     empty.className = 'saves-empty';
     empty.innerHTML = 'No saved games found.<br><span style="font-size:11px;opacity:0.7;">Start a game and save your progress to see it here.</span>';
@@ -7085,7 +7089,8 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
         cloudDeleteSave(save.slotKey).then(() => {
           cloudListSaves().then(newCloud => {
             _renderSavesList(listEl, _getLocalSaves(), newCloud, fromTitle, false);
-          }).catch(() => {
+          }).catch(err => {
+            console.error('[Glyph Depths] cloudListSaves error (after delete):', err);
             _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
           });
         });
@@ -7104,6 +7109,13 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadingEl.className = 'saves-loading';
     loadingEl.textContent = '\u2601\uFE0F Loading cloud saves\u2026';
     listEl.appendChild(loadingEl);
+  }
+
+  if (cloudSaves === 'error') {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'padding:10px 12px;margin:6px 0;background:rgba(200,60,60,0.15);border:1px solid #944;border-radius:6px;font-size:12px;color:#f88;';
+    errEl.textContent = 'Could not load cloud saves. Check your connection and try again.';
+    listEl.appendChild(errEl);
   }
 }
 
@@ -7178,11 +7190,28 @@ function initFirebase() {
   // Wait for Firebase Auth to resolve persisted session (currentUser is null until
   // auth state loads asynchronously from localStorage/IndexedDB).
   if (firebaseUser) return Promise.resolve(); // Already signed in this session
-  return new Promise(resolve => {
-    const unsub = firebase.auth().onAuthStateChanged(user => {
-      unsub();
-      if (user) firebaseUser = user;
-      resolve();
+
+  // On iOS standalone (home screen webclip), signInWithPopup is unsupported,
+  // so we use signInWithRedirect instead. On page load after the redirect, we
+  // must call getRedirectResult() to pick up the sign-in credential before
+  // onAuthStateChanged fires.
+  const isStandalone = window.navigator.standalone === true;
+  const redirectCheck = isStandalone
+    ? firebase.auth().getRedirectResult().then(result => {
+        if (result && result.user) firebaseUser = result.user;
+      }).catch(err => {
+        console.error('[Glyph Depths] getRedirectResult error:', err);
+      })
+    : Promise.resolve();
+
+  return redirectCheck.then(() => {
+    if (firebaseUser) return; // Got user from redirect result
+    return new Promise(resolve => {
+      const unsub = firebase.auth().onAuthStateChanged(user => {
+        unsub();
+        if (user) firebaseUser = user;
+        resolve();
+      });
     });
   });
 }
@@ -7190,6 +7219,16 @@ function initFirebase() {
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
+
+  // iOS standalone (home screen webclip) cannot open popups. Use redirect flow instead —
+  // the page will navigate away and return; initFirebase() will pick up the result via
+  // getRedirectResult() on the next load. Return a never-settling promise so callers don't
+  // treat the navigation as a failure.
+  if (window.navigator.standalone === true) {
+    firebase.auth().signInWithRedirect(provider);
+    return new Promise(() => {});
+  }
+
   return new Promise((resolve, reject) => {
     let settled = false;
     function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
@@ -7291,11 +7330,18 @@ function cloudLoadGame(slotName) {
 
 function cloudListSaves() {
   if (!firebaseUser || !firebaseDb) return Promise.resolve([]);
-  return firestoreTimeout(firebaseDb.collection('saves')
-    .where('uid', '==', firebaseUser.uid)
-    .orderBy('timestamp', 'desc')
-    .get()
-  ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  // No .orderBy() here — that would require a composite Firestore index that may not exist.
+  // Client-side sort in _renderSavesList() handles ordering instead.
+  function attempt() {
+    return firestoreTimeout(
+      firebaseDb.collection('saves').where('uid', '==', firebaseUser.uid).get(),
+      15000
+    ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+  return attempt().catch(err => {
+    console.error('[Glyph Depths] cloudListSaves failed, retrying:', err);
+    return attempt();
+  });
 }
 
 function cloudDeleteSave(slotName) {
