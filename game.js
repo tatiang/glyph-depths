@@ -1443,6 +1443,9 @@ function generateFloor() {
       const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
       setTile(sx, sy, T.STAIRS_DOWN);
     }
+    // One-way doors must run after stairs are placed (needs valid stair pos)
+    // and after player position is set (needs valid player pos for BFS).
+    addOneWayDoors();
   }
 
   // Spawn enemies
@@ -1705,8 +1708,6 @@ function addDoors() {
     }
   }
 
-  // Add rare one-way doors (close permanently behind you)
-  addOneWayDoors();
 }
 
 // BFS reachability check — used to ensure one-way doors don't create dead ends
