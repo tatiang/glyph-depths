@@ -970,6 +970,10 @@ function newRun(classId = 'adventurer') {
   Audio.startAmbient(getBiomeKey(state.floor));
   updateUI();
   render();
+  inputLocked = true;
+  showFloorCard(state.floor, getBiomeKey(state.floor), () => {
+    inputLocked = false;
+  });
 }
 
 function createPlayer(classId = 'adventurer') {
@@ -1557,7 +1561,6 @@ function generateBSP() {
 
   // Add some doors
   addDoors();
-  return { x: startX, y: startY };
 }
 
 function splitNode(node, depth) {
