@@ -6839,6 +6839,20 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
     signInBtn.className = 'saves-auth-btn';
     signInBtn.textContent = 'Sign In';
     const fn = () => {
+      // iOS standalone: signInWithPopup is blocked and signInWithRedirect leaves the
+      // webclip context. Instead, open the app in Safari (same origin = shared IndexedDB).
+      // The user signs in there, then returns and taps the button again to reload, at
+      // which point Firebase reads the auth state from IndexedDB.
+      if (window.navigator.standalone === true) {
+        if (signInBtn.dataset.step === 'waiting') {
+          location.reload();
+          return;
+        }
+        signInBtn.dataset.step = 'waiting';
+        signInBtn.textContent = 'Tap here when done';
+        window.open(location.href);
+        return;
+      }
       signInBtn.textContent = '...';
       signInBtn.disabled = true;
       cloudSignIn().then(() => {
@@ -7177,27 +7191,11 @@ function initFirebase() {
   // auth state loads asynchronously from localStorage/IndexedDB).
   if (firebaseUser) return Promise.resolve(); // Already signed in this session
 
-  // On iOS standalone (home screen webclip), signInWithPopup is unsupported,
-  // so we use signInWithRedirect instead. On page load after the redirect, we
-  // must call getRedirectResult() to pick up the sign-in credential before
-  // onAuthStateChanged fires.
-  const isStandalone = window.navigator.standalone === true;
-  const redirectCheck = isStandalone
-    ? firebase.auth().getRedirectResult().then(result => {
-        if (result && result.user) firebaseUser = result.user;
-      }).catch(err => {
-        console.error('[Glyph Depths] getRedirectResult error:', err);
-      })
-    : Promise.resolve();
-
-  return redirectCheck.then(() => {
-    if (firebaseUser) return; // Got user from redirect result
-    return new Promise(resolve => {
-      const unsub = firebase.auth().onAuthStateChanged(user => {
-        unsub();
-        if (user) firebaseUser = user;
-        resolve();
-      });
+  return new Promise(resolve => {
+    const unsub = firebase.auth().onAuthStateChanged(user => {
+      unsub();
+      if (user) firebaseUser = user;
+      resolve();
     });
   });
 }
@@ -7205,15 +7203,6 @@ function initFirebase() {
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
-
-  // iOS standalone (home screen webclip) cannot open popups. Use redirect flow instead —
-  // the page will navigate away and return; initFirebase() will pick up the result via
-  // getRedirectResult() on the next load. Return a never-settling promise so callers don't
-  // treat the navigation as a failure.
-  if (window.navigator.standalone === true) {
-    firebase.auth().signInWithRedirect(provider);
-    return new Promise(() => {});
-  }
 
   return new Promise((resolve, reject) => {
     let settled = false;
