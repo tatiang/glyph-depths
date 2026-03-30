@@ -4684,13 +4684,19 @@ function playerMove(dx, dy) {
     return;
   }
 
-  // Check for one-way door — opens, then seals behind you
+  // Check for one-way door — player moves through, door seals at the door frame behind them
   if (getTile(nx, ny) === T.DOOR_ONEWAY) {
-    setTile(nx, ny, T.FLOOR);
-    const ox = state.player.x, oy = state.player.y;
-    state.player.x = nx;
-    state.player.y = ny;
-    setTile(ox, oy, T.DOOR_SEALED);
+    const dx = nx - state.player.x, dy = ny - state.player.y;
+    const throughX = nx + dx, throughY = ny + dy;
+    // Move through the door if the far side is walkable; otherwise stop at the door tile
+    if (isWalkable(throughX, throughY)) {
+      state.player.x = throughX;
+      state.player.y = throughY;
+    } else {
+      state.player.x = nx;
+      state.player.y = ny;
+    }
+    setTile(nx, ny, T.DOOR_SEALED);
     addMessage('The door slams shut behind you! Bash it 5 times to break through.', 'damage');
     Audio.door();
     haptic(50);
@@ -6022,6 +6028,8 @@ function renderShopItems(merchant) {
   const container = $('shop-items');
   container.innerHTML = '';
 
+  let expandedDiv = null; // track which item card is currently expanded
+
   for (const shopItem of merchant.shopItems) {
     const div = document.createElement('div');
     div.className = 'shop-item';
@@ -6033,7 +6041,9 @@ function renderShopItems(merchant) {
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
     const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(shopItem.price * 0.75)) : shopItem.price;
     const exclusiveTag = shopItem.artificerOnly ? ` <span style="color:#f0a030;font-size:11px;">[⚒️ Forged]</span>` : '';
-    div.innerHTML = `<span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
+    const collapsedHTML = `<span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
+    div.innerHTML = collapsedHTML;
+
     const buyHandler = () => {
       if (div.style.pointerEvents === 'none') return;
       if (state.player.gold >= effectivePrice) {
@@ -6080,13 +6090,80 @@ function renderShopItems(merchant) {
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
         div.style.opacity = '0.3';
         div.style.pointerEvents = 'none';
+        expandedDiv = null;
         updateUI();
       } else {
         addMessage("You can't afford that.", 'damage');
+        // Collapse back on failure
+        div.innerHTML = collapsedHTML;
+        div.style.flexDirection = '';
+        div.style.alignItems = '';
+        expandedDiv = null;
       }
     };
-    div.addEventListener('click', buyHandler);
-    div.addEventListener('touchend', (e) => { e.preventDefault(); buyHandler(); }, { passive: false });
+
+    const expandItem = () => {
+      if (div.style.pointerEvents === 'none') return;
+      // If already expanded, collapse it
+      if (expandedDiv === div) {
+        div.innerHTML = collapsedHTML;
+        div.style.flexDirection = '';
+        div.style.alignItems = '';
+        expandedDiv = null;
+        return;
+      }
+      // Collapse any previously expanded item
+      if (expandedDiv) {
+        expandedDiv.innerHTML = expandedDiv._collapsedHTML || '';
+        expandedDiv.style.flexDirection = '';
+        expandedDiv.style.alignItems = '';
+        expandedDiv = null;
+      }
+      // Build item description
+      let desc = '';
+      if (it.desc) desc = it.desc;
+      else if (it.itemType === 'weapon') desc = `Melee weapon. +${it.attack} ATK.`;
+      else if (it.itemType === 'ranged') desc = `Ranged weapon. ${it.damage} DMG, range ${it.range}.`;
+      else if (it.itemType === 'armor') desc = `Armor. +${it.defense} DEF.`;
+      else if (it.itemType === 'food') desc = 'Restores 30 hunger.';
+      else if (it.itemType === 'arrows') desc = `${it.count} arrows for your ranged weapon.`;
+      else if (it.itemType === 'ring') desc = it.effect ? `Ring. ${it.effect}.` : 'A magical ring.';
+      else if (it.itemType === 'potion') desc = it.identified ? (it.desc || 'A potion.') : 'Unidentified potion.';
+      else if (it.itemType === 'scroll') desc = it.identified ? (it.desc || 'A scroll.') : 'Unidentified scroll.';
+
+      const canAfford = state.player.gold >= effectivePrice;
+      div._collapsedHTML = collapsedHTML;
+      div.style.flexDirection = 'column';
+      div.style.alignItems = 'stretch';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span>
+          <span class="price">${effectivePrice}💰</span>
+        </div>
+        ${desc ? `<div style="font-size:12px;color:var(--text-dim);margin:6px 0 8px;">${desc}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button class="save-action-btn" style="flex:1;min-height:44px;background:${canAfford ? 'var(--gold)' : 'var(--btn)'};color:${canAfford ? '#000' : 'var(--text-dim)'};border-color:${canAfford ? 'var(--gold)' : 'var(--panel-border)'};" id="_shop_buy_btn">Buy ${effectivePrice}💰</button>
+          <button class="save-action-btn" style="flex:1;min-height:44px;" id="_shop_cancel_btn">Cancel</button>
+        </div>`;
+
+      const buyBtn = div.querySelector('#_shop_buy_btn');
+      const cancelBtn = div.querySelector('#_shop_cancel_btn');
+      const doBuy = () => { buyHandler(); };
+      const doCancel = () => {
+        div.innerHTML = collapsedHTML;
+        div.style.flexDirection = '';
+        div.style.alignItems = '';
+        expandedDiv = null;
+      };
+      buyBtn.addEventListener('click', doBuy);
+      buyBtn.addEventListener('touchend', (e) => { e.preventDefault(); doBuy(); }, { passive: false });
+      cancelBtn.addEventListener('click', doCancel);
+      cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); doCancel(); }, { passive: false });
+      expandedDiv = div;
+    };
+
+    div.addEventListener('click', expandItem);
+    div.addEventListener('touchend', (e) => { e.preventDefault(); expandItem(); }, { passive: false });
     container.appendChild(div);
   }
 
@@ -6179,9 +6256,14 @@ function endTurn() {
   }
 
   if (state.player.hunger <= 0 && state.turnCount % HUNGER_DAMAGE_TICK === 0) {
-    state.player.hp--;
-    addMessage('You are starving! (-1 HP)', 'damage');
-    if (state.player.hp <= 0) { playerDeath('starvation', '🍖'); return; }
+    if (state.floor <= 3) {
+      // Grace period: warn but no HP damage on early floors so new players aren't killed by hunger before finding food
+      addMessage('You are famished, but press on.', 'damage');
+    } else {
+      state.player.hp--;
+      addMessage('You are starving! (-1 HP)', 'damage');
+      if (state.player.hp <= 0) { playerDeath('starvation', '🍖'); return; }
+    }
   }
 
   // Passive regeneration — base 1 HP/30 turns; Regen perk halves the interval
@@ -7057,22 +7139,49 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     delBtn.className = 'save-action-btn save-delete';
     delBtn.textContent = '\uD83D\uDDD1';
     const capturedCloud = Array.isArray(cloudSaves) ? cloudSaves : [];
-    const delFn = () => {
-      if (save.storage === 'local') {
-        deleteSaveSlot(save.slotKey);
-        _renderSavesList(listEl, _getLocalSaves(), capturedCloud, fromTitle, false);
-      } else {
-        cloudDeleteSave(save.slotKey).then(() => {
-          cloudListSaves().then(newCloud => {
-            _renderSavesList(listEl, _getLocalSaves(), newCloud, fromTitle, false);
-          }).catch(() => {
-            _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+    const confirmDeleteFn = () => {
+      // Replace btnRow with inline confirmation strip
+      btnRow.innerHTML = '';
+      const confirmLabel = document.createElement('span');
+      confirmLabel.textContent = 'Delete?';
+      confirmLabel.style.cssText = 'font-size:12px;color:var(--text-dim);align-self:center;flex:1';
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'save-action-btn save-delete';
+      confirmBtn.textContent = 'Delete';
+      confirmBtn.style.flex = '1';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'save-action-btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.flex = '1';
+      const doDelete = () => {
+        confirmBtn.disabled = true;
+        cancelBtn.disabled = true;
+        if (save.storage === 'local') {
+          deleteSaveSlot(save.slotKey);
+          _renderSavesList(listEl, _getLocalSaves(), capturedCloud, fromTitle, false);
+        } else {
+          cloudDeleteSave(save.slotKey).then(() => {
+            cloudListSaves().then(newCloud => {
+              _renderSavesList(listEl, _getLocalSaves(), newCloud, fromTitle, false);
+            }).catch(() => {
+              _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+            });
           });
-        });
-      }
+        }
+      };
+      const doCancel = () => {
+        _renderSavesList(listEl, _getLocalSaves(), capturedCloud, fromTitle, false);
+      };
+      confirmBtn.addEventListener('click', doDelete);
+      confirmBtn.addEventListener('touchend', (e) => { e.preventDefault(); doDelete(); }, { passive: false });
+      cancelBtn.addEventListener('click', doCancel);
+      cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); doCancel(); }, { passive: false });
+      btnRow.appendChild(confirmLabel);
+      btnRow.appendChild(confirmBtn);
+      btnRow.appendChild(cancelBtn);
     };
-    delBtn.addEventListener('click', delFn);
-    delBtn.addEventListener('touchend', (e) => { e.preventDefault(); delFn(); }, { passive: false });
+    delBtn.addEventListener('click', confirmDeleteFn);
+    delBtn.addEventListener('touchend', (e) => { e.preventDefault(); confirmDeleteFn(); }, { passive: false });
     btnRow.appendChild(delBtn);
 
     card.appendChild(btnRow);
@@ -7720,10 +7829,29 @@ function render() {
     }
   }
 
-  // Draw player
+  // Draw player — always on top of items/enemies/NPCs/stairs
   const playerSX = (p.x - camX) * ts + ts / 2;
   const playerSY = (p.y - camY) * ts + ts / 2;
+  // Clear any overlapping entity glyphs by painting the tile background before the player glyph
+  ctx.fillStyle = biome.bg;
+  ctx.fillRect((p.x - camX) * ts, (p.y - camY) * ts, ts, ts);
+  // Redraw the tile underneath the player (so the floor/stairs/etc. are still visible around the player)
+  const playerTile = getTile(p.x, p.y);
+  let playerTileGlyph, playerTileColor;
+  switch (playerTile) {
+    case T.STAIRS_DOWN: playerTileGlyph = '▼'; playerTileColor = '#80ff80'; break;
+    case T.STAIRS_UP:   playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+    case T.DOOR_OPEN:   playerTileGlyph = '\\'; playerTileColor = '#c0a060'; break;
+    case T.FLOOR:       playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+    case T.CORRIDOR:    playerTileGlyph = '·'; playerTileColor = biome.corrVis; break;
+    default:            playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+  }
+  ctx.globalAlpha = 1.0;
+  ctx.font = `${Math.floor(ts * 0.7)}px monospace`;
+  ctx.fillStyle = playerTileColor;
+  ctx.fillText(playerTileGlyph, playerSX, playerSY);
   ctx.font = `${Math.floor(ts * 0.75)}px serif`;
+  ctx.fillStyle = '#ffffff';
   if (hasStatusEffect(p, 'invisibility')) {
     ctx.globalAlpha = 0.4;
   }
