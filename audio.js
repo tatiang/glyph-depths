@@ -5,6 +5,11 @@ const Audio = (() => {
   let ctx = null;
   let enabled = true;
   let masterGain = null;
+  let ambientNodes = [];       // Currently playing {osc, gain} objects
+  let ambientTimer = null;     // setTimeout ID for next cycle
+  let ambientBiome = null;     // Current biome key string
+  let ambientStopping = false; // Prevents reschedule during fadeout
+  let ambientGain = null;      // Single gain node for mute/unmute control
 
   function init() {
     if (ctx) return;
@@ -198,6 +203,18 @@ const Audio = (() => {
     noise(0.3, [0.02, 0.08, 0.2, 0.15]);
   }
 
+  function danger() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Two low heartbeat-like pulses
+    osc('sine', 110, 0.12, [0.005, 0.02, 0.5, 0.07]);
+    osc('sine', 82, 0.10, [0.005, 0.02, 0.4, 0.06]);
+    setTimeout(() => {
+      osc('sine', 110, 0.10, [0.005, 0.02, 0.4, 0.06]);
+      osc('sine', 82, 0.08, [0.005, 0.02, 0.3, 0.05]);
+    }, 220);
+  }
+
   // Title / intro music — mysterious descending melody with reverb-like echoes
   function titleMusic() {
     if (!ctx || !enabled) return;
@@ -273,10 +290,187 @@ const Audio = (() => {
     });
   }
 
+  // === AMBIENT BIOME AUDIO ===
+
+  const BIOME_AUDIO = {
+    sewers: [
+      { type: 'sine', freq: 55, gain: 0.10 },
+      { type: 'sine', freq: 110, gain: 0.08, detune: -6 },
+      { type: 'sine', freq: 220, gain: 0.05 },
+      { type: 'noise', freq: 400, gain: 0.05, filter: 'bandpass' }
+    ],
+    crypt: [
+      { type: 'sine', freq: 73.4, gain: 0.10 },
+      { type: 'triangle', freq: 110, gain: 0.07, detune: 5 },
+      { type: 'triangle', freq: 220, gain: 0.05, detune: -10 },
+      { type: 'sine', freq: 146.8, gain: 0.04 },
+      { type: 'noise', freq: 200, gain: 0.04, filter: 'bandpass' }
+    ],
+    citadel: [
+      { type: 'sawtooth', freq: 49, gain: 0.07 },
+      { type: 'sine', freq: 98, gain: 0.10, detune: 3 },
+      { type: 'triangle', freq: 196, gain: 0.06, detune: -5 },
+      { type: 'triangle', freq: 130.8, gain: 0.05 },
+      { type: 'noise', freq: 600, gain: 0.03, filter: 'bandpass' }
+    ],
+    abyss: [
+      { type: 'sine', freq: 41.2, gain: 0.12 },
+      { type: 'sine', freq: 82.4, gain: 0.08, detune: -12 },
+      { type: 'sine', freq: 164.8, gain: 0.05 },
+      { type: 'noise', freq: 150, gain: 0.06, filter: 'lowpass' }
+    ],
+    sanctum: [
+      { type: 'sine', freq: 65.4, gain: 0.09 },
+      { type: 'sine', freq: 131, gain: 0.07, detune: 4 },
+      { type: 'sine', freq: 98, gain: 0.05 },
+      { type: 'triangle', freq: 262, gain: 0.04 },
+      { type: 'sine', freq: 523, gain: 0.025, lfo: { rate: 0.3, depth: 8 } }
+    ],
+    boss: [
+      { type: 'sawtooth', freq: 36.7, gain: 0.09 },
+      { type: 'sine', freq: 55, gain: 0.09, detune: 15 },
+      { type: 'sine', freq: 110, gain: 0.06 },
+      { type: 'noise', freq: 300, gain: 0.05, filter: 'bandpass', Q: 2.0 }
+    ]
+  };
+
+  function scheduleAmbientCycle(biomeKey) {
+    if (ambientStopping) return;
+    if (!ctx || !enabled) return;
+
+    // iOS: wait for AudioContext to resume before scheduling
+    if (ctx.state === 'suspended') {
+      const onResume = () => {
+        ctx.removeEventListener('statechange', onResume);
+        if (!ambientStopping) scheduleAmbientCycle(biomeKey);
+      };
+      ctx.addEventListener('statechange', onResume);
+      return;
+    }
+
+    const layers = BIOME_AUDIO[biomeKey];
+    if (!layers) return;
+
+    const now = ctx.currentTime;
+    const fadeIn = 2;
+    const hold = 4;
+    const fadeOut = 2;
+    const total = fadeIn + hold + fadeOut; // 8s
+
+    layers.forEach(layer => {
+      const layerGain = ctx.createGain();
+      // Envelope: fade in → hold → fade out
+      layerGain.gain.setValueAtTime(0, now);
+      layerGain.gain.linearRampToValueAtTime(layer.gain, now + fadeIn);
+      layerGain.gain.setValueAtTime(layer.gain, now + fadeIn + hold);
+      layerGain.gain.linearRampToValueAtTime(0, now + total);
+      layerGain.connect(ambientGain);
+
+      if (layer.type === 'noise') {
+        // Noise layer with filter
+        const bufferSize = Math.ceil(ctx.sampleRate * (total + 0.1));
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = layer.filter || 'bandpass';
+        filter.frequency.value = layer.freq;
+        filter.Q.value = layer.Q || 1;
+        src.connect(filter);
+        filter.connect(layerGain);
+        src.start(now);
+        src.stop(now + total + 0.05);
+        ambientNodes.push({ src, gain: layerGain });
+      } else {
+        // Oscillator layer
+        const o = ctx.createOscillator();
+        o.type = layer.type;
+        o.frequency.value = layer.freq;
+        if (layer.detune) o.detune.value = layer.detune;
+
+        // LFO vibrato (for Sanctum crystalline layer)
+        if (layer.lfo) {
+          const lfo = ctx.createOscillator();
+          const lfoGain = ctx.createGain();
+          lfo.type = 'sine';
+          lfo.frequency.value = layer.lfo.rate;
+          lfoGain.gain.value = layer.lfo.depth;
+          lfo.connect(lfoGain);
+          lfoGain.connect(o.detune);
+          lfo.start(now);
+          lfo.stop(now + total + 0.05);
+        }
+
+        o.connect(layerGain);
+        o.start(now);
+        o.stop(now + total + 0.05);
+        ambientNodes.push({ osc: o, gain: layerGain });
+      }
+    });
+
+    // Schedule next overlapping cycle at 6s (2s before current ends)
+    ambientTimer = setTimeout(() => {
+      if (!ambientStopping) scheduleAmbientCycle(biomeKey);
+    }, (fadeIn + hold) * 1000); // 6000ms
+  }
+
+  function startAmbient(biomeKey) {
+    if (!ctx) init();
+    if (ambientBiome === biomeKey && !ambientStopping) return; // same biome, no-op
+    if (ambientBiome !== null) stopAmbient();
+
+    ambientStopping = false;
+    ambientBiome = biomeKey;
+
+    if (!ambientGain) {
+      ambientGain = ctx.createGain();
+      ambientGain.gain.value = 1.0;
+      ambientGain.connect(masterGain);
+    } else {
+      // Restore gain in case it was faded out
+      ambientGain.gain.cancelScheduledValues(ctx.currentTime);
+      ambientGain.gain.setValueAtTime(1.0, ctx.currentTime);
+    }
+
+    if (!enabled) return; // respect mute — will start when re-enabled
+    scheduleAmbientCycle(biomeKey);
+  }
+
+  function stopAmbient() {
+    ambientStopping = true;
+    if (ambientTimer) {
+      clearTimeout(ambientTimer);
+      ambientTimer = null;
+    }
+    // Fade out the master ambient gain over 1.5s
+    if (ambientGain && ctx) {
+      const now = ctx.currentTime;
+      ambientGain.gain.cancelScheduledValues(now);
+      ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+      ambientGain.gain.linearRampToValueAtTime(0, now + 1.5);
+    }
+    // Let running nodes self-stop on their own schedule
+    ambientNodes = [];
+    ambientBiome = null;
+  }
+
+  function setAmbientMuted(muted) {
+    if (!ambientGain || !ctx) return;
+    const now = ctx.currentTime;
+    ambientGain.gain.cancelScheduledValues(now);
+    ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+    ambientGain.gain.linearRampToValueAtTime(muted ? 0 : 1.0, now + 0.3);
+  }
+
   return {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, miss, crit, merchant, boss, titleMusic
+    door, miss, crit, merchant, boss, danger, titleMusic,
+    startAmbient, stopAmbient, setAmbientMuted
   };
 })();
