@@ -970,6 +970,10 @@ function newRun(classId = 'adventurer') {
   Audio.startAmbient(getBiomeKey(state.floor));
   updateUI();
   render();
+  inputLocked = true;
+  showFloorCard(state.floor, getBiomeKey(state.floor), () => {
+    inputLocked = false;
+  });
 }
 
 function createPlayer(classId = 'adventurer') {
@@ -1072,7 +1076,16 @@ function createPlayer(classId = 'adventurer') {
     ancientTongue: false,
     // Soul Amulet
     soulFragments: 0,
-    defPurchases: 0  // Sage shop: tracks escalating +1 DEF cost
+    defPurchases: 0, // Sage shop: tracks escalating +1 DEF cost
+    // Per-floor class ability state (reset each floor in playerDescend)
+    classState: {
+      haggledThisFloor: false,
+      appraisedThisFloor: false,
+      floorKills: 0,
+      iceTraps: [],
+      fortifiedThisFloor: false,
+      illusionEntity: null
+    }
   };
 }
 
@@ -1410,16 +1423,12 @@ function generateFloor() {
   p.enrageActive = false;
   p.engageTurnsLeft = 0;
   state.rooms = [];
-  let startX = Math.floor(MAP_W / 2);
-  let startY = Math.floor(MAP_H / 2);
 
   if (state.floor === MAX_FLOOR) {
-    ({ x: startX, y: startY } = generateBossFloor());
+    generateBossFloor();
   } else {
-    ({ x: startX, y: startY } = generateBSP());
+    generateBSP();
   }
-  p.x = startX;
-  p.y = startY;
 
   // Announce biome when entering a new region — lore-flavored messages
   const BIOME_ENTRY = {
@@ -1435,14 +1444,18 @@ function generateFloor() {
     addMessage(`${biome.name}: ${BIOME_ENTRY[state.floor]}`, 'gold');
   }
 
+
   // Place stairs down (except boss floor)
   if (state.floor < MAX_FLOOR) {
-    const farthestRoom = getFarthestRoom(startX, startY);
+    const farthestRoom = getFarthestRoom(p.x, p.y);
     if (farthestRoom) {
       const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
       const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
       setTile(sx, sy, T.STAIRS_DOWN);
     }
+    // One-way doors must run after stairs are placed (needs valid stair pos)
+    // and after player position is set (needs valid player pos for BFS).
+    addOneWayDoors();
   }
 
   // Spawn enemies
@@ -1456,8 +1469,8 @@ function generateFloor() {
     placeGhost();
   }
 
-  // Merchant on floors 3, 6, 9
-  if ([3, 7, 11, 15, 19].includes(state.floor)) {
+  // Merchant on floors 5, 10, 15 (20-floor dungeon)
+  if ([5, 10, 15].includes(state.floor)) {
     spawnMerchant();
     addMessage("There's a merchant somewhere around here...", 'good');
   }
@@ -1551,13 +1564,13 @@ function generateBSP() {
   createRooms(root);
   connectRooms(root);
 
+  // Place player in first room
   const firstRoom = state.rooms[0];
-  const startX = firstRoom ? firstRoom.x + Math.floor(firstRoom.w / 2) : Math.floor(MAP_W / 2);
-  const startY = firstRoom ? firstRoom.y + Math.floor(firstRoom.h / 2) : Math.floor(MAP_H / 2);
+  state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
+  state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
 
   // Add some doors
   addDoors();
-  return { x: startX, y: startY };
 }
 
 function splitNode(node, depth) {
@@ -1705,8 +1718,6 @@ function addDoors() {
     }
   }
 
-  // Add rare one-way doors (close permanently behind you)
-  addOneWayDoors();
 }
 
 // BFS reachability check — used to ensure one-way doors don't create dead ends
@@ -1752,7 +1763,7 @@ function bfsReachableStrict(sx, sy, tx, ty) {
 }
 
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return;
+  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return; // Not on first or boss floor
 
   // Find stairs
   let stx = -1, sty = -1;
@@ -1762,6 +1773,7 @@ function addOneWayDoors() {
     }
   }
   if (stx < 0) return;
+
 
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
@@ -1824,13 +1836,13 @@ function generateBossFloor() {
     }
   }
   // No upstairs — player can only descend
-  const startX = 5;
-  const startY = room.y + Math.floor(room.h / 2);
+  // Player start
+  state.player.x = 5;
+  state.player.y = room.y + Math.floor(room.h / 2);
   // Boss in center
   const boss = createEnemy(BOSS, 25, 25);
   state.entities.push(boss);
   Audio.boss();
-  return { x: startX, y: startY };
 }
 
 // === TILE HELPERS ===
@@ -5069,11 +5081,27 @@ function pickupItem(itemEntity) {
     }
     return;
   }
+  // Stack potions and scrolls of the same type
+  if (itemEntity.item.itemType === 'potion' || itemEntity.item.itemType === 'scroll') {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === itemEntity.item.itemType &&
+      i.effectId === itemEntity.item.effectId
+    );
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      state.itemsFound++;
+      addMessage(`You pick up ${itemEntity.item.name}. (×${existing.count})`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     showPopupNotice('Inventory Full');
     return;
   }
+  itemEntity.item.count = 1;
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
   const it = itemEntity.item;
@@ -5210,12 +5238,22 @@ function playerDescend() {
   setTimeout(() => {
     activeAnimations.length = 0;
     generateFloor();
+    // Place player at start of new floor
+    if (state.floor < MAX_FLOOR) {
+      const firstRoom = state.rooms[0];
+      state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
+      state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
+    }
     addMessage(`You descend to floor ${state.floor}...`, '');
     if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
+    computeFOV();
     updateUI();
+    render();
     Audio.startAmbient(getBiomeKey(state.floor));
     $('fade').classList.remove('active');
-    inputLocked = false;
+    showFloorCard(state.floor, getBiomeKey(state.floor), () => {
+      inputLocked = false;
+    });
   }, 400);
 }
 
@@ -5283,7 +5321,7 @@ function useItem(item, index) {
 
     case 'potion':
       applyPotionEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       if (!item.identified) {
         potionIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
@@ -5293,7 +5331,7 @@ function useItem(item, index) {
 
     case 'scroll':
       applyScrollEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       if (!item.identified) {
         scrollIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
@@ -5412,8 +5450,13 @@ function useItem(item, index) {
 
 function dropItem(index) {
   const item = state.player.inventory[index];
-  state.entities.push(createItemEntity(item, state.player.x, state.player.y));
-  state.player.inventory.splice(index, 1);
+  const dropped = { ...item, count: 1 };
+  if ((item.count || 1) > 1) {
+    item.count--;
+  } else {
+    state.player.inventory.splice(index, 1);
+  }
+  state.entities.push(createItemEntity(dropped, state.player.x, state.player.y));
   addMessage(`You drop the ${item.name}.`, '');
   updateUI();
   render();
@@ -6367,7 +6410,7 @@ function endTurn() {
   processStatusEffects();
   if (state.gameOver) return;
 
-  // Victory check (boss dead on boss floor)
+  // Victory check (boss dead on final floor)
   if (state.floor === MAX_FLOOR && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
     showVictory();
     return;
@@ -6850,11 +6893,13 @@ function showSavesOverlay(fromTitle) {
         _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (showSavesOverlay):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', fromTitle, false);
         });
       }
-    }).catch(() => {
+    }).catch(err => {
+      console.error('[Glyph Depths] Firebase init error:', err);
       _renderSavesAuthBar(authBar, listEl, fromTitle);
     });
   }
@@ -6913,6 +6958,20 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
     signInBtn.className = 'saves-auth-btn';
     signInBtn.textContent = 'Sign In';
     const fn = () => {
+      // iOS standalone: signInWithPopup is blocked and signInWithRedirect leaves the
+      // webclip context. Instead, open the app in Safari (same origin = shared IndexedDB).
+      // The user signs in there, then returns and taps the button again to reload, at
+      // which point Firebase reads the auth state from IndexedDB.
+      if (window.navigator.standalone === true) {
+        if (signInBtn.dataset.step === 'waiting') {
+          location.reload();
+          return;
+        }
+        signInBtn.dataset.step = 'waiting';
+        signInBtn.textContent = 'Tap here when done';
+        window.open(location.href);
+        return;
+      }
       signInBtn.textContent = '...';
       signInBtn.disabled = true;
       cloudSignIn().then(() => {
@@ -6921,8 +6980,9 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
         _renderSavesList(listEl, _getLocalSaves(), null, fromTitle, true);
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, fromTitle, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (after sign-in):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', fromTitle, false);
         });
       }).catch(() => {
         barEl.innerHTML = '';
@@ -7027,8 +7087,9 @@ function _doSaveCurrentGame(saveBtn, sectionEl) {
       if (listEl) {
         cloudListSaves().then(cloudSaves => {
           _renderSavesList(listEl, _getLocalSaves(), cloudSaves, false, false);
-        }).catch(() => {
-          _renderSavesList(listEl, _getLocalSaves(), [], false, false);
+        }).catch(err => {
+          console.error('[Glyph Depths] cloudListSaves error (after save):', err);
+          _renderSavesList(listEl, _getLocalSaves(), 'error', false, false);
         });
       }
     }).catch(err => {
@@ -7076,7 +7137,7 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     return tb - ta;
   });
 
-  if (allSaves.length === 0 && !loadingCloud) {
+  if (allSaves.length === 0 && !loadingCloud && cloudSaves !== 'error') {
     const empty = document.createElement('div');
     empty.className = 'saves-empty';
     empty.innerHTML = 'No saved games found.<br><span style="font-size:11px;opacity:0.7;">Start a game and save your progress to see it here.</span>';
@@ -7163,7 +7224,8 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
           cloudDeleteSave(save.slotKey).then(() => {
             cloudListSaves().then(newCloud => {
               _renderSavesList(listEl, _getLocalSaves(), newCloud, fromTitle, false);
-            }).catch(() => {
+            }).catch(err => {
+              console.error('[Glyph Depths] cloudListSaves error (after delete):', err);
               _renderSavesList(listEl, _getLocalSaves(), [], fromTitle, false);
             });
           });
@@ -7193,6 +7255,13 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadingEl.className = 'saves-loading';
     loadingEl.textContent = '\u2601\uFE0F Loading cloud saves\u2026';
     listEl.appendChild(loadingEl);
+  }
+
+  if (cloudSaves === 'error') {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'padding:10px 12px;margin:6px 0;background:rgba(200,60,60,0.15);border:1px solid #944;border-radius:6px;font-size:12px;color:#f88;';
+    errEl.textContent = 'Could not load cloud saves. Check your connection and try again.';
+    listEl.appendChild(errEl);
   }
 }
 
@@ -7267,6 +7336,7 @@ function initFirebase() {
   // Wait for Firebase Auth to resolve persisted session (currentUser is null until
   // auth state loads asynchronously from localStorage/IndexedDB).
   if (firebaseUser) return Promise.resolve(); // Already signed in this session
+
   return new Promise(resolve => {
     const unsub = firebase.auth().onAuthStateChanged(user => {
       unsub();
@@ -7279,6 +7349,7 @@ function initFirebase() {
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
+
   return new Promise((resolve, reject) => {
     let settled = false;
     function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
@@ -7380,11 +7451,18 @@ function cloudLoadGame(slotName) {
 
 function cloudListSaves() {
   if (!firebaseUser || !firebaseDb) return Promise.resolve([]);
-  return firestoreTimeout(firebaseDb.collection('saves')
-    .where('uid', '==', firebaseUser.uid)
-    .orderBy('timestamp', 'desc')
-    .get()
-  ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  // No .orderBy() here — that would require a composite Firestore index that may not exist.
+  // Client-side sort in _renderSavesList() handles ordering instead.
+  function attempt() {
+    return firestoreTimeout(
+      firebaseDb.collection('saves').where('uid', '==', firebaseUser.uid).get(),
+      15000
+    ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }
+  return attempt().catch(err => {
+    console.error('[Glyph Depths] cloudListSaves failed, retrying:', err);
+    return attempt();
+  });
 }
 
 function cloudDeleteSave(slotName) {
@@ -8214,6 +8292,12 @@ function renderInventory() {
       if (isLoaded) slot.style.boxShadow = '0 0 6px rgba(255,128,32,0.5)';
     } else if (item.itemType === 'food' && item.stack && item.stack > 1) {
       slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#f0c040;font-weight:bold;">×${item.stack}</span>`;
+    } else if ((item.count || 1) > 1) {
+      slot.textContent = item.glyph;
+      const badge = document.createElement('span');
+      badge.className = 'inv-count';
+      badge.textContent = item.count;
+      slot.appendChild(badge);
     } else {
       slot.textContent = item.glyph;
     }
@@ -8654,6 +8738,7 @@ function setupInput() {
   // Action buttons
   $('btn-pickup').addEventListener('click', () => { Audio.resume(); playerPickup(); });
   $('btn-stairs').addEventListener('click', () => { Audio.resume(); playerDescend(); });
+  $('btn-stairs').addEventListener('touchend', (e) => { e.preventDefault(); Audio.resume(); playerDescend(); }, { passive: false });
   $('btn-wait').addEventListener('click', () => { Audio.resume(); playerWait(); });
   $('btn-quickuse').addEventListener('click', () => { Audio.resume(); showQuickUse(); });
   $('btn-settings').addEventListener('click', showSettings);
@@ -10183,6 +10268,77 @@ function showQuickThrow() {
 }
 
 // === FLOOR BIOMES ===
+// === FLOOR TRANSITION CARD ===
+const FLOOR_CARD_DATA = {
+  sewers: {
+    atmo: 'Water drips from stone that once knew sunlight. The drowned foundations of Erathis swallow every sound you make.'
+  },
+  crypt: {
+    atmo: 'The air turns cold and motionless. These corridors stretch in directions the dead chose for themselves — and now for you.'
+  },
+  citadel: {
+    atmo: 'Runed armor lines the walls in silent rows. The Citadel\'s knights have forgotten their names, but not their orders.'
+  },
+  abyss: {
+    atmo: 'Reality thins at the edges down here. The darkness is not empty — it has been watching you descend from the very first step.'
+  },
+  sanctum: {
+    atmo: 'Crystalline walls hum with concentrated glyph energy. Beautiful, intricate, and engineered to kill you slowly.'
+  },
+  boss: {
+    atmo: 'Perfect silence. The Glyph King has waited an eternity for a worthy end. He does not look afraid.'
+  }
+};
+
+function showFloorCard(floor, biomeKey, onDone) {
+  const card = $('floor-card');
+  const biome = getFloorBiome(floor);
+  const data  = FLOOR_CARD_DATA[biomeKey] || FLOOR_CARD_DATA.sewers;
+
+  $('floor-card-floor').textContent = 'Floor ' + floor;
+  $('floor-card-name').textContent  = biome.name;
+  $('floor-card-atmo').textContent  = data.atmo;
+
+  const EXIT_MS   =  350;
+  const SAFETY_MS = EXIT_MS + 400;
+  // Minimum display time before tap is accepted (prevents accidental instant-dismiss)
+  const MIN_MS = 600;
+
+  card.classList.remove('fc-exit');
+  card.classList.add('fc-enter');
+
+  var dismissed = false;
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
+    card.removeEventListener('click', onTap);
+    card.removeEventListener('touchend', onTap);
+    card.classList.remove('fc-enter');
+    card.classList.add('fc-exit');
+
+    var finished = false;
+    var finish = function() {
+      if (finished) return;
+      finished = true;
+      card.classList.remove('fc-exit');
+      onDone();
+    };
+    card.addEventListener('animationend', finish, { once: true });
+    setTimeout(finish, SAFETY_MS);
+  }
+
+  function onTap(e) {
+    if (e.type === 'touchend') e.preventDefault();
+    dismiss();
+  }
+
+  // Accept tap after minimum display time
+  setTimeout(function() {
+    card.addEventListener('click', onTap);
+    card.addEventListener('touchend', onTap, { passive: false });
+  }, MIN_MS);
+}
+
 function getBiomeKey(floor) {
   if (floor >= 20) return 'boss';
   if (floor >= 17) return 'sanctum';

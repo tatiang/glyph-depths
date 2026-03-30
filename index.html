@@ -256,6 +256,16 @@
 
     .inv-slot.equipped { border-color: var(--gold); box-shadow: 0 0 4px rgba(240, 192, 64, 0.3); }
     .inv-slot.empty { opacity: 0.3; }
+    .inv-count {
+      position: absolute;
+      bottom: 1px;
+      right: 3px;
+      font-size: 9px;
+      font-weight: bold;
+      color: var(--gold);
+      line-height: 1;
+      pointer-events: none;
+    }
 
     /* === CONTROLS === */
     #controls {
@@ -931,6 +941,92 @@
     }
 
     #fade.active { opacity: 1; pointer-events: all; }
+
+    /* === FLOOR TRANSITION CARD === */
+    #floor-card {
+      position: fixed;
+      inset: 0;
+      height: 100dvh;
+      height: 100vh; /* fallback for browsers without dvh */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 210;
+      pointer-events: none;
+      opacity: 0;
+      background: transparent;
+    }
+
+    #floor-card.fc-enter {
+      animation: fc-slide-in 0.4s ease-out forwards;
+      pointer-events: all;
+      background: rgba(0, 0, 0, 0.78);
+    }
+
+    #floor-card.fc-exit {
+      animation: fc-slide-out 0.35s ease-in forwards;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.78);
+    }
+
+    .floor-card-tap {
+      margin-top: 20px;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      opacity: 0.7;
+    }
+
+    .floor-card-inner {
+      text-align: center;
+      padding: 32px 40px;
+      border: 1px solid rgba(200, 200, 210, 0.12);
+      border-radius: 12px;
+      background: rgba(5, 5, 8, 0.88);
+      max-width: 320px;
+      width: calc(100% - 48px);
+    }
+
+    .floor-card-floor {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    .floor-card-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 14px;
+    }
+
+    .floor-card-atmo {
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text);
+      font-style: italic;
+    }
+
+    @keyframes fc-slide-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    @keyframes fc-slide-out {
+      from { opacity: 1; transform: translateY(0);     }
+      to   { opacity: 0; transform: translateY(-12px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #floor-card.fc-enter { animation: fc-fade-in  0.4s  ease-out forwards; }
+      #floor-card.fc-exit  { animation: fc-fade-out 0.35s ease-in  forwards; }
+    }
+
+    @keyframes fc-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fc-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
     /* Level up flash */
     #canvas-wrap.levelup-flash {
@@ -1753,6 +1849,16 @@
   </div>
 
   <div id="fade"></div>
+
+  <!-- Floor Transition Card -->
+  <div id="floor-card" role="status" aria-live="polite" aria-atomic="true">
+    <div class="floor-card-inner">
+      <div class="floor-card-floor" id="floor-card-floor"></div>
+      <div class="floor-card-name" id="floor-card-name"></div>
+      <div class="floor-card-atmo" id="floor-card-atmo"></div>
+      <div class="floor-card-tap">Tap to continue</div>
+    </div>
+  </div>
 
   <!-- Badge Toast -->
   <div id="badge-toast"></div>
