@@ -10,6 +10,7 @@ const MAP_W = 50, MAP_H = 50;
 const VIEW_COLS = 15, VIEW_ROWS = 19;
 const FOV_RADIUS = 8;
 const MAX_INVENTORY = 10;
+const MAX_FLOOR = 20;
 const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
@@ -282,14 +283,14 @@ function generateFloor() {
   state.entities = [];
   state.rooms = [];
 
-  if (state.floor === 10) {
+  if (state.floor === MAX_FLOOR) {
     generateBossFloor();
   } else {
     generateBSP();
   }
 
-  // Place stairs down (except floor 10)
-  if (state.floor < 10) {
+  // Place stairs down (except boss floor)
+  if (state.floor < MAX_FLOOR) {
     const farthestRoom = getFarthestRoom(p.x, p.y);
     const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
     const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
@@ -307,8 +308,8 @@ function generateFloor() {
     placeGhost();
   }
 
-  // Merchant on floors 3, 6, 9
-  if ([3, 6, 9].includes(state.floor)) {
+  // Merchant on floors 5, 10, 15
+  if ([5, 10, 15].includes(state.floor)) {
     spawnMerchant();
   }
 
@@ -486,7 +487,7 @@ function addDoors() {
 }
 
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= 10) return; // Not on first or boss floor
+  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return; // Not on first or boss floor
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
     for (let x = 1; x < MAP_W - 1; x++) {
@@ -639,7 +640,7 @@ function removeEntity(e) {
 
 // === SPAWNING ===
 function spawnEnemies() {
-  if (state.floor === 10) return; // Boss already placed
+  if (state.floor === MAX_FLOOR) return; // Boss already placed
   const floorConfig = getFloorConfig(state.floor);
   const count = floorConfig.minEnemies + Math.floor(Math.random() * (floorConfig.maxEnemies - floorConfig.minEnemies + 1));
   const tier = floorConfig.tier;
@@ -746,16 +747,26 @@ function randomFloorTile() {
 
 function getFloorConfig(floor) {
   const configs = {
-    1:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
-    2:  { tier: 1, nextTier: null,  minEnemies: 4, maxEnemies: 5, minItems: 2, maxItems: 3, food: 1 },
-    3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
-    4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
-    5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
-    6:  { tier: 2, nextTier: 3,     minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    1:  { tier: 1, nextTier: null,  minEnemies: 3, maxEnemies: 4,  minItems: 2, maxItems: 3, food: 1 },
+    2:  { tier: 1, nextTier: null,  minEnemies: 4, maxEnemies: 5,  minItems: 2, maxItems: 3, food: 1 },
+    3:  { tier: 1, nextTier: 2,     minEnemies: 5, maxEnemies: 6,  minItems: 3, maxItems: 4, food: 1 },
+    4:  { tier: 2, nextTier: null,  minEnemies: 5, maxEnemies: 7,  minItems: 3, maxItems: 4, food: 1 },
+    5:  { tier: 2, nextTier: null,  minEnemies: 6, maxEnemies: 8,  minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
+    6:  { tier: 2, nextTier: 3,     minEnemies: 7, maxEnemies: 9,  minItems: 3, maxItems: 4, food: 1 },
     7:  { tier: 3, nextTier: null,  minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
     8:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
     9:  { tier: 3, nextTier: null,  minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
-    10: { tier: 3, nextTier: null,  minEnemies: 0, maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
+    10: { tier: 3, nextTier: null,  minEnemies: 9, maxEnemies: 12, minItems: 3, maxItems: 4, food: 1 },
+    11: { tier: 3, nextTier: null,  minEnemies: 9, maxEnemies: 13, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    12: { tier: 3, nextTier: null,  minEnemies: 10, maxEnemies: 14, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    13: { tier: 3, nextTier: null,  minEnemies: 10, maxEnemies: 14, minItems: 3, maxItems: 4, food: 1 },
+    14: { tier: 3, nextTier: null,  minEnemies: 11, maxEnemies: 15, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    15: { tier: 3, nextTier: null,  minEnemies: 11, maxEnemies: 15, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    16: { tier: 3, nextTier: null,  minEnemies: 12, maxEnemies: 16, minItems: 3, maxItems: 4, food: 1 },
+    17: { tier: 3, nextTier: null,  minEnemies: 12, maxEnemies: 16, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    18: { tier: 3, nextTier: null,  minEnemies: 13, maxEnemies: 17, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    19: { tier: 3, nextTier: null,  minEnemies: 13, maxEnemies: 18, minItems: 3, maxItems: 4, food: 1 },
+    20: { tier: 3, nextTier: null,  minEnemies: 0,  maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
   };
   return configs[floor] || configs[1];
 }
@@ -1779,10 +1790,27 @@ function pickupItem(itemEntity) {
     removeEntity(itemEntity);
     return;
   }
+  // Stack potions, scrolls, and food of the same type
+  const stackable = ['potion', 'scroll', 'food'];
+  if (stackable.includes(itemEntity.item.itemType)) {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === itemEntity.item.itemType &&
+      (itemEntity.item.itemType === 'food' || i.effectId === itemEntity.item.effectId)
+    );
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      state.itemsFound++;
+      addMessage(`You pick up ${itemEntity.item.name}. (×${existing.count})`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage('Inventory full!', 'damage');
     return;
   }
+  itemEntity.item.count = 1;
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
   addMessage(`You pick up ${itemEntity.item.name}.`, 'good');
@@ -1814,14 +1842,14 @@ function playerDescend() {
   setTimeout(() => {
     generateFloor();
     // Place player at stairs up position or first room
-    if (state.floor < 10) {
+    if (state.floor < MAX_FLOOR) {
       const firstRoom = state.rooms[0];
       state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
       state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
       setTile(state.player.x, state.player.y, T.STAIRS_UP);
     }
     addMessage(`You descend to floor ${state.floor}...`, '');
-    if (state.floor === 10) addMessage('You sense an overwhelming presence...', 'damage');
+    if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
     computeFOV();
     updateUI();
     render();
@@ -1865,7 +1893,7 @@ function useItem(item, index) {
 
     case 'potion':
       applyPotionEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       // Identify this potion type
       if (!item.identified) {
         potionIdentified[item.effectId] = true;
@@ -1882,7 +1910,7 @@ function useItem(item, index) {
 
     case 'scroll':
       applyScrollEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       if (!item.identified) {
         scrollIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
@@ -1897,7 +1925,7 @@ function useItem(item, index) {
 
     case 'food':
       p.hunger = Math.min(100, p.hunger + 30);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       addMessage('You eat a ration. (+30 hunger)', 'good');
       Audio.useItem();
       break;
@@ -1909,8 +1937,13 @@ function useItem(item, index) {
 
 function dropItem(index) {
   const item = state.player.inventory[index];
-  state.entities.push(createItemEntity(item, state.player.x, state.player.y));
-  state.player.inventory.splice(index, 1);
+  const dropped = { ...item, count: 1 };
+  if ((item.count || 1) > 1) {
+    item.count--;
+  } else {
+    state.player.inventory.splice(index, 1);
+  }
+  state.entities.push(createItemEntity(dropped, state.player.x, state.player.y));
   addMessage(`You drop the ${item.name}.`, '');
   updateUI();
   render();
@@ -2201,7 +2234,7 @@ function endTurn() {
   }
 
   // After lingering too long (15+ turns), wandering monsters approach
-  if (state.idleTurns > 0 && state.idleTurns % 15 === 0 && state.floor < 10) {
+  if (state.idleTurns > 0 && state.idleTurns % 15 === 0 && state.floor < MAX_FLOOR) {
     const spawnCount = 1 + (state.idleTurns >= 30 ? 1 : 0);
     const tier = Math.ceil(state.floor / 3);
     const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[1];
@@ -2240,8 +2273,8 @@ function endTurn() {
   processStatusEffects();
   if (state.gameOver) return;
 
-  // Victory check (boss dead on floor 10)
-  if (state.floor === 10 && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
+  // Victory check (boss dead on final floor)
+  if (state.floor === MAX_FLOOR && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
     showVictory();
     return;
   }
@@ -2603,6 +2636,12 @@ function renderInventory() {
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
     slot.textContent = item.glyph;
+    if ((item.count || 1) > 1) {
+      const badge = document.createElement('span');
+      badge.className = 'inv-count';
+      badge.textContent = item.count;
+      slot.appendChild(badge);
+    }
     const idx = i;
     makeTappable(slot, (e) => showItemMenu(item, idx, e));
     bar.appendChild(slot);

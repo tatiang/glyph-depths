@@ -195,6 +195,16 @@
 
     .inv-slot.equipped { border-color: var(--gold); box-shadow: 0 0 4px rgba(240, 192, 64, 0.3); }
     .inv-slot.empty { opacity: 0.3; }
+    .inv-count {
+      position: absolute;
+      bottom: 1px;
+      right: 3px;
+      font-size: 9px;
+      font-weight: bold;
+      color: var(--gold);
+      line-height: 1;
+      pointer-events: none;
+    }
 
     /* === CONTROLS === */
     #controls {
@@ -672,7 +682,7 @@
 
     <div id="msg-log">
       <div class="msg">Welcome to the Unnamed Depths. Nothing is what it seems.</div>
-      <div class="msg">Swipe or d-pad to move. Descend 10 floors and defeat the King.</div>
+      <div class="msg">Swipe or d-pad to move. Descend 20 floors and defeat the King.</div>
     </div>
 
     <div id="inv-bar">
