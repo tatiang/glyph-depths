@@ -1444,6 +1444,7 @@ function generateFloor() {
     addMessage(`${biome.name}: ${BIOME_ENTRY[state.floor]}`, 'gold');
   }
 
+
   // Place stairs down (except boss floor)
   if (state.floor < MAX_FLOOR) {
     const farthestRoom = getFarthestRoom(p.x, p.y);
@@ -1468,8 +1469,8 @@ function generateFloor() {
     placeGhost();
   }
 
-  // Merchant on floors 3, 6, 9
-  if ([3, 7, 11, 15, 19].includes(state.floor)) {
+  // Merchant on floors 5, 10, 15 (20-floor dungeon)
+  if ([5, 10, 15].includes(state.floor)) {
     spawnMerchant();
     addMessage("There's a merchant somewhere around here...", 'good');
   }
@@ -1762,7 +1763,7 @@ function bfsReachableStrict(sx, sy, tx, ty) {
 }
 
 function addOneWayDoors() {
-  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return;
+  if (state.floor <= 1 || state.floor >= MAX_FLOOR) return; // Not on first or boss floor
 
   // Find stairs
   let stx = -1, sty = -1;
@@ -1772,6 +1773,7 @@ function addOneWayDoors() {
     }
   }
   if (stx < 0) return;
+
 
   const candidates = [];
   for (let y = 1; y < MAP_H - 1; y++) {
@@ -5073,11 +5075,27 @@ function pickupItem(itemEntity) {
     }
     return;
   }
+  // Stack potions and scrolls of the same type
+  if (itemEntity.item.itemType === 'potion' || itemEntity.item.itemType === 'scroll') {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === itemEntity.item.itemType &&
+      i.effectId === itemEntity.item.effectId
+    );
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      state.itemsFound++;
+      addMessage(`You pick up ${itemEntity.item.name}. (×${existing.count})`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     showPopupNotice('Inventory Full');
     return;
   }
+  itemEntity.item.count = 1;
   state.player.inventory.push(itemEntity.item);
   state.itemsFound++;
   const it = itemEntity.item;
@@ -5297,7 +5315,7 @@ function useItem(item, index) {
 
     case 'potion':
       applyPotionEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       if (!item.identified) {
         potionIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
@@ -5307,7 +5325,7 @@ function useItem(item, index) {
 
     case 'scroll':
       applyScrollEffect(item);
-      p.inventory.splice(index, 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(index, 1); }
       if (!item.identified) {
         scrollIdentified[item.effectId] = true;
         addMessage(`It was a ${item.trueName}!`, 'good');
@@ -5426,8 +5444,13 @@ function useItem(item, index) {
 
 function dropItem(index) {
   const item = state.player.inventory[index];
-  state.entities.push(createItemEntity(item, state.player.x, state.player.y));
-  state.player.inventory.splice(index, 1);
+  const dropped = { ...item, count: 1 };
+  if ((item.count || 1) > 1) {
+    item.count--;
+  } else {
+    state.player.inventory.splice(index, 1);
+  }
+  state.entities.push(createItemEntity(dropped, state.player.x, state.player.y));
   addMessage(`You drop the ${item.name}.`, '');
   updateUI();
   render();
@@ -6305,7 +6328,7 @@ function endTurn() {
   processStatusEffects();
   if (state.gameOver) return;
 
-  // Victory check (boss dead on boss floor)
+  // Victory check (boss dead on final floor)
   if (state.floor === MAX_FLOOR && !state.entities.some(e => e.type === 'enemy' && e.name === 'Glyph King')) {
     showVictory();
     return;
@@ -8141,6 +8164,12 @@ function renderInventory() {
       if (isLoaded) slot.style.boxShadow = '0 0 6px rgba(255,128,32,0.5)';
     } else if (item.itemType === 'food' && item.stack && item.stack > 1) {
       slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#f0c040;font-weight:bold;">×${item.stack}</span>`;
+    } else if ((item.count || 1) > 1) {
+      slot.textContent = item.glyph;
+      const badge = document.createElement('span');
+      badge.className = 'inv-count';
+      badge.textContent = item.count;
+      slot.appendChild(badge);
     } else {
       slot.textContent = item.glyph;
     }
