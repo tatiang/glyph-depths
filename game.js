@@ -2219,10 +2219,10 @@ function renderSageServices(sage) {
   const discount = p.bartererDiscount;
   const finalPrice = (base) => Math.max(1, discount ? Math.floor(scalePrice(base) * 0.75) : scalePrice(base));
 
-  const UNCURSE_COST  = finalPrice(UNCURSE_BASE);
-  const IDENTIFY_COST = finalPrice(IDENTIFY_BASE);
-  const HEAL_COST     = finalPrice(HEAL_BASE);
-  const BLESS_COST    = finalPrice(BLESS_BASE);
+  const UNCURSE_COST  = getLocalPrice(sage, 'uncurse', finalPrice(UNCURSE_BASE));
+  const IDENTIFY_COST = getLocalPrice(sage, 'identify', finalPrice(IDENTIFY_BASE));
+  const HEAL_COST     = getLocalPrice(sage, 'heal', finalPrice(HEAL_BASE));
+  const BLESS_COST    = getLocalPrice(sage, 'bless', finalPrice(BLESS_BASE));
 
   // Show discount banner for Barterer or scholars/clerics
   if (discount || isScholar || isCleric) {
@@ -2254,6 +2254,7 @@ function renderSageServices(sage) {
         }
         addMessage(`The sage purifies your gear! ${removed} item${removed === 1 ? '' : 's'} uncursed.`, 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'uncurse');
         animateEntityFlash(p.x, p.y, '#f0c040');
         renderSageServices(sage);
         updateUI();
@@ -2287,6 +2288,7 @@ function renderSageServices(sage) {
         refreshIdentifiedItems();
         addMessage(`The sage reveals ${count} item${count === 1 ? '' : 's'}!`, 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'identify');
         animateEntityFlash(p.x, p.y, '#60c0ff');
         renderSageServices(sage);
         updateUI();
@@ -2314,6 +2316,7 @@ function renderSageServices(sage) {
         p.hp = p.maxHp;
         addMessage(`The sage restores you fully! (+${healed} HP)`, 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'heal');
         animateEntityFlash(p.x, p.y, '#40ff60');
         renderSageServices(sage);
         updateUI();
@@ -2340,6 +2343,7 @@ function renderSageServices(sage) {
         applyStatusEffect(p, 'blessed', 50);
         addMessage('The sage blesses your weapon! (+2 Atk, 50 turns)', 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'bless');
         animateEntityFlash(p.x, p.y, '#ffe060');
         renderSageServices(sage);
         updateUI();
@@ -2356,7 +2360,7 @@ function renderSageServices(sage) {
 
   // Enchanted Lantern (if player doesn't already have one)
   const hasLantern = p.inventory.some(it => it.itemType === 'lantern');
-  const LANTERN_COST = finalPrice(35);
+  const LANTERN_COST = getLocalPrice(sage, 'lantern', finalPrice(35));
   const lanternDiv = document.createElement('div');
   lanternDiv.className = 'shop-item';
   if (!hasLantern) {
@@ -2367,6 +2371,7 @@ function renderSageServices(sage) {
         p.inventory.push({ name: 'Enchanted Lantern', glyph: '🔦', itemType: 'lantern', desc: 'Use Oil Flasks to light. +3 FOV when lit.', value: 35, indestructible: true });
         addMessage('You purchase an Enchanted Lantern!', 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'lantern');
         renderSageServices(sage);
         updateUI();
       } else {
@@ -2382,7 +2387,7 @@ function renderSageServices(sage) {
 
   // Alchemist's Mortar (if player doesn't already have one)
   const hasMortar = p.inventory.some(it => it.itemType === 'mortar');
-  const MORTAR_COST = finalPrice(30);
+  const MORTAR_COST = getLocalPrice(sage, 'mortar', finalPrice(30));
   const mortarDiv = document.createElement('div');
   mortarDiv.className = 'shop-item';
   if (!hasMortar) {
@@ -2393,6 +2398,7 @@ function renderSageServices(sage) {
         p.inventory.push({ name: "Alchemist's Mortar", glyph: '🧪', itemType: 'mortar', desc: 'Combine 2 potions + herb to brew powerful elixirs.', value: 30, indestructible: true });
         addMessage("You purchase an Alchemist's Mortar!", 'good');
         Audio.gold();
+        recordLocalPurchase(sage, 'mortar');
         renderSageServices(sage);
         updateUI();
       } else {
@@ -2406,9 +2412,9 @@ function renderSageServices(sage) {
   }
   container.appendChild(mortarDiv);
 
-  // +1 Defense (escalating cost per purchase)
+  // +1 Defense (escalating cost per purchase, plus local inflation)
   const DEF_BASE = 15 + (p.defPurchases || 0) * 10;
-  const DEF_COST = finalPrice(DEF_BASE);
+  const DEF_COST = getLocalPrice(sage, 'defense', finalPrice(DEF_BASE));
   const defDiv = document.createElement('div');
   defDiv.className = 'shop-item';
   defDiv.innerHTML = `<span>🛡️ +1 Defense</span><span class="price">${DEF_COST}💰</span>`;
@@ -2419,6 +2425,7 @@ function renderSageServices(sage) {
       p.defPurchases = (p.defPurchases || 0) + 1;
       addMessage(`The sage hardens your resolve! (+1 DEF, now ${p.defense})`, 'good');
       Audio.gold();
+      recordLocalPurchase(sage, 'defense');
       animateEntityFlash(p.x, p.y, '#80b0ff');
       renderSageServices(sage);
       updateUI();
@@ -2429,7 +2436,7 @@ function renderSageServices(sage) {
   container.appendChild(defDiv);
 
   // Refresh services button
-  const REFRESH_COST = finalPrice(30);
+  const REFRESH_COST = getLocalPrice(sage, 'refresh', finalPrice(30));
   const refreshDiv = document.createElement('div');
   refreshDiv.className = 'shop-item';
   if (sage.refreshesLeft > 0) {
@@ -2437,6 +2444,7 @@ function renderSageServices(sage) {
     const refreshHandler = () => {
       if (p.gold >= REFRESH_COST) {
         p.gold -= REFRESH_COST;
+        recordLocalPurchase(sage, 'refresh');
         sage.refreshesLeft--;
         // Remove blessed status so it can be re-purchased
         p.statusEffects = p.statusEffects.filter(e => e.type !== 'blessed');
@@ -2645,16 +2653,21 @@ function showTavern(tavern) {
     updateUI();
   }
 
-  // Buy Ration — 5 gold
+  // Buy Ration — base 5 gold, inflates per purchase from this tavern
+  const rationPrice = getLocalPrice(tavern, 'ration', 5);
   const rationBtn = document.createElement('button');
   rationBtn.className = 'perk-btn';
-  rationBtn.innerHTML = `<div class="perk-name">🍖 Buy Ration (5💰)</div><div class="perk-desc">Add food to your inventory</div>`;
+  rationBtn.innerHTML = `<div class="perk-name">🍖 Buy Ration (${rationPrice}💰)</div><div class="perk-desc">Add food to your inventory</div>`;
   const rationHandler = () => {
-    if (p.gold >= 5) {
+    const cost = getLocalPrice(tavern, 'ration', 5);
+    if (p.gold >= cost) {
       if (addFoodToInventory()) {
-        p.gold -= 5;
+        p.gold -= cost;
+        recordLocalPurchase(tavern, 'ration');
         tavernFeedback('You buy a warm ration.', 'good');
         Audio.gold();
+        // Refresh button to show updated price
+        rationBtn.innerHTML = `<div class="perk-name">🍖 Buy Ration (${getLocalPrice(tavern, 'ration', 5)}💰)</div><div class="perk-desc">Add food to your inventory</div>`;
       } else {
         tavernFeedback('Inventory full!', 'damage');
       }
@@ -2704,22 +2717,26 @@ function showTavern(tavern) {
   rumorBtn.addEventListener('touchend', (e) => { e.preventDefault(); rumorHandler(); }, { passive: false });
   container.appendChild(rumorBtn);
 
-  // Gamble — 10 gold, 50/50
+  // Gamble — base 10 gold, inflates per gamble at this tavern
+  const gamblePrice = getLocalPrice(tavern, 'gamble', 10);
   const gambleBtn = document.createElement('button');
   gambleBtn.className = 'perk-btn';
-  gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (10💰)</div><div class="perk-desc">50/50: double your bet or lose it</div>`;
+  gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (${gamblePrice}💰)</div><div class="perk-desc">50/50: double your bet or lose it</div>`;
   const gambleHandler = () => {
-    if (p.gold >= 10) {
-      p.gold -= 10;
+    const cost = getLocalPrice(tavern, 'gamble', 10);
+    if (p.gold >= cost) {
+      p.gold -= cost;
+      recordLocalPurchase(tavern, 'gamble');
       if (Math.random() < 0.5) {
-        p.gold += 20;
-        tavernFeedback('You win! The dice favor you. (+20 gold)', 'gold');
+        p.gold += cost * 2;
+        tavernFeedback(`You win! The dice favor you. (+${cost * 2} gold)`, 'gold');
         Audio.gold();
       } else {
-        tavernFeedback('You lose... The house always wins. (-10 gold)', 'damage');
+        tavernFeedback(`You lose... The house always wins. (-${cost} gold)`, 'damage');
         Audio.hit();
       }
       haptic(30);
+      gambleBtn.innerHTML = `<div class="perk-name">🎲 Gamble (${getLocalPrice(tavern, 'gamble', 10)}💰)</div><div class="perk-desc">50/50: double your bet or lose it</div>`;
       refreshGold();
     } else {
       tavernFeedback('Not enough gold to gamble.', 'damage');
@@ -2731,9 +2748,10 @@ function showTavern(tavern) {
 
   // Hire Sword — hire a companion ally
   const hasAlly = state.entities.some(e => e.type === 'enemy' && e.isAlly);
-  const HIRE_COST = 40;
+  const HIRE_BASE = 40;
+  const localHireCost = getLocalPrice(tavern, 'hire', HIRE_BASE);
   const bartDiscount = p.bartererDiscount;
-  const finalHireCost = bartDiscount ? Math.max(1, Math.floor(HIRE_COST * 0.75)) : HIRE_COST;
+  const finalHireCost = bartDiscount ? Math.max(1, Math.floor(localHireCost * 0.75)) : localHireCost;
   const hireBtn = document.createElement('button');
   hireBtn.className = 'perk-btn';
   const allyHp = Math.floor(10 + state.floor * 2);
@@ -2751,6 +2769,7 @@ function showTavern(tavern) {
     }
     if (p.gold >= finalHireCost) {
       p.gold -= finalHireCost;
+      recordLocalPurchase(tavern, 'hire');
       // Spawn ally near the player
       const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
       let ax = state.player.x, ay = state.player.y;
@@ -6045,6 +6064,20 @@ function showShrineChoice() {
   $('levelup-overlay').classList.add('active');
 }
 
+// === LOCAL PRICING ===
+// Per-instance price inflation: each purchase of a specific item/service
+// from a specific shop entity increases that item's price by 15%.
+function getLocalPrice(entity, key, basePrice) {
+  if (!entity._purchaseCounts) entity._purchaseCounts = {};
+  const count = entity._purchaseCounts[key] || 0;
+  return Math.ceil(basePrice * (1 + 0.15 * count));
+}
+
+function recordLocalPurchase(entity, key) {
+  if (!entity._purchaseCounts) entity._purchaseCounts = {};
+  entity._purchaseCounts[key] = (entity._purchaseCounts[key] || 0) + 1;
+}
+
 // === MERCHANT ===
 function showMerchant(merchant) {
   merchant.visited = true;
@@ -6100,7 +6133,8 @@ function renderShopItems(merchant) {
     else if (it.itemType === 'ranged') statTag = ` <span style="color:#4a9;font-size:11px;">[${it.damage} DMG, ${it.range} rng]</span>`;
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
-    const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(shopItem.price * 0.75)) : shopItem.price;
+    const localPrice = getLocalPrice(merchant, it.name, shopItem.price);
+    const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(localPrice * 0.75)) : localPrice;
     const exclusiveTag = shopItem.artificerOnly ? ` <span style="color:#f0a030;font-size:11px;">[⚒️ Forged]</span>` : '';
     const collapsedHTML = `<span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
     div.innerHTML = collapsedHTML;
@@ -6131,6 +6165,7 @@ function renderShopItems(merchant) {
           if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
         }
         Audio.gold();
+        recordLocalPurchase(merchant, shopItem.item.name);
         // Sharp Dealer: every 3rd purchase grants a free item
         if (state.player.sharpDealer) {
           state.player.merchantPurchaseCount = (state.player.merchantPurchaseCount || 0) + 1;
