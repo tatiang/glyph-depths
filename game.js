@@ -270,19 +270,27 @@ function renderCodexContent(cat) {
     div.className = 'codex-entry' + (isUnlocked ? ' codex-entry-unlocked' : ' codex-entry-locked');
     if (isUnlocked) {
       div.innerHTML = `
-        <div class="codex-entry-header">
-          <span class="codex-entry-icon">${entry.icon}</span>
-          <span class="codex-entry-title">${entry.title}</span>
-          ${isNew ? '<span class="codex-new-badge">NEW</span>' : ''}
-        </div>
-        <div class="codex-entry-text">${entry.text}</div>`;
+        <div class="codex-entry-body">
+          <div class="codex-glyph-badge">${entry.icon}</div>
+          <div class="codex-entry-content">
+            <div class="codex-entry-header">
+              <span class="codex-entry-title">${entry.title}</span>
+              ${isNew ? '<span class="codex-new-badge">NEW</span>' : ''}
+            </div>
+            <div class="codex-entry-text">${entry.text}</div>
+          </div>
+        </div>`;
     } else {
       div.innerHTML = `
-        <div class="codex-entry-header">
-          <span class="codex-entry-icon" style="opacity:0.25">❓</span>
-          <span class="codex-entry-title codex-locked-title">${entry.lockedTitle || '???'}</span>
-        </div>
-        <div class="codex-entry-text codex-locked-text">Not yet discovered.</div>`;
+        <div class="codex-entry-body">
+          <div class="codex-glyph-badge" style="opacity:0.25;font-size:20px">❓</div>
+          <div class="codex-entry-content">
+            <div class="codex-entry-header">
+              <span class="codex-entry-title codex-locked-title">${entry.lockedTitle || '???'}</span>
+            </div>
+            <div class="codex-entry-text codex-locked-text">Not yet discovered.</div>
+          </div>
+        </div>`;
     }
     container.appendChild(div);
   }
@@ -1108,7 +1116,7 @@ function newRun(classId = 'adventurer') {
   applyMasteryBonuses(classId);
   const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
   // Welcome messages with player name and class
-  addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into the Unnamed Depths.`, 'gold');
+  addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into the Shards of the Unknown.`, 'gold');
   const activeMasteries = getActiveMasteries(classId);
   if (activeMasteries.length > 0) {
     addMessage(`Mastery bonuses: ${activeMasteries.map(m => m.name).join(', ')}`, 'gold');
@@ -2306,7 +2314,7 @@ const NPC_LORE = [
   "A shade recalls: \"I once found three runes on a single floor. The synergy made me invincible. For two floors. Then I met something that didn't care about synergies.\"",
   // Humor and personality
   "A ghost laughs to itself: \"The Glyph King sends his regards. I don't know what that means. I've been saying it for centuries because another ghost told me to.\"",
-  "A spectral figure gestures broadly: \"Welcome to the Unnamed Depths! Population: declining. Amenities: merchants who can't leave and taverns that serve ghost ale. Enjoy your stay.\"",
+  "A spectral figure gestures broadly: \"Welcome to the Shards of the Unknown! Population: declining. Amenities: merchants who can't leave and taverns that serve ghost ale. Enjoy your stay.\"",
   "A translucent cook grumbles: \"Rations in this dungeon taste like cardboard soaked in regret. But they keep you alive, so eat them and stop complaining.\"",
   "A shade of a locksmith mutters: \"Bone keys. Who makes keys out of bone? Aldric, that's who. The man was practical in the worst possible way.\"",
   "A ghost waves dismissively: \"Everyone asks how to beat the King. Nobody asks how the King is doing. The answer is: bored, immortal, and rewriting the laws of physics for fun.\"",
