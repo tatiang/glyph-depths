@@ -538,7 +538,7 @@ const CLASS_DEFS = [
   },
   {
     id: 'ninja', name: 'Ninja', icon: '🌟',
-    flavor: 'Silent, precise. Strikes front and back simultaneously.',
+    flavor: 'Silent, precise. Strikes two foes in a single turn.',
     hp: 11, attack: 3, defense: 0,
     hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
     passive: '🗡️ Backstab: hits opposite tile · 🌟 Star Throw',
@@ -3053,9 +3053,9 @@ function randomRoomFloorTile() {
 
 function getFloorConfig(floor) {
   const configs = {
-    1:  { tier: 1, nextTier: null, minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 1 },
-    2:  { tier: 1, nextTier: null, minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 1 },
-    3:  { tier: 1, nextTier: 2,   minEnemies: 4, maxEnemies: 5, minItems: 3, maxItems: 4, food: 1 },
+    1:  { tier: 1, nextTier: null, minEnemies: 2, maxEnemies: 3, minItems: 2, maxItems: 3, food: 2 },
+    2:  { tier: 1, nextTier: null, minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 2 },
+    3:  { tier: 1, nextTier: 2,   minEnemies: 4, maxEnemies: 5, minItems: 3, maxItems: 4, food: 2 },
     4:  { tier: 1, nextTier: 2,   minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
     5:  { tier: 2, nextTier: null, minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
     6:  { tier: 2, nextTier: null, minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
@@ -4083,6 +4083,17 @@ function processEntityEffects(entity) {
     playerDeath('status effects', '☠️');
   } else if (entity.hp <= 0 && !isPlayer) {
     addMessage(`${entity.name} succumbs to their wounds!`, 'good');
+    if (!entity.isAlly) {
+      state.player.xp += entity.xp;
+      state.score += entity.xp * 10;
+      checkBadgesOnKill(entity);
+      while (state.player.xp >= state.player.xpToNext) {
+        state.player.xp -= state.player.xpToNext;
+        state.player.level++;
+        state.player.xpToNext = 15 + state.player.level * 10;
+        showLevelUp();
+      }
+    }
     removeEntity(entity);
     state.enemiesKilled++;
   }
@@ -4657,12 +4668,15 @@ function playerMove(dx, dy) {
         if (bonus && bonus !== enemy && bonus.hp > 0) { attackEntity(p, bonus); break; }
       }
     }
-    // Ninja backstab: also attack enemy directly behind player
+    // Ninja dual strike: also attack any other adjacent enemy in the same turn
     if (p.backstab) {
-      const backEnemy = enemyAt(p.x - dx, p.y - dy);
-      if (backEnemy && backEnemy.hp > 0 && !backEnemy.isAlly) {
-        attackEntity(p, backEnemy);
-        addMessage('🌟 Backstab!', 'good');
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const second = enemyAt(p.x + ddx, p.y + ddy);
+        if (second && second !== enemy && second.hp > 0 && !second.isAlly) {
+          attackEntity(p, second);
+          addMessage('🌟 Dual Strike!', 'good');
+          break;
+        }
       }
     }
     // Daredevil ricochet: chain to adjacent enemies at 50% then 25%
@@ -5988,15 +6002,19 @@ function triggerSpecialEvent() {
 function showShrineChoice() {
   inputLocked = true;
   const allSacrifices = [
+    // High-cost options
     { text: 'Sacrifice 5 Max HP for +2 Attack', apply: () => { state.player.maxHp -= 5; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.attack += 2; }},
     { text: 'Sacrifice 10 Gold for +1 Defense', apply: () => { state.player.gold = Math.max(0, state.player.gold - 10); state.player.defense += 1; }},
     { text: 'Sanctify your soul — gain life-drain immunity', apply: () => { state.player.drainImmune = true; addMessage('🛡️ Your soul is shielded from the hunger of wraiths.', 'good'); }, condition: () => !state.player.drainImmune && state.player.classId !== 'cleric' },
     { text: 'Sacrifice 3 Max HP to restore 30 hunger', apply: () => { state.player.maxHp -= 3; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.hunger = Math.min(100, state.player.hunger + 30); }},
+    // Low-cost / helpful options
+    { text: 'The shrine tends your wounds — restore 4 HP', apply: () => { state.player.hp = Math.min(state.player.maxHp, state.player.hp + 4); addMessage('The shrine mends your wounds.', 'good'); }, condition: () => state.player.hp < state.player.maxHp },
+    { text: 'The shrine eases your hunger — restore 25 hunger', apply: () => { state.player.hunger = Math.min(100, state.player.hunger + 25); addMessage('The shrine soothes your hunger.', 'good'); }, condition: () => state.player.hunger < 80 },
   ];
   // Filter to available options + always include "leave"
   const sacrifices = allSacrifices.filter(s => !s.condition || s.condition());
-  // Pick 2 random options from available, plus "leave"
-  while (sacrifices.length > 2) sacrifices.splice(Math.floor(Math.random() * sacrifices.length), 1);
+  // Pick 3 random options from available, plus "leave"
+  while (sacrifices.length > 3) sacrifices.splice(Math.floor(Math.random() * sacrifices.length), 1);
   sacrifices.push({ text: 'Leave the shrine alone', apply: () => {} });
 
   const container = $('perk-choices');
@@ -6275,7 +6293,9 @@ function endTurn() {
     const classRate = state.player.hungerRate || 1;
     const plentyBonus = hasStatusEffect(state.player, 'plenty') ? 0.5 : 1;
     const diffMult = state.difficulty === 'easy' ? 0.75 : state.difficulty === 'hard' ? 1.25 : 1;
-    const rate = classRate * ringBonus * runeBonus * plentyBonus * diffMult;
+    // Early floors: hunger drains more slowly to ease new players into the mechanic
+    const earlyFloorMult = state.floor <= 2 ? 0.5 : state.floor <= 4 ? 0.75 : 1;
+    const rate = classRate * ringBonus * runeBonus * plentyBonus * diffMult * earlyFloorMult;
     const drainBase = Math.floor(rate);
     const drainFrac = rate % 1;
     const drain = drainBase + (Math.random() < (drainFrac || 1) ? 1 : 0);
@@ -7196,9 +7216,6 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
     btnRow.appendChild(loadBtn);
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'save-action-btn save-delete';
-    delBtn.textContent = '\uD83D\uDDD1';
     const capturedCloud = Array.isArray(cloudSaves) ? cloudSaves : [];
     const confirmDeleteFn = () => {
       // Replace btnRow with inline confirmation strip
@@ -8231,7 +8248,9 @@ function updateUI() {
       setBtn(`🪙 RATION (−5 HP)`, canAfford);
       setBar(canAfford ? 100 : 0, canAfford ? '#f0c040' : 'var(--text-dim)');
     } else {
-      spRow.style.display = 'none';
+      spRow.style.display = '';
+      setBtn('No special ability', false);
+      setBar(0, 'var(--text-dim)');
     }
   }
 }
