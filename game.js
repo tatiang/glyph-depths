@@ -1460,6 +1460,7 @@ function generateFloor() {
 
   // Spawn enemies
   spawnEnemies();
+  guaranteeLargeRoomEnemies();
 
   // Spawn items
   spawnItems();
@@ -1977,6 +1978,51 @@ function spawnEnemies() {
       template = templates[Math.floor(Math.random() * templates.length)];
     }
     state.entities.push(createEnemy(template, pos.x, pos.y));
+  }
+}
+
+// Guarantee at least one enemy in every large room (area >= 72 tiles).
+// Runs after spawnEnemies() so it only fills rooms left empty by the normal pass.
+// Caps extra spawns to avoid flooding early floors.
+function guaranteeLargeRoomEnemies() {
+  if (state.floor === MAX_FLOOR) return;
+  const LARGE_ROOM_AREA = 72; // ~9×8 tiles — noticeably spacious
+  // Max extras: scales gently with floor so early levels stay manageable
+  const maxExtra = state.floor <= 3 ? 2 : state.floor <= 6 ? 3 : 99;
+  const floorConfig = getFloorConfig(state.floor);
+  const tier = floorConfig.tier;
+  const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[1];
+  let extraSpawned = 0;
+
+  for (const room of state.rooms) {
+    if (extraSpawned >= maxExtra) break;
+    if (room.w * room.h < LARGE_ROOM_AREA) continue;
+
+    // Check if any enemy is already inside this room
+    const hasEnemy = state.entities.some(e =>
+      e.type === 'enemy' && e.hp > 0 &&
+      e.x >= room.x && e.x < room.x + room.w &&
+      e.y >= room.y && e.y < room.y + room.h
+    );
+    if (hasEnemy) continue;
+
+    // Collect valid spawn tiles inside the room
+    const candidates = [];
+    for (let ry = room.y; ry < room.y + room.h; ry++) {
+      for (let rx = room.x; rx < room.x + room.w; rx++) {
+        if (getTile(rx, ry) !== T.FLOOR) continue;
+        if (enemyAt(rx, ry)) continue;
+        // Keep a 3-tile buffer from the player
+        if (Math.abs(rx - state.player.x) <= 3 && Math.abs(ry - state.player.y) <= 3) continue;
+        candidates.push({ x: rx, y: ry });
+      }
+    }
+    if (candidates.length === 0) continue;
+
+    const pos = candidates[Math.floor(Math.random() * candidates.length)];
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    state.entities.push(createEnemy(template, pos.x, pos.y));
+    extraSpawned++;
   }
 }
 
