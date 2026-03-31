@@ -79,6 +79,9 @@ let badgeState = {}; // { badgeId: { unlocked: true, date: '...' } }
 let badgeCounts = {}; // cumulative counters: { exterminator: 100, rat_catcher: 10, ... }
 let badgesEarnedThisRun = []; // badges unlocked during current run
 
+let codexUnlocked = new Set(); // IDs of discovered codex entries
+let codexNew = new Set();      // IDs unlocked since last Codex open
+
 function loadBadges() {
   try {
     badgeState = JSON.parse(localStorage.getItem('glyphDepths_badges') || '{}');
@@ -90,6 +93,26 @@ function saveBadges() {
   try {
     localStorage.setItem('glyphDepths_badges', JSON.stringify(badgeState));
     localStorage.setItem('glyphDepths_badgeCounts', JSON.stringify(badgeCounts));
+  } catch {}
+}
+
+function loadCodex() {
+  try {
+    const raw = localStorage.getItem('glyphDepths_codex');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      codexUnlocked = new Set(parsed.unlocked || []);
+      codexNew = new Set(parsed.newIds || []);
+    }
+  } catch { codexUnlocked = new Set(); codexNew = new Set(); }
+}
+
+function saveCodex() {
+  try {
+    localStorage.setItem('glyphDepths_codex', JSON.stringify({
+      unlocked: Array.from(codexUnlocked),
+      newIds: Array.from(codexNew)
+    }));
   } catch {}
 }
 
@@ -162,6 +185,130 @@ function showBadgeOverlay() {
 function closeBadgeOverlay() {
   $('badge-overlay').classList.remove('active');
   inputLocked = false;
+}
+
+// === CODEX ===
+function toRoman(n) {
+  const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+  const syms = ['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+  let r = '';
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) { r += syms[i]; n -= vals[i]; }
+  }
+  return r;
+}
+
+function biomeCodexId(floor) {
+  if (floor <= 4)  return 'biome_sewers';
+  if (floor <= 8)  return 'biome_crypt';
+  if (floor <= 12) return 'biome_citadel';
+  if (floor <= 16) return 'biome_abyss';
+  if (floor < MAX_FLOOR) return 'biome_sanctum';
+  return 'biome_throne';
+}
+
+function findCodexEntry(id) {
+  if (id.startsWith('bestiary_')) return CODEX_BESTIARY_DATA.find(e => e.id === id) || null;
+  if (id.startsWith('biome_'))    return CODEX_BIOME_DATA.find(e => e.id === id) || null;
+  if (id.startsWith('rune_')) {
+    const rune = GLYPH_RUNES.find(r => 'rune_' + r.id === id);
+    return rune ? { icon: rune.symbol, title: rune.name, cat: 'runes' } : null;
+  }
+  if (id.startsWith('lore_')) {
+    const idx = parseInt(id.slice(5));
+    return { icon: '🗣️', title: 'Fragment ' + toRoman(idx + 1), cat: 'lore' };
+  }
+  return null;
+}
+
+function unlockCodexEntry(id) {
+  if (codexUnlocked.has(id)) return;
+  codexUnlocked.add(id);
+  codexNew.add(id);
+  saveCodex();
+  const entry = findCodexEntry(id);
+  if (entry) showCodexToast(entry);
+}
+
+function showCodexToast(entry) {
+  const toast = $('badge-toast');
+  if (!toast) return;
+  toast.innerHTML = `<span class="badge-toast-icon">📖</span> <span class="badge-toast-text">Codex Updated: ${entry.title}</span>`;
+  toast.classList.add('active');
+  setTimeout(() => toast.classList.remove('active'), 3200);
+}
+
+function getCodexEntriesForCat(cat) {
+  if (cat === 'bestiary') return CODEX_BESTIARY_DATA;
+  if (cat === 'biomes')   return CODEX_BIOME_DATA;
+  if (cat === 'runes') return GLYPH_RUNES.map(r => ({
+    id: 'rune_' + r.id, icon: r.symbol, cat: 'runes', title: r.name, text: r.desc, lockedTitle: r.name
+  }));
+  if (cat === 'lore') return NPC_LORE.map((text, i) => ({
+    id: 'lore_' + i, icon: '🗣️', cat: 'lore',
+    title: 'Fragment ' + toRoman(i + 1),
+    text,
+    lockedTitle: 'Unknown Fragment'
+  }));
+  return [];
+}
+
+function renderCodexContent(cat) {
+  const container = $('codex-entries');
+  const progress  = $('codex-progress');
+  if (!container || !progress) return;
+  container.innerHTML = '';
+
+  const entries  = getCodexEntriesForCat(cat);
+  const found    = entries.filter(e => codexUnlocked.has(e.id)).length;
+  progress.textContent = `${found} / ${entries.length} discovered`;
+
+  for (const entry of entries) {
+    const isUnlocked = codexUnlocked.has(entry.id);
+    const isNew      = codexNew.has(entry.id);
+    const div = document.createElement('div');
+    div.className = 'codex-entry' + (isUnlocked ? ' codex-entry-unlocked' : ' codex-entry-locked');
+    if (isUnlocked) {
+      div.innerHTML = `
+        <div class="codex-entry-header">
+          <span class="codex-entry-icon">${entry.icon}</span>
+          <span class="codex-entry-title">${entry.title}</span>
+          ${isNew ? '<span class="codex-new-badge">NEW</span>' : ''}
+        </div>
+        <div class="codex-entry-text">${entry.text}</div>`;
+    } else {
+      div.innerHTML = `
+        <div class="codex-entry-header">
+          <span class="codex-entry-icon" style="opacity:0.25">❓</span>
+          <span class="codex-entry-title codex-locked-title">${entry.lockedTitle || '???'}</span>
+        </div>
+        <div class="codex-entry-text codex-locked-text">Not yet discovered.</div>`;
+    }
+    container.appendChild(div);
+  }
+}
+
+let codexActiveCat = 'bestiary';
+
+function showCodexOverlay() {
+  codexActiveCat = 'bestiary';
+  setActiveCodexTab('bestiary');
+  renderCodexContent('bestiary');
+  inputLocked = true;
+  $('codex-overlay').classList.add('active');
+}
+
+function closeCodexOverlay() {
+  codexNew.clear();
+  saveCodex();
+  $('codex-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function setActiveCodexTab(cat) {
+  document.querySelectorAll('.codex-tab').forEach(btn => {
+    btn.classList.toggle('codex-tab-active', btn.dataset.cat === cat);
+  });
 }
 
 function renderBadgesEarned(containerId) {
@@ -634,6 +781,7 @@ function boot() {
   ctxC = canvas.getContext('2d');
   loadSettings();
   loadBadges();
+  loadCodex();
   loadMastery();
   setupCanvas();
   setupInput();
@@ -1347,6 +1495,47 @@ const GLYPH_RUNES = [
   { id: 'fortune',   name: 'Glyph of Fortune',    symbol: '🍀', desc: '+5% crit chance', effect: 'fortune' },
 ];
 
+// === CODEX DATA ===
+const CODEX_BESTIARY_DATA = [
+  { id: 'bestiary_rat',              icon: '🐀', cat: 'bestiary', title: 'Sewer Rat',          text: 'Once pets of Erathis\'s inhabitants, warped by ambient rune energy into lean scavengers. They flee when wounded — a rare show of wisdom in these depths.' },
+  { id: 'bestiary_skeleton',         icon: '💀', cat: 'bestiary', title: 'Skeleton',            text: 'Bone and iron will, sustained by patrol glyphs carved into their ribs. The runes remember their purpose long after the mind has dissolved.' },
+  { id: 'bestiary_bat',              icon: '🦇', cat: 'bestiary', title: 'Bat',                 text: 'Drawn to glyph resonance, they navigate halls where silence is rare. Erratic and quick — kill them before they call others.' },
+  { id: 'bestiary_slime',            icon: '🟢', cat: 'bestiary', title: 'Slime',               text: 'A colony of cells unified by terrible hunger. Cutting one in half doesn\'t reduce its appetite — it doubles it. The runes prevent them from ever fully dying.' },
+  { id: 'bestiary_goblin',           icon: '👺', cat: 'bestiary', title: 'Goblin',              text: 'Former scavengers who found the depths profitable and stopped leaving. Cunning, greedy, surprisingly resilient. They learned to navigate the runes. Now they enforce them.' },
+  { id: 'bestiary_ghost',            icon: '👻', cat: 'bestiary', title: 'Ghost',               text: 'The restless dead who refused the Crypt\'s hospitality. Phase-shifted by unresolved purpose, they drift through walls searching for something they\'ve forgotten they lost.' },
+  { id: 'bestiary_spider',           icon: '🕷️', cat: 'bestiary', title: 'Spider',              text: 'Cave spiders grew enormous in the dark and learned patience. Their webs are woven from crystallized silence — step in one and the world goes very, very quiet.' },
+  { id: 'bestiary_ogre',             icon: '👹', cat: 'bestiary', title: 'Ogre',                text: 'The dungeon\'s groundskeepers, kept loyal by choice glyphs. Strong enough to move rubble, too dim to ask questions. The runes gave them duty and took their doubts.' },
+  { id: 'bestiary_wraith',           icon: '🌑', cat: 'bestiary', title: 'Wraith',              text: 'Creatures of pure hunger — life-draining echoes that have forgotten everything but the cold. They weep as they kill. The tears are the worst part.' },
+  { id: 'bestiary_mimic',            icon: '📦', cat: 'bestiary', title: 'Mimic',               text: 'Items that absorbed too much ambient glyph energy and developed appetite. Not malice — just terrible, fundamental loneliness expressed through teeth.' },
+  { id: 'bestiary_necromancer',      icon: '☠️', cat: 'bestiary', title: 'Necromancer',         text: 'Aldric\'s former students who believed they could master death. They learned too well. Now they animate the dead out of academic habit and professional despair.' },
+  { id: 'bestiary_demon',            icon: '😈', cat: 'bestiary', title: 'Demon',               text: 'Born when Aldric drove flame runes into living rock. Each leaves embers in its wake — not as a weapon, but a signature. They consider it art.' },
+  { id: 'bestiary_dark_knight',      icon: '🗡️', cat: 'bestiary', title: 'Dark Knight',        text: 'The Citadel\'s honor guard. Their armor is fused to their bones. They cannot remove it. They cannot stop fighting. They follow orders carved into their marrow.' },
+  { id: 'bestiary_banshee',          icon: '👻', cat: 'bestiary', title: 'Banshee',             text: 'Every shriek is a death replayed — not a weapon but a memory. The wail is the precise moment they died, echoing in corridors that learned to carry grief.' },
+  { id: 'bestiary_hydra',            icon: '🐉', cat: 'bestiary', title: 'Hydra',               text: 'A garden snake before the runes found it. Each piece remembers the whole. The whole remembers only hunger.' },
+  { id: 'bestiary_warlock',          icon: '🧙', cat: 'bestiary', title: 'Warlock',             text: 'Sorcerers who bargained for rune power and received too much of it. They flee because the power burns and they dare not stop moving.' },
+  { id: 'bestiary_shadow_stalker',   icon: '🕶️', cat: 'bestiary', title: 'Shadow Stalker',     text: 'Assassins who traded their shadow for speed. The shadow kept hunting independently. Now they are both hunter and hunted.' },
+  { id: 'bestiary_abyssal_fiend',    icon: '👿', cat: 'bestiary', title: 'Abyssal Fiend',       text: 'Something that seeped through rune fractures. It burns because it comes from a realm where burning is simply the natural state of all things.' },
+  { id: 'bestiary_void_wraith',      icon: '🌀', cat: 'bestiary', title: 'Void Wraith',         text: 'A Wraith that fell into the Abyss and found nothing to anchor to. It drains life to confirm that solid things still exist somewhere in creation.' },
+  { id: 'bestiary_elder_mimic',      icon: '📦', cat: 'bestiary', title: 'Elder Mimic',         text: 'Old enough to have forgotten it was ever an object. It has perfected the art of being a room. You may have walked through one already.' },
+  { id: 'bestiary_arch_lich',        icon: '☠️', cat: 'bestiary', title: 'Arch Lich',           text: 'Aldric\'s first apprentice, fully consumed. He collects spellbooks with the casual cruelty of a child collecting beetles — for a work he\'ll never finish.' },
+  { id: 'bestiary_phantom_assassin', icon: '🗝️', cat: 'bestiary', title: 'Phantom Assassin',   text: 'Rogues who found the depths comfortable and stopped leaving. They strike from angles that don\'t exist, from silence that shouldn\'t be able to hold a shape.' },
+  { id: 'bestiary_cave_troll',       icon: '🧌', cat: 'bestiary', title: 'Cave Troll',          text: 'The city\'s blacksmith before the fall. Aldric\'s runes gave him impossible strength and took his mind. He regenerates because the runes refuse a craftsman\'s death.' },
+  { id: 'bestiary_lich',             icon: '🧿', cat: 'bestiary', title: 'Lich',                text: 'Aldric\'s second apprentice, who understood death better than his master. He sits on the eighth floor collecting souls like footnotes — for a work he\'ll never finish.' },
+  { id: 'bestiary_balrog',           icon: '👿', cat: 'bestiary', title: 'Balrog',              text: 'Born when Aldric drove the Glyph of Flame into the earth itself. The fire took shape and found one purpose: burning everything that isn\'t fire.' },
+  { id: 'bestiary_void_titan',       icon: '🌀', cat: 'bestiary', title: 'Void Titan',          text: 'Not created by Aldric — it seeped through rune fractures from the space between words. It drains because that is all that space can do.' },
+  { id: 'bestiary_glyph_guardian',   icon: '⚔️', cat: 'bestiary', title: 'Glyph Guardian',     text: 'The last defense before the throne. Not a warrior — a lock. Its entire existence is the act of preventing passage. What it guards against, it has forgotten.' },
+  { id: 'bestiary_glyph_king',       icon: '👑', cat: 'bestiary', title: 'Glyph King',          text: 'Once a mortal scribe named Aldric who carved the first rune into living stone and heard it scream a language older than speech. He collected all twelve. He became the dungeon.' },
+];
+
+const CODEX_BIOME_DATA = [
+  { id: 'biome_sewers',  icon: '🚧', cat: 'biomes', title: 'The Sewers',      lockedTitle: 'The Sewers',      text: 'The drowned foundations of Erathis. Once a vibrant city, pulled underground stone by stone as Aldric\'s runes rewrote the laws of what belonged above and what belonged below.' },
+  { id: 'biome_crypt',   icon: '💀', cat: 'biomes', title: 'The Crypt',        lockedTitle: 'The Crypt',        text: 'The Crypt was not built — it grew. Every adventurer who dies here adds another corridor, another empty room. The dead are patient architects with no other appointments.' },
+  { id: 'biome_citadel', icon: '🏰', cat: 'biomes', title: 'The Citadel',      lockedTitle: 'The Citadel',      text: 'Runed armor lines the halls. The Citadel\'s knights still remember their orders after centuries. Duty encoded in glyph energy outlasts flesh, mind, and meaning.' },
+  { id: 'biome_abyss',   icon: '🌀', cat: 'biomes', title: 'The Abyss',        lockedTitle: 'The Abyss',        text: 'A wound in the earth where the runes tore too deep. Reality thins here. The darkness is not empty — it watches. Even the Glyph King fears what seeps in from below.' },
+  { id: 'biome_sanctum', icon: '✨', cat: 'biomes', title: 'The Sanctum',      lockedTitle: 'The Sanctum',      text: 'Crystalline walls hum with glyph energy. Beautiful, silent, perfect. A throne room designed for a god who was once a mortal scribe with a chisel and impossible ambitions.' },
+  { id: 'biome_throne',  icon: '👑', cat: 'biomes', title: 'The Throne Room',  lockedTitle: 'The Throne Room',  text: 'The final floor. The Glyph King waits in perfect silence — not a creature guarding his domain, but the domain itself. The walls pulse with his heartbeat. The floors shift with his breathing.' },
+];
+
 // Rune tile type — we'll use a special entity, not a tile type, to avoid changing T constants
 // Rune entities: { type: 'rune', x, y, glyph: '✦', rune: GLYPH_RUNES[i] }
 
@@ -1442,6 +1631,7 @@ function generateFloor() {
   if (BIOME_ENTRY[state.floor]) {
     const biome = getFloorBiome(state.floor);
     addMessage(`${biome.name}: ${BIOME_ENTRY[state.floor]}`, 'gold');
+    unlockCodexEntry(biomeCodexId(state.floor));
   }
 
 
@@ -2139,8 +2329,9 @@ function spawnNPCs() {
   const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
   const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
   if (getTile(x, y) !== T.FLOOR) return;
-  const lore = NPC_LORE[Math.floor(Math.random() * NPC_LORE.length)];
-  state.entities.push({ type: 'npc', x, y, glyph: '🗣️', name: 'Wandering Shade', lore, spoken: false });
+  const loreIdx = Math.floor(Math.random() * NPC_LORE.length);
+  const lore = NPC_LORE[loreIdx];
+  state.entities.push({ type: 'npc', x, y, glyph: '🗣️', name: 'Wandering Shade', lore, loreIdx, spoken: false });
 }
 
 function spawnMerchant() {
@@ -2990,6 +3181,7 @@ function collectGlyphRune(runeEntity) {
   const p = state.player;
   p.runes.push(rune);
   removeEntity(runeEntity);
+  unlockCodexEntry('rune_' + rune.id);
 
   // Apply immediate effects
   switch (rune.effect) {
@@ -3791,6 +3983,7 @@ function killEnemy(enemy) {
 
   // Badge checks
   checkBadgesOnKill(enemy);
+  unlockCodexEntry('bestiary_' + enemy.name.toLowerCase().replace(/\s+/g, '_'));
 
   // Check level up
   while (state.player.xp >= state.player.xpToNext) {
@@ -4106,6 +4299,7 @@ function processEntityEffects(entity) {
       state.player.xp += entity.xp;
       state.score += entity.xp * 10;
       checkBadgesOnKill(entity);
+      unlockCodexEntry('bestiary_' + entity.name.toLowerCase().replace(/\s+/g, '_'));
       while (state.player.xp >= state.player.xpToNext) {
         state.player.xp -= state.player.xpToNext;
         state.player.level++;
@@ -4923,6 +5117,7 @@ function playerMove(dx, dy) {
     if (!npc.spoken) {
       npc.spoken = true;
       addMessage(npc.lore, 'gold');
+      if (npc.loreIdx !== undefined) unlockCodexEntry('lore_' + npc.loreIdx);
       // Sage class: gain XP from hearing lore
       if (state.player.sageClass) {
         state.player.xp += 5;
@@ -9126,6 +9321,21 @@ function setupUI() {
   const badgesFromSettingsFn = () => { $('settings-overlay').classList.remove('active'); showBadgeOverlay(); };
   $('btn-badges-from-settings').addEventListener('click', badgesFromSettingsFn);
   $('btn-badges-from-settings').addEventListener('touchend', (e) => { e.preventDefault(); badgesFromSettingsFn(); }, { passive: false });
+
+  const codexFromSettingsFn = () => { $('settings-overlay').classList.remove('active'); showCodexOverlay(); };
+  $('btn-codex-from-settings').addEventListener('click', codexFromSettingsFn);
+  $('btn-codex-from-settings').addEventListener('touchend', (e) => { e.preventDefault(); codexFromSettingsFn(); }, { passive: false });
+  $('btn-close-codex').addEventListener('click', closeCodexOverlay);
+  $('btn-close-codex').addEventListener('touchend', (e) => { e.preventDefault(); closeCodexOverlay(); }, { passive: false });
+  document.querySelectorAll('.codex-tab').forEach(btn => {
+    const handler = () => {
+      codexActiveCat = btn.dataset.cat;
+      setActiveCodexTab(codexActiveCat);
+      renderCodexContent(codexActiveCat);
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
+  });
   $('btn-close-help').addEventListener('click', closeHelp);
   $('btn-close-help').addEventListener('touchend', (e) => { e.preventDefault(); closeHelp(); }, { passive: false });
   $('btn-close-help-bottom').addEventListener('click', closeHelp);
