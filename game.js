@@ -10162,11 +10162,103 @@ function renderMinimap() {
   ctx.fillRect(px - 1, py, scale + 2, scale);
   ctx.fillRect(px, py - 1, scale, scale + 2);
 
-  // Legend strip
+  // Legend strip — colorblind-accessible with distinct patterns per swatch
   const ly = MAP_H * scale + 4;
+  const sw = 8; // swatch size (px)
   ctx.font = 'bold 10px monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+
+  // Helper: draw a colored swatch with a distinct overlay pattern
+  // Patterns: 'downArrow', 'X', 'circle', 'dollar', 'diamond', 'star',
+  //           'hStripes', 'arrow', 'hashLines', 'dots'
+  function legendSwatch(x, y, color, pattern) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, sw, sw);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, sw - 1, sw - 1);
+    var cx = x + sw / 2, cy = y + sw / 2;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#fff';
+    ctx.fillStyle = '#fff';
+    switch (pattern) {
+      case 'downArrow': // ▼ Stairs
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 2);
+        ctx.lineTo(cx - 2, cy - 1.5);
+        ctx.lineTo(cx + 2, cy - 1.5);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 'X': // × Foe
+        ctx.beginPath();
+        ctx.moveTo(x + 1.5, y + 1.5);
+        ctx.lineTo(x + sw - 1.5, y + sw - 1.5);
+        ctx.moveTo(x + sw - 1.5, y + 1.5);
+        ctx.lineTo(x + 1.5, y + sw - 1.5);
+        ctx.stroke();
+        break;
+      case 'circle': // ○ NPC
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case 'dollar': // $ Shop
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', cx, cy);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.font = 'bold 10px monospace';
+        break;
+      case 'diamond': // ◇ Item
+        ctx.beginPath();
+        ctx.moveTo(cx, y + 1);
+        ctx.lineTo(x + sw - 1, cy);
+        ctx.lineTo(cx, y + sw - 1);
+        ctx.lineTo(x + 1, cy);
+        ctx.closePath();
+        ctx.stroke();
+        break;
+      case 'star': // ✦ Sage
+        ctx.beginPath();
+        ctx.moveTo(cx, y + 1); ctx.lineTo(cx, y + sw - 1);
+        ctx.moveTo(x + 1, cy); ctx.lineTo(x + sw - 1, cy);
+        ctx.stroke();
+        break;
+      case 'hStripes': // ═ Door
+        for (var i = 1; i < sw - 1; i += 2) {
+          ctx.beginPath();
+          ctx.moveTo(x + 1, y + i + 0.5);
+          ctx.lineTo(x + sw - 1, y + i + 0.5);
+          ctx.stroke();
+        }
+        break;
+      case 'arrow': // → 1-Way
+        ctx.beginPath();
+        ctx.moveTo(x + 1.5, cy);
+        ctx.lineTo(x + sw - 1.5, cy);
+        ctx.moveTo(x + sw - 3, cy - 2);
+        ctx.lineTo(x + sw - 1, cy);
+        ctx.lineTo(x + sw - 3, cy + 2);
+        ctx.stroke();
+        break;
+      case 'hashLines': // # Sealed
+        ctx.beginPath();
+        ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + sw - 1, y + sw - 1);
+        ctx.moveTo(x + sw / 2, y + 1); ctx.lineTo(x + sw - 1, y + sw / 2);
+        ctx.moveTo(x + 1, y + sw / 2); ctx.lineTo(x + sw / 2, y + sw - 1);
+        ctx.stroke();
+        break;
+      case 'dots': // ∷ Rubble
+        ctx.fillRect(cx - 2, cy - 1, 1.5, 1.5);
+        ctx.fillRect(cx + 1, cy - 1, 1.5, 1.5);
+        ctx.fillRect(cx - 1, cy + 1, 1.5, 1.5);
+        break;
+    }
+  }
 
   ctx.fillStyle = '#c8a840';
   ctx.fillText(`Floor ${state.floor} — ${biome.name}`, 4, ly);
@@ -10176,42 +10268,41 @@ function renderMinimap() {
 
   // Row 1: stairs
   const row3 = ly + 30;
-  ctx.fillStyle = '#00e060'; ctx.fillRect(4, row3, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Stairs', 12, row3 - 1);
+  legendSwatch(4, row3, '#00e060', 'downArrow');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Stairs', 14, row3 - 1);
 
   // Row 2: entities
   const row4 = ly + 46;
-  ctx.fillStyle = '#ff4040'; ctx.fillRect(4, row4, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Foe', 12, row4 - 1);
+  legendSwatch(4, row4, '#ff4040', 'X');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Foe', 14, row4 - 1);
 
-  ctx.fillStyle = '#40e0ff'; ctx.fillRect(46, row4, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('NPC', 54, row4 - 1);
+  legendSwatch(48, row4, '#40e0ff', 'circle');
+  ctx.fillStyle = '#aaa'; ctx.fillText('NPC', 58, row4 - 1);
 
-  ctx.fillStyle = '#f0c040'; ctx.fillRect(90, row4, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Shop', 98, row4 - 1);
+  legendSwatch(94, row4, '#f0c040', 'dollar');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Shop', 104, row4 - 1);
 
-  ctx.fillStyle = '#c0c040'; ctx.fillRect(140, row4, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Item', 148, row4 - 1);
+  legendSwatch(144, row4, '#c0c040', 'diamond');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Item', 154, row4 - 1);
 
-  const halfW = MAP_W * scale / 2;
-  ctx.fillStyle = '#a060ff'; ctx.fillRect(halfW + 4, row4, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Sage', halfW + 12, row4 - 1);
-
-  // Row 3: doors
+  // Row 3: doors + sage
   const row5 = ly + 62;
-  ctx.fillStyle = '#8B6914'; ctx.fillRect(4, row5, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Door', 12, row5 - 1);
+  legendSwatch(4, row5, '#8B6914', 'hStripes');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Door', 14, row5 - 1);
 
-  ctx.fillStyle = '#c06030'; ctx.fillRect(54, row5, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('1-Way', 62, row5 - 1);
+  legendSwatch(54, row5, '#c06030', 'arrow');
+  ctx.fillStyle = '#aaa'; ctx.fillText('1-Way', 64, row5 - 1);
 
-  ctx.fillStyle = '#6a2020'; ctx.fillRect(110, row5, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Sealed', 118, row5 - 1);
+  legendSwatch(112, row5, '#6a2020', 'hashLines');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Sealed', 122, row5 - 1);
+
+  legendSwatch(176, row5, '#a060ff', 'star');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Sage', 186, row5 - 1);
 
   // Row 4: terrain
   const row6 = ly + 78;
-  ctx.fillStyle = '#9a6535'; ctx.fillRect(4, row6, 6, 6);
-  ctx.fillStyle = '#aaa'; ctx.fillText('Rubble', 12, row6 - 1);
+  legendSwatch(4, row6, '#9a6535', 'dots');
+  ctx.fillStyle = '#aaa'; ctx.fillText('Rubble', 14, row6 - 1);
 }
 
 // === QUICKCAST ===
