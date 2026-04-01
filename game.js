@@ -5653,14 +5653,32 @@ function applyScrollEffect(scroll) {
     case 'create_food': {
       const arcane = state.player.arcaneAffinity;
       const count = arcane ? 3 : 2;
-      let added = 0;
+      let added = 0, dropped = 0;
       for (let i = 0; i < count; i++) {
-        if (addFoodToInventory()) added++;
+        if (addFoodToInventory()) {
+          added++;
+        } else {
+          // Inventory full — drop ration on nearest open floor tile
+          const dirs = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+          let placed = false;
+          for (const [ddx, ddy] of dirs) {
+            const fx = state.player.x + ddx, fy = state.player.y + ddy;
+            if (isWalkable(fx, fy) && !state.entities.find(e => e.type === 'item' && e.x === fx && e.y === fy)) {
+              state.entities.push({ type: 'item', x: fx, y: fy, glyph: '🍖', item: { ...FOOD, stack: 1 } });
+              dropped++;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) dropped++; // no space at all — silent loss (extremely rare)
+        }
       }
-      if (added > 0) {
+      if (added > 0 && dropped > 0) {
+        addMessage(`${added} ration${added > 1 ? 's' : ''} in your pack; ${dropped} dropped nearby!`, 'good');
+      } else if (added > 0) {
         addMessage(`${added} ration${added > 1 ? 's' : ''} materialize${added === 1 ? 's' : ''} in your pack!`, 'good');
       } else {
-        addMessage('Your inventory is too full for food!', 'damage');
+        addMessage(`Inventory full — ${dropped} ration${dropped > 1 ? 's' : ''} dropped nearby!`, 'good');
       }
       break;
     }
@@ -6008,14 +6026,18 @@ function showShrineChoice() {
     // High-cost options
     { text: 'Sacrifice 5 Max HP for +2 Attack', apply: () => { state.player.maxHp -= 5; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.attack += 2; }},
     { text: 'Sacrifice 10 Gold for +1 Defense', apply: () => { state.player.gold = Math.max(0, state.player.gold - 10); state.player.defense += 1; }},
-    { text: 'Sanctify your soul — gain life-drain immunity', apply: () => { state.player.drainImmune = true; addMessage('🛡️ Your soul is shielded from the hunger of wraiths.', 'good'); }, condition: () => !state.player.drainImmune && state.player.classId !== 'cleric' },
+    { text: 'Sanctify your soul — gain life-drain immunity', rare: true, apply: () => { state.player.drainImmune = true; addMessage('🛡️ Your soul is shielded from the hunger of wraiths.', 'good'); }, condition: () => !state.player.drainImmune && state.player.classId !== 'cleric' },
     { text: 'Sacrifice 3 Max HP to restore 30 hunger', apply: () => { state.player.maxHp -= 3; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.hunger = Math.min(100, state.player.hunger + 30); }},
     // Low-cost / helpful options
     { text: 'The shrine tends your wounds — restore 4 HP', apply: () => { state.player.hp = Math.min(state.player.maxHp, state.player.hp + 4); addMessage('The shrine mends your wounds.', 'good'); }, condition: () => state.player.hp < state.player.maxHp },
     { text: 'The shrine eases your hunger — restore 25 hunger', apply: () => { state.player.hunger = Math.min(100, state.player.hunger + 25); addMessage('The shrine soothes your hunger.', 'good'); }, condition: () => state.player.hunger < 80 },
   ];
-  // Filter to available options + always include "leave"
-  const sacrifices = allSacrifices.filter(s => !s.condition || s.condition());
+  // Filter to available options; rare options have a 70% chance to be skipped
+  const sacrifices = allSacrifices.filter(s => {
+    if (s.condition && !s.condition()) return false;
+    if (s.rare && Math.random() < 0.70) return false;
+    return true;
+  });
   // Pick 3 random options from available, plus "leave"
   while (sacrifices.length > 3) sacrifices.splice(Math.floor(Math.random() * sacrifices.length), 1);
   sacrifices.push({ text: 'Leave the shrine alone', apply: () => {} });
