@@ -7221,6 +7221,10 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
     btnRow.appendChild(loadBtn);
 
+    const delBtn = document.createElement('button');
+    delBtn.className = 'save-action-btn save-delete';
+    delBtn.textContent = '\uD83D\uDDD1';
+
     const capturedCloud = Array.isArray(cloudSaves) ? cloudSaves : [];
     const confirmDeleteFn = () => {
       // Replace btnRow with inline confirmation strip
