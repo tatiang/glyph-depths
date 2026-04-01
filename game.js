@@ -1226,6 +1226,10 @@ function createPlayer(classId = 'adventurer') {
     fireWardCooldown: 0,
     // Ranger double shot perk
     doubleShot: false,
+    // Teleport sight — Ninja/Rogue/Escape Artist see hidden teleport tiles
+    teleportSight: ['ninja', 'rogue', 'escapeartist'].includes(classId),
+    // Wall trap: pending bolt trap on room entry { axis: 'x'|'y' } or null
+    wallTrap: null,
     // Sage
     sageClass: classId === 'sage',
     scrollMastery: classId === 'sage',
@@ -4903,6 +4907,28 @@ function playerMove(dx, dy) {
   const p = state.player;
   const nx = p.x + dx, ny = p.y + dy;
 
+  // === WALL TRAP RESOLUTION ===
+  // If a bolt trap was primed on the previous turn, resolve it now.
+  // Moving perpendicular to the trap axis dodges it; any other move gets hit.
+  if (p.wallTrap) {
+    const trap = p.wallTrap;
+    p.wallTrap = null;
+    const dodged = (trap.axis === 'x' && dx === 0 && dy !== 0) ||
+                   (trap.axis === 'y' && dy === 0 && dx !== 0);
+    if (dodged) {
+      addMessage('You sidestep the bolt — it sparks off the wall!', 'good');
+    } else {
+      const dmg = Math.max(1, Math.min(8, 3 + Math.floor(state.floor / 3)) - p.defense);
+      p.hp -= dmg;
+      addMessage(`⚡ A bolt strikes you from the wall! (-${dmg} HP)`, 'damage');
+      haptic(50);
+      screenShake();
+      animateEntityFlash(p.x, p.y, '#ff4040');
+      updateUI();
+      if (p.hp <= 0) { playerDeath('a wall trap', '⚡'); return; }
+    }
+  }
+
   // Webbed — skip movement
   if (hasStatusEffect(p, 'webbed')) {
     addMessage('You struggle free from the web!', '');
@@ -5091,7 +5117,11 @@ function playerMove(dx, dy) {
   }
 
   // Check walkable (phasing ghosts can walk through walls)
-  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) { endTurn(); return; }
+  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) {
+    addMessage('You bump into a wall.', '');
+    endTurn();
+    return;
+  }
 
   const oldX = p.x, oldY = p.y;
   p.x = nx;
@@ -5112,6 +5142,21 @@ function playerMove(dx, dy) {
       }
       state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '❄️', name: 'Ice Trap', hazardType: 'ice', turns: 8 });
       addMessage('❄️ Ice trap placed!', '');
+    }
+  }
+
+  // === WALL TRAP: ROOM ENTRY CHECK ===
+  // When entering a room from a corridor, there's a chance a hidden bolt trap fires next turn.
+  // Floors 3+ only; each room can only prime once per visit (tracked by p.wallTrap being null).
+  if (state.floor >= 3 && !p.wallTrap) {
+    const wasInRoom = state.rooms.some(r =>
+      oldX >= r.x && oldX < r.x + r.w && oldY >= r.y && oldY < r.y + r.h);
+    const nowInRoom = state.rooms.some(r =>
+      p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
+    if (!wasInRoom && nowInRoom && Math.random() < 0.20) {
+      p.wallTrap = { axis: Math.abs(dx) > 0 ? 'x' : 'y' };
+      addMessage('⚠️ A section of wall slides open — a trap is primed!', 'damage');
+      animateEntityFlash(p.x, p.y, '#ff8000');
     }
   }
 
@@ -7944,9 +7989,15 @@ function render() {
           tileColor = vis ? '#8060c0' : '#302040';
           break;
         case T.TELEPORT:
-          // Invisible teleport — looks like normal floor until triggered
-          tileGlyph = '·';
-          tileColor = vis ? biome.floorVis : biome.floorDim;
+          // Ninja/Rogue/Escape Artist can sense hidden teleports
+          if (state.player.teleportSight) {
+            tileGlyph = '◊';
+            tileColor = vis ? '#40e0d0' : '#1a6060';
+          } else {
+            // Invisible teleport — looks like normal floor until triggered
+            tileGlyph = '·';
+            tileColor = vis ? biome.floorVis : biome.floorDim;
+          }
           break;
         case T.TELEPORT_VIS:
           // Revealed teleport — pulsing cyan
@@ -10305,8 +10356,13 @@ function renderMinimap() {
           ctx.fillStyle = '#8060c0';
           break;
         case T.TELEPORT:
-          // Hidden teleport — don't show on minimap
-          continue;
+          // Ninja/Rogue/Escape Artist see hidden teleports on minimap
+          if (state.player.teleportSight) {
+            ctx.fillStyle = '#40e0d0';
+          } else {
+            continue;
+          }
+          break;
         case T.TELEPORT_VIS:
           ctx.fillStyle = '#40e0d0';
           break;
