@@ -3833,9 +3833,9 @@ function attackEntity(attacker, defender) {
     }
   }
 
-  // Spider web
+  // Spider web — duration 2 so it survives the same-turn processStatusEffects decrement
   if (attacker.special === 'web' && targetIsPlayer && Math.random() < 0.4) {
-    addStatusEffect(state.player, 'webbed', 1);
+    addStatusEffect(state.player, 'webbed', 2);
     addMessage('You are caught in a web!', 'damage');
   }
 
@@ -4260,14 +4260,16 @@ function showLevelUp() {
     btn.className = 'perk-btn';
     const classTag = perk.classOnly ? `<div style="font-size:10px;color:#c0a0ff;margin-bottom:2px;">★ CLASS PERK</div>` : '';
     btn.innerHTML = `${classTag}<div class="perk-name">${perk.name}</div><div class="perk-desc">${perk.desc}</div>`;
-    btn.addEventListener('click', () => {
+    const onPick = () => {
       perk.apply();
       checkNewSynergies();
       $('levelup-overlay').classList.remove('active');
       inputLocked = false;
       updateUI();
       render();
-    });
+    };
+    btn.addEventListener('click', onPick);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); onPick(); }, { passive: false });
     container.appendChild(btn);
   }
 
@@ -5701,7 +5703,10 @@ function useItem(item, index) {
         addMessage(`It was a ${item.trueName}!`, 'good');
         refreshIdentifiedItems();
       }
-      break;
+      updateUI();
+      render();
+      endTurn();
+      return;
 
     case 'scroll':
       applyScrollEffect(item);
@@ -5711,7 +5716,10 @@ function useItem(item, index) {
         addMessage(`It was a ${item.trueName}!`, 'good');
         refreshIdentifiedItems();
       }
-      break;
+      updateUI();
+      render();
+      endTurn();
+      return;
 
     case 'ranged':
       // Equip ranged weapon
@@ -5770,7 +5778,10 @@ function useItem(item, index) {
       addMessage('You eat a ration. (+30 hunger)', 'good');
       Audio.useItem();
       if (state.runStats) state.runStats.foodEaten++;
-      break;
+      updateUI();
+      render();
+      endTurn();
+      return;
     }
 
     case 'oil': {
@@ -10743,13 +10754,22 @@ function showQuickUse() {
   title.textContent = '🧪 Quick Use';
   menu.appendChild(title);
 
+  let _closer = null;
+  const cleanup = () => {
+    if (_closer) {
+      document.removeEventListener('click', _closer);
+      document.removeEventListener('touchend', _closer);
+      _closer = null;
+    }
+  };
+
   for (const { item, idx } of consumables) {
     const btn = document.createElement('button');
     let label = `${item.glyph} ${item.name}`;
     if (item.itemType === 'thrown') label += ` (${item.ammo})`;
     btn.textContent = label;
     const captureIdx = idx;
-    const fn = () => { closeItemMenu(); useItem(item, captureIdx); };
+    const fn = () => { cleanup(); closeItemMenu(); useItem(item, captureIdx); };
     btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
     btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
     menu.appendChild(btn);
@@ -10757,8 +10777,8 @@ function showQuickUse() {
 
   const cancel = document.createElement('button');
   cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
-  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+  cancel.addEventListener('click', (e) => { e.stopPropagation(); cleanup(); closeItemMenu(); });
+  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); cleanup(); closeItemMenu(); }, { passive: false });
   menu.appendChild(cancel);
 
   menu.style.left = '50%';
@@ -10768,9 +10788,9 @@ function showQuickUse() {
   menu.classList.add('active');
 
   setTimeout(() => {
-    const closer = (e) => { if (!$('item-menu').contains(e.target)) closeItemMenu(); };
-    document.addEventListener('click', closer, { once: true });
-    document.addEventListener('touchend', closer, { once: true });
+    _closer = (e) => { if (!$('item-menu').contains(e.target)) { cleanup(); closeItemMenu(); } };
+    document.addEventListener('click', _closer, { once: true });
+    document.addEventListener('touchend', _closer, { once: true });
   }, 200);
 }
 
@@ -10794,6 +10814,15 @@ function showQuickEquip() {
   title.textContent = '⚔️ Quick Equip';
   menu.appendChild(title);
 
+  let _eqCloser = null;
+  const eqCleanup = () => {
+    if (_eqCloser) {
+      document.removeEventListener('click', _eqCloser);
+      document.removeEventListener('touchend', _eqCloser);
+      _eqCloser = null;
+    }
+  };
+
   for (const { item, idx } of equippable) {
     const btn = document.createElement('button');
     let label = `${item.glyph} ${item.name}`;
@@ -10803,7 +10832,7 @@ function showQuickEquip() {
     else if (item.special) label += ` (${item.special})`;
     btn.textContent = label;
     const captureIdx = idx;
-    const fn = () => { closeItemMenu(); useItem(item, captureIdx); };
+    const fn = () => { eqCleanup(); closeItemMenu(); useItem(item, captureIdx); };
     btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
     btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false });
     menu.appendChild(btn);
@@ -10811,8 +10840,8 @@ function showQuickEquip() {
 
   const cancel = document.createElement('button');
   cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', (e) => { e.stopPropagation(); closeItemMenu(); });
-  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeItemMenu(); }, { passive: false });
+  cancel.addEventListener('click', (e) => { e.stopPropagation(); eqCleanup(); closeItemMenu(); });
+  cancel.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); eqCleanup(); closeItemMenu(); }, { passive: false });
   menu.appendChild(cancel);
 
   menu.style.left = '50%';
@@ -10822,9 +10851,9 @@ function showQuickEquip() {
   menu.classList.add('active');
 
   setTimeout(() => {
-    const closer = (e) => { if (!$('item-menu').contains(e.target)) closeItemMenu(); };
-    document.addEventListener('click', closer, { once: true });
-    document.addEventListener('touchend', closer, { once: true });
+    _eqCloser = (e) => { if (!$('item-menu').contains(e.target)) { eqCleanup(); closeItemMenu(); } };
+    document.addEventListener('click', _eqCloser, { once: true });
+    document.addEventListener('touchend', _eqCloser, { once: true });
   }, 200);
 }
 
