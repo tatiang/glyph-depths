@@ -5091,7 +5091,7 @@ function playerMove(dx, dy) {
   }
 
   // Check walkable (phasing ghosts can walk through walls)
-  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) return;
+  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) { endTurn(); return; }
 
   const oldX = p.x, oldY = p.y;
   p.x = nx;
@@ -5531,11 +5531,14 @@ function playerDescend() {
     computeFOV();
     updateUI();
     render();
-    Audio.startAmbient(getBiomeKey(state.floor));
+    const newBiome = getBiomeKey(state.floor);
+    Audio.startAmbient(newBiome);
     $('fade').classList.remove('active');
-    showFloorCard(state.floor, getBiomeKey(state.floor), () => {
+    if (newBiome !== getBiomeKey(state.floor - 1)) {
+      showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
+    } else {
       inputLocked = false;
-    });
+    }
   }, 400);
 }
 
@@ -7075,11 +7078,13 @@ function loadGameFromSlot(slot) {
     scrollIdentified = saveData.scrollIdentified || {};
     badgesEarnedThisRun = saveData.badgesEarnedThisRun || [];
 
-    // Restore state, converting Uint8Array markers back
+    // Restore state, converting Uint8Array/Map/Set markers back
     const s = saveData.state;
     for (const key of Object.keys(s)) {
       if (s[key] && s[key]._uint8) {
         s[key] = new Uint8Array(s[key].data);
+      } else if (s[key] && s[key]._map) {
+        s[key] = new Map(s[key].data);
       } else if (s[key] && s[key]._set) {
         s[key] = new Set(s[key].data);
       }
