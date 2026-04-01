@@ -10,12 +10,12 @@ const MAP_W = 50, MAP_H = 50;
 const VIEW_COLS = 15, VIEW_ROWS = 19;
 const FOV_RADIUS = 8;
 const MAX_INVENTORY = 10;
-const MAX_FLOOR = 20;
+const MAX_FLOOR = 24;
 const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13, RUBBLE: 14 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13, RUBBLE: 14, WATER: 15, BRIDGE: 16, STEPPING_STONE: 17, STALAGMITE: 18 };
 
 // === GAME STATE ===
 let state = null; // main game state object
@@ -200,9 +200,10 @@ function toRoman(n) {
 
 function biomeCodexId(floor) {
   if (floor <= 4)  return 'biome_sewers';
-  if (floor <= 8)  return 'biome_crypt';
-  if (floor <= 12) return 'biome_citadel';
-  if (floor <= 16) return 'biome_abyss';
+  if (floor <= 8)  return 'biome_caverns';
+  if (floor <= 12) return 'biome_crypt';
+  if (floor <= 16) return 'biome_citadel';
+  if (floor <= 20) return 'biome_abyss';
   if (floor < MAX_FLOOR) return 'biome_sanctum';
   return 'biome_throne';
 }
@@ -1574,7 +1575,11 @@ const ENEMY_TIERS = {
     { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
     { name: 'Ghost', glyph: '👻', hp: 6, attack: 3, defense: 0, ai: 'chase', xp: 10, special: 'phase', detect: 8 },
     { name: 'Spider', glyph: '🕷️', hp: 5, attack: 2, defense: 0, ai: 'ambush', xp: 6, special: 'web', detect: 4 },
-    { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 }
+    { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 },
+    { name: 'Cave Lurker', glyph: '🦎', hp: 6, attack: 4, defense: 0, ai: 'ambush', xp: 9, special: 'ambush_strike', detect: 5 },
+    { name: 'River Shade', glyph: '🌊', hp: 9, attack: 3, defense: 1, ai: 'patrol', xp: 10, special: 'aquatic', detect: 7 },
+    { name: 'Echo Bat', glyph: '🦇', hp: 4, attack: 2, defense: 0, ai: 'wander', xp: 7, special: 'echo_alert', detect: 6 },
+    { name: 'Blind Stalker', glyph: '👁', hp: 12, attack: 4, defense: 1, ai: 'chase', xp: 11, special: 'blind', detect: 10 }
   ],
   3: [
     { name: 'Wraith', glyph: '🌑', hp: 10, attack: 5, defense: 1, ai: 'chase', xp: 15, special: 'drain', detect: 8 },
@@ -1607,10 +1612,11 @@ const BOSS = {
 // Mini-bosses guard milestone floors
 const MINI_BOSSES = {
   4:  { name: 'Cave Troll',    glyph: '🧌', hp: 22, attack: 5, defense: 3, ai: 'chase', xp: 30, special: 'troll_regen', detect: 8 },
-  8:  { name: 'Lich',          glyph: '🧿', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
-  12: { name: 'Balrog',        glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 },
-  16: { name: 'Void Titan',    glyph: '🌀', hp: 45, attack: 8, defense: 5, ai: 'chase', xp: 80, special: 'drain',      detect: 10 },
-  19: { name: 'Glyph Guardian', glyph: '⚔️', hp: 55, attack: 9, defense: 6, ai: 'chase', xp: 90, special: 'boss',      detect: 12 },
+  8:  { name: 'Cavern Wyrm',   glyph: '🐍', hp: 24, attack: 4, defense: 3, ai: 'chase', xp: 40, special: 'aquatic',     detect: 9 },
+  12: { name: 'Lich',          glyph: '🧿', hp: 28, attack: 3, defense: 2, ai: 'flee',  xp: 45, special: 'summon',      detect: 10 },
+  16: { name: 'Balrog',        glyph: '👿', hp: 35, attack: 7, defense: 4, ai: 'chase', xp: 60, special: 'fire_trail',  detect: 9 },
+  20: { name: 'Void Titan',    glyph: '🌀', hp: 45, attack: 8, defense: 5, ai: 'chase', xp: 80, special: 'drain',      detect: 10 },
+  23: { name: 'Glyph Guardian', glyph: '⚔️', hp: 55, attack: 9, defense: 6, ai: 'chase', xp: 90, special: 'boss',      detect: 12 },
 };
 
 // === DUNGEON GENERATION (BSP) ===
@@ -1627,20 +1633,26 @@ function generateFloor() {
   p.enrageActive = false;
   p.engageTurnsLeft = 0;
   state.rooms = [];
+  state.steppingStoneMessageShown = false;
 
   if (state.floor === MAX_FLOOR) {
     generateBossFloor();
   } else {
     generateBSP();
+    // Carve water features on Caverns floors (5-8)
+    if (state.floor >= 5 && state.floor <= 8) {
+      carveWaterFeatures();
+    }
   }
 
   // Announce biome when entering a new region — lore-flavored messages
   const BIOME_ENTRY = {
     1: 'The drowned foundations of Erathis. Water drips from stone that remembers sunlight.',
-    5: 'The air turns cold. Corridors stretch in directions the dead have chosen.',
-    9: 'Runed armor lines the walls. The Citadel\'s knights still remember their orders.',
-    13: 'Reality thins. The darkness here is not empty — it watches.',
-    17: 'Crystalline walls hum with glyph energy. The Sanctum is beautiful. It is also a trap.',
+    5: 'Water rushes through ancient cracks. Something vast moves beneath the surface.',
+    9: 'The air turns cold. Corridors stretch in directions the dead have chosen.',
+    13: 'Runed armor lines the walls. The Citadel\'s knights still remember their orders.',
+    17: 'Reality thins. The darkness here is not empty — it watches.',
+    21: 'Crystalline walls hum with glyph energy. The Sanctum is beautiful. It is also a trap.',
   };
   BIOME_ENTRY[MAX_FLOOR] = 'The throne room. The Glyph King waits in perfect silence.';
   if (BIOME_ENTRY[state.floor]) {
@@ -1675,14 +1687,14 @@ function generateFloor() {
     placeGhost();
   }
 
-  // Merchant on floors 5, 10, 15 (20-floor dungeon)
-  if ([5, 10, 15].includes(state.floor)) {
+  // Merchant on floors 3, 7, 11, 15, 19, 23 (24-floor dungeon)
+  if ([3, 7, 11, 15, 19, 23].includes(state.floor)) {
     spawnMerchant();
     addMessage("There's a merchant somewhere around here...", 'good');
   }
 
-  // Sage on floors 2, 5, 8 (uncurse, identify, heal)
-  if ([2, 5, 9, 13, 17].includes(state.floor)) {
+  // Sage on floors 2, 6, 10, 14, 18, 22 (uncurse, identify, heal)
+  if ([2, 6, 10, 14, 18, 22].includes(state.floor)) {
     spawnSage();
   }
 
@@ -1747,13 +1759,13 @@ function generateFloor() {
     triggerAvalanche();
   }
 
-  // Bonus wing on floors 6, 12, 18
-  if ([6, 12, 18].includes(state.floor)) {
+  // Bonus wing on floors 6, 10, 16, 22
+  if ([6, 10, 16, 22].includes(state.floor)) {
     generateBonusWing();
   }
 
-  // Tavern on floors 5, 10, 14
-  if ([5, 10, 14].includes(state.floor)) {
+  // Tavern on floors 9, 14, 18
+  if ([9, 14, 18].includes(state.floor)) {
     spawnTavern();
   }
 
@@ -1940,7 +1952,7 @@ function bfsReachable(sx, sy, tx, ty) {
       const nx = x + dx, ny = y + dy;
       const t = getTile(nx, ny);
       // Treat closed doors and corridors as passable for connectivity check
-      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET) continue;
+      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET || t === T.STALAGMITE) continue;
       q.push([nx, ny]);
     }
   }
@@ -1961,11 +1973,176 @@ function bfsReachableStrict(sx, sy, tx, ty) {
     for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       const nx = x + dx, ny = y + dy;
       const t = getTile(nx, ny);
-      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET || t === T.DOOR_ONEWAY || t === T.DOOR_LOCKED) continue;
+      if (t === T.WALL || t === T.DOOR_SEALED || t === T.RUBBLE || t === T.WALL_SECRET || t === T.DOOR_ONEWAY || t === T.DOOR_LOCKED || t === T.STALAGMITE) continue;
       q.push([nx, ny]);
     }
   }
   return false;
+}
+
+// === WATER FEATURE CARVING (Caverns biome, floors 5-8) ===
+function carveWaterFeatures() {
+  const p = state.player;
+
+  // 1. River: carve a winding strip of WATER from one edge to another
+  // Only convert WALL tiles — never FLOOR or CORRIDOR
+  const startEdge = Math.floor(Math.random() * 4); // 0=top,1=bottom,2=left,3=right
+  let rx, ry;
+  if (startEdge === 0)      { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = 1; }
+  else if (startEdge === 1) { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = MAP_H - 2; }
+  else if (startEdge === 2) { rx = 1; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  else                      { rx = MAP_W - 2; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+
+  // Destination: opposite edge area
+  let gx, gy;
+  if (startEdge === 0)      { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = MAP_H - 2; }
+  else if (startEdge === 1) { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = 1; }
+  else if (startEdge === 2) { gx = MAP_W - 2; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  else                      { gx = 1; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+
+  // Drunk-walk river, only converting WALL tiles
+  const waterTiles = new Set();
+  let cx = rx, cy = ry;
+  for (let step = 0; step < 200; step++) {
+    // Convert 1x2 strip
+    for (let ow = -1; ow <= 0; ow++) {
+      const wx = cx + (startEdge < 2 ? ow : 0);
+      const wy = cy + (startEdge >= 2 ? ow : 0);
+      if (wx > 0 && wx < MAP_W - 1 && wy > 0 && wy < MAP_H - 1) {
+        if (getTile(wx, wy) === T.WALL) {
+          setTile(wx, wy, T.WATER);
+          waterTiles.add(wy * MAP_W + wx);
+        }
+      }
+    }
+    if (cx === gx && cy === gy) break;
+    // Trend toward goal with some drift
+    const ddx = gx - cx, ddy = gy - cy;
+    const r = Math.random();
+    if (r < 0.6) {
+      // Move toward goal
+      if (Math.abs(ddx) >= Math.abs(ddy)) cx += Math.sign(ddx);
+      else cy += Math.sign(ddy);
+    } else if (r < 0.8) {
+      // Perpendicular drift
+      if (Math.abs(ddx) >= Math.abs(ddy)) cy += (Math.random() < 0.5 ? 1 : -1);
+      else cx += (Math.random() < 0.5 ? 1 : -1);
+    } else {
+      // Move toward goal on both axes
+      if (ddx !== 0) cx += Math.sign(ddx);
+      if (ddy !== 0) cy += Math.sign(ddy);
+    }
+    cx = Math.max(1, Math.min(MAP_W - 2, cx));
+    cy = Math.max(1, Math.min(MAP_H - 2, cy));
+  }
+
+  // 2. Bridges: where WATER crosses a CORRIDOR, place a BRIDGE
+  for (const idx of waterTiles) {
+    const bx = idx % MAP_W, by = Math.floor(idx / MAP_W);
+    // Check if removing this WATER would restore corridor connectivity
+    for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      const adjTile = getTile(bx + ddx, by + ddy);
+      if (adjTile === T.CORRIDOR || adjTile === T.FLOOR) {
+        setTile(bx, by, T.BRIDGE);
+        waterTiles.delete(idx);
+        break;
+      }
+    }
+  }
+
+  // 3. Validate connectivity: player must reach stairs
+  let stx = -1, sty = -1;
+  outer: for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outer; }
+    }
+  }
+  // If stairs haven't been placed yet, use farthest room center as proxy
+  if (stx < 0 && state.rooms.length > 0) {
+    const far = state.rooms[state.rooms.length - 1];
+    stx = far.x + Math.floor(far.w / 2);
+    sty = far.y + Math.floor(far.h / 2);
+  }
+
+  if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
+    // Connectivity broken — add bridges on all remaining WATER tiles adjacent to walkable
+    for (let y = 1; y < MAP_H - 1; y++) {
+      for (let x = 1; x < MAP_W - 1; x++) {
+        if (getTile(x, y) !== T.WATER) continue;
+        for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+          const adj = getTile(x + ddx, y + ddy);
+          if (adj === T.FLOOR || adj === T.CORRIDOR || adj === T.BRIDGE) {
+            setTile(x, y, T.BRIDGE);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
+  const eligibleRooms = state.rooms.filter(r => {
+    const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
+    const isStart = (Math.abs(cx2 - p.x) + Math.abs(cy2 - p.y)) < 3;
+    return !isStart && r.w >= 5 && r.h >= 5;
+  });
+  if (eligibleRooms.length > 0) {
+    const lakeRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
+    const stones = [];
+    // Flood interior (exclude 1-tile border) with WATER, scatter stepping stones
+    for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1; ly++) {
+      for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1; lx++) {
+        if (getTile(lx, ly) === T.FLOOR) {
+          if (Math.random() < 0.12) {
+            setTile(lx, ly, T.STEPPING_STONE);
+            stones.push({ x: lx, y: ly });
+          } else {
+            setTile(lx, ly, T.WATER);
+          }
+        }
+      }
+    }
+    // Ensure at least 3 stepping stones
+    if (stones.length < 3) {
+      for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1 && stones.length < 3; ly++) {
+        for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1 && stones.length < 3; lx++) {
+          if (getTile(lx, ly) === T.WATER) {
+            setTile(lx, ly, T.STEPPING_STONE);
+            stones.push({ x: lx, y: ly });
+          }
+        }
+      }
+    }
+    // Place an item on one stepping stone
+    if (stones.length > 0) {
+      const st = stones[Math.floor(Math.random() * stones.length)];
+      const lakeItem = generateRandomItem(state.floor);
+      if (lakeItem) state.entities.push(createItemEntity(lakeItem, st.x, st.y));
+    }
+  }
+
+  // 5. Stalagmites: in 2-3 rooms, place 2-4 STALAGMITE tiles at random FLOOR positions
+  const stagRooms = shuffle([...state.rooms]).slice(0, 2 + Math.floor(Math.random() * 2));
+  for (const sRoom of stagRooms) {
+    const count = 2 + Math.floor(Math.random() * 3);
+    const midX = sRoom.x + Math.floor(sRoom.w / 2);
+    const midY = sRoom.y + Math.floor(sRoom.h / 2);
+    let placed = 0;
+    for (let attempt = 0; attempt < 30 && placed < count; attempt++) {
+      const sx = sRoom.x + 1 + Math.floor(Math.random() * (sRoom.w - 2));
+      const sy = sRoom.y + 1 + Math.floor(Math.random() * (sRoom.h - 2));
+      // Don't place at room center or on non-floor tiles
+      if (sx === midX && sy === midY) continue;
+      if (getTile(sx, sy) !== T.FLOOR) continue;
+      // Don't block connectivity — temporarily place and check
+      setTile(sx, sy, T.STALAGMITE);
+      if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
+        setTile(sx, sy, T.FLOOR); // revert
+      } else {
+        placed++;
+      }
+    }
+  }
 }
 
 function addOneWayDoors() {
@@ -2064,14 +2241,14 @@ function setTile(x, y, t) {
 
 function isWalkable(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
-  // TELEPORT and TELEPORT_VIS are walkable (floor-like)
+  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.WATER && t !== T.STALAGMITE;
+  // TELEPORT, TELEPORT_VIS, BRIDGE, STEPPING_STONE are walkable (floor-like)
 }
 
 function isTransparent(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED;
-  // One-way doors are visible (transparent) but handled specially for movement
+  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.STALAGMITE;
+  // One-way doors and WATER are visible (transparent) but handled specially
 }
 
 function getFarthestRoom(fromX, fromY) {
@@ -3092,13 +3269,13 @@ function generateShopItems(floor) {
     const weaponPool = WEAPONS.filter(w => w.tier <= tier);
     if (weaponPool.length > 0) {
       const w = applyFloorBonus({ ...weaponPool[Math.floor(Math.random() * weaponPool.length)] }, floor);
-      items.push({ item: w, price: w.value + (floor >= 9 ? 10 : 0) });
+      items.push({ item: w, price: w.value + (floor >= 13 ? 10 : 0) });
     }
   } else {
     const rangedPool = RANGED_WEAPONS.filter(r => r.tier <= tier);
     if (rangedPool.length > 0) {
       const r = applyFloorBonus({ ...rangedPool[Math.floor(Math.random() * rangedPool.length)] }, floor);
-      items.push({ item: r, price: r.value + (floor >= 9 ? 10 : 0) });
+      items.push({ item: r, price: r.value + (floor >= 13 ? 10 : 0) });
     }
   }
   // Arrow bundle
@@ -3329,29 +3506,38 @@ function getFloorConfig(floor) {
     2:  { tier: 1, nextTier: null, minEnemies: 3, maxEnemies: 4, minItems: 2, maxItems: 3, food: 2 },
     3:  { tier: 1, nextTier: 2,   minEnemies: 4, maxEnemies: 5, minItems: 3, maxItems: 4, food: 2 },
     4:  { tier: 1, nextTier: 2,   minEnemies: 5, maxEnemies: 6, minItems: 3, maxItems: 4, food: 1 },
-    5:  { tier: 2, nextTier: null, minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
-    6:  { tier: 2, nextTier: null, minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
-    7:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
-    8:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
-    9:  { tier: 3, nextTier: null, minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    10: { tier: 3, nextTier: null, minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: 1 },
-    11: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 11, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    12: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
-    13: { tier: 4, nextTier: null, minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    14: { tier: 4, nextTier: null, minEnemies: 9, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
-    15: { tier: 4, nextTier: 5,   minEnemies: 9, maxEnemies: 13, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
-    16: { tier: 4, nextTier: 5,   minEnemies: 10, maxEnemies: 14, minItems: 2, maxItems: 3, food: 1 },
-    17: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 14, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
-    18: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
-    19: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: 1 },
-    20: { tier: 5, nextTier: null, minEnemies: 0,  maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
+    // Caverns floors 5-8
+    5:  { tier: 2, nextTier: null, minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1, caverns: true },
+    6:  { tier: 2, nextTier: null, minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0, caverns: true },
+    7:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1, caverns: true },
+    8:  { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1, caverns: true },
+    // Crypt floors 9-12 (was 5-8)
+    9:  { tier: 2, nextTier: null, minEnemies: 5, maxEnemies: 7, minItems: 3, maxItems: 4, food: 1 },
+    10: { tier: 2, nextTier: null, minEnemies: 6, maxEnemies: 8, minItems: 3, maxItems: 4, food: Math.random() < 0.5 ? 1 : 0 },
+    11: { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    12: { tier: 2, nextTier: 3,   minEnemies: 7, maxEnemies: 9, minItems: 3, maxItems: 4, food: 1 },
+    // Citadel floors 13-16 (was 9-12)
+    13: { tier: 3, nextTier: null, minEnemies: 7, maxEnemies: 10, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    14: { tier: 3, nextTier: null, minEnemies: 8, maxEnemies: 10, minItems: 2, maxItems: 3, food: 1 },
+    15: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 11, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    16: { tier: 3, nextTier: 4,   minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
+    // Abyss floors 17-20 (was 13-16)
+    17: { tier: 4, nextTier: null, minEnemies: 8, maxEnemies: 12, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    18: { tier: 4, nextTier: null, minEnemies: 9, maxEnemies: 12, minItems: 2, maxItems: 3, food: 1 },
+    19: { tier: 4, nextTier: 5,   minEnemies: 9, maxEnemies: 13, minItems: 2, maxItems: 3, food: Math.random() < 0.5 ? 1 : 0 },
+    20: { tier: 4, nextTier: 5,   minEnemies: 10, maxEnemies: 14, minItems: 2, maxItems: 3, food: 1 },
+    // Sanctum floors 21-23 (was 17-19)
+    21: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 14, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
+    22: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
+    23: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: 1 },
+    24: { tier: 5, nextTier: null, minEnemies: 0,  maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
   };
   return configs[floor] || configs[1];
 }
 
 // Add floor-scaling bonus to equipment: deeper floors grant +1 ATK/DEF/DMG at certain thresholds
 function applyFloorBonus(item, floor) {
-  const bonus = floor >= 16 ? 2 : floor >= 9 ? 1 : 0;
+  const bonus = floor >= 20 ? 2 : floor >= 13 ? 1 : 0;
   if (bonus === 0) return item;
   if (item.itemType === 'weapon' && item.attack != null) {
     item.attack += bonus;
@@ -3604,7 +3790,7 @@ function castLight(cx, cy, row, startSlope, endSlope, radius, oct) {
 }
 
 // === A* PATHFINDING (BOUNDED) ===
-function findPath(sx, sy, gx, gy, phaseThrough) {
+function findPath(sx, sy, gx, gy, phaseThrough, canSwim) {
   const open = [{ x: sx, y: sy, g: 0, h: Math.abs(gx - sx) + Math.abs(gy - sy), parent: null }];
   const closed = new Set();
   let expansions = 0;
@@ -3628,7 +3814,9 @@ function findPath(sx, sy, gx, gy, phaseThrough) {
       const nx = cur.x + dx, ny = cur.y + dy;
       const nk = nx + ',' + ny;
       if (closed.has(nk)) continue;
-      if (!phaseThrough && !isWalkable(nx, ny)) {
+      const tileAtN = getTile(nx, ny);
+      const waterPassable = canSwim && tileAtN === T.WATER;
+      if (!phaseThrough && !waterPassable && !isWalkable(nx, ny)) {
         // Allow walking to goal even if it's the player's position
         if (nx !== gx || ny !== gy) continue;
       }
@@ -3672,6 +3860,17 @@ function isUndead(entity) {
 }
 
 function attackEntity(attacker, defender) {
+  // Ambush Strike: double damage on first hit while undetected (alertness < 2)
+  let ambushBonus = 1;
+  if (attacker !== state.player && attacker.special === 'ambush_strike' && !attacker.ambushUsed && attacker.alertness < 2) {
+    ambushBonus = 2;
+    attacker.ambushUsed = true;
+    attacker.alertness = 2;
+    if (defender === state.player) {
+      addMessage(`The ${attacker.name} strikes from the shadows!`, 'damage');
+    }
+  }
+
   const atk = getEffectiveAttack(attacker);
   const def = getEffectiveDefense(defender);
   let critChance = (attacker === state.player)
@@ -3681,6 +3880,7 @@ function attackEntity(attacker, defender) {
   const isCrit = Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
+  if (ambushBonus > 1) damage *= ambushBonus;
   // Easy mode: enemies deal 1 less damage
   if (state.difficulty === 'easy' && attacker !== state.player) {
     damage = Math.max(1, damage - 1);
@@ -3917,7 +4117,8 @@ function getEffectiveDefense(entity) {
     if (hasStatusEffect(state.player, 'courage')) def += 1;
     return Math.max(0, def);
   }
-  return entity.defense;
+  // Aquatic enemies get +1 DEF when on or adjacent to water
+  return entity.defense + (entity.aquaticDefBonus || 0);
 }
 
 function applyWeaponSpecial(weapon, target) {
@@ -4038,6 +4239,18 @@ function killEnemy(enemy) {
 
   // Soul Amulet: collect fragment
   soulAmuletCollect();
+
+  // Echo Alert: on death, alert all enemies within 8 tiles
+  if (enemy.special === 'echo_alert') {
+    const echoRadius = 8;
+    let alerted = 0;
+    for (const e of state.entities) {
+      if (e.type !== 'enemy' || e.hp <= 0 || e === enemy) continue;
+      const d = Math.abs(e.x - enemy.x) + Math.abs(e.y - enemy.y);
+      if (d <= echoRadius) { e.alertness = 2; alerted++; }
+    }
+    if (alerted > 0) addMessage('A dying shriek echoes through the cavern!', 'damage');
+  }
 
   addMessage(`${enemy.name} is destroyed! (+${enemy.xp} XP)`, 'good');
   removeEntity(enemy);
@@ -4451,6 +4664,12 @@ function processEnemies() {
       enemy.alertness = Math.max(0, enemy.alertness - 1);
     }
 
+    // Blind Stalker: only moves/chases when player moved last turn
+    if (enemy.special === 'blind' && !state.player.movedLastTurn) {
+      // Stay still — sense nothing
+      continue;
+    }
+
     // Execute AI
     switch (enemy.ai) {
       case 'wander': wanderAI(enemy); break;
@@ -4565,9 +4784,16 @@ function chaseAI(enemy) {
     }
   }
 
-  const step = findPath(enemy.x, enemy.y, tx, ty, enemy.special === 'phase');
+  const canSwim = enemy.special === 'aquatic';
+  const step = findPath(enemy.x, enemy.y, tx, ty, enemy.special === 'phase', canSwim);
   if (step) {
     tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
+  }
+
+  // Aquatic bonus DEF when adjacent to water
+  if (canSwim) {
+    const adjWater = [[0,-1],[0,1],[-1,0],[1,0]].some(([dx, dy]) => getTile(enemy.x + dx, enemy.y + dy) === T.WATER || getTile(enemy.x, enemy.y) === T.WATER);
+    enemy.aquaticDefBonus = adjWater ? 1 : 0;
   }
 }
 
@@ -4580,7 +4806,8 @@ function patrolAI(enemy) {
     enemy.patrolTarget = { x: room.x + Math.floor(Math.random() * room.w), y: room.y + Math.floor(Math.random() * room.h) };
   }
 
-  const step = findPath(enemy.x, enemy.y, enemy.patrolTarget.x, enemy.patrolTarget.y, false);
+  const canSwim = enemy.special === 'aquatic';
+  const step = findPath(enemy.x, enemy.y, enemy.patrolTarget.x, enemy.patrolTarget.y, false, canSwim);
   if (step) {
     tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
   }
@@ -4798,34 +5025,40 @@ function allyAI(ally) {
 
 function tryMoveEnemy(enemy, nx, ny) {
   const phaseThrough = enemy.special === 'phase';
+  const canSwim = enemy.special === 'aquatic';
   if (phaseThrough) {
     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
   } else {
-    // Enemies on floor 5+ can bash open closed doors while chasing
-    if (getTile(nx, ny) === T.DOOR_CLOSED && enemy.alertness >= 2 && state.floor >= 5) {
-      setTile(nx, ny, T.DOOR_OPEN);
-      addMessage(`${enemy.name} smashes the door open!`, 'damage');
-      Audio.door();
-      return; // uses their move for this turn
-    }
-    // Strong enemies (attack >= 5) can bash through Mason-built walls (takes 3 hits)
-    if (getTile(nx, ny) === T.WALL && enemy.attack >= 5 && enemy.alertness >= 2 &&
-        state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
-      const eKey = ny * MAP_W + nx;
-      const eWallHp = (state.masonWalls.get(eKey) || 3) - 1;
-      if (eWallHp <= 0) {
-        setTile(nx, ny, T.FLOOR);
-        state.masonWalls.delete(eKey);
-        addMessage(`${enemy.name} smashes through your wall!`, 'damage');
-      } else {
-        state.masonWalls.set(eKey, eWallHp);
-        addMessage(`${enemy.name} hammers your wall (${eWallHp} HP left)!`, 'damage');
+    // Aquatic enemies can move into water
+    if (canSwim && getTile(nx, ny) === T.WATER) {
+      // water is passable for aquatic enemies
+    } else {
+      // Enemies on floor 9+ (was 5+) can bash open closed doors while chasing
+      if (getTile(nx, ny) === T.DOOR_CLOSED && enemy.alertness >= 2 && state.floor >= 9) {
+        setTile(nx, ny, T.DOOR_OPEN);
+        addMessage(`${enemy.name} smashes the door open!`, 'damage');
+        Audio.door();
+        return; // uses their move for this turn
       }
-      Audio.door();
-      computeFOV();
-      return; // uses their move for this turn
+      // Strong enemies (attack >= 5) can bash through Mason-built walls (takes 3 hits)
+      if (getTile(nx, ny) === T.WALL && enemy.attack >= 5 && enemy.alertness >= 2 &&
+          state.masonWalls && state.masonWalls.has(ny * MAP_W + nx)) {
+        const eKey = ny * MAP_W + nx;
+        const eWallHp = (state.masonWalls.get(eKey) || 3) - 1;
+        if (eWallHp <= 0) {
+          setTile(nx, ny, T.FLOOR);
+          state.masonWalls.delete(eKey);
+          addMessage(`${enemy.name} smashes through your wall!`, 'damage');
+        } else {
+          state.masonWalls.set(eKey, eWallHp);
+          addMessage(`${enemy.name} hammers your wall (${eWallHp} HP left)!`, 'damage');
+        }
+        Audio.door();
+        computeFOV();
+        return; // uses their move for this turn
+      }
+      if (!isWalkable(nx, ny)) return;
     }
-    if (!isWalkable(nx, ny)) return;
   }
 
   // Don't move onto other enemies (unless phasing)
@@ -5167,6 +5400,7 @@ function playerMove(dx, dy) {
   const oldX = p.x, oldY = p.y;
   p.x = nx;
   p.y = ny;
+  p.movedLastTurn = true;
   Audio.step();
   haptic(10);
 
@@ -5241,6 +5475,12 @@ function playerMove(dx, dy) {
     haptic(40);
     Audio.useItem();
     computeFOV();
+  }
+
+  // Stepping Stone — one-time message per floor
+  if (getTile(nx, ny) === T.STEPPING_STONE && !state.steppingStoneMessageShown) {
+    state.steppingStoneMessageShown = true;
+    addMessage('You balance on the wet stone.', '');
   }
 
   // Check for hazards
@@ -6691,6 +6931,10 @@ function renderShopItems(merchant) {
 function endTurn() {
   if (state.gameOver || state.victory) return;
 
+  // Track player movement for Blind Stalker special
+  // movedLastTurn is set to true in playerMove when the player actually moves
+  // We reset it here after processEnemies uses it
+
   state.turnCount++;
   state.player.turnsSurvived++;
   if (state.player.hp > state.peakHp) state.peakHp = state.player.hp;
@@ -6833,6 +7077,8 @@ function endTurn() {
 
   // Enemy turns
   processEnemies();
+  // Reset movement tracking after enemies have processed
+  state.player.movedLastTurn = false;
   if (state.gameOver) return;
 
   // Status effects
@@ -7212,6 +7458,13 @@ function loadGameFromSlot(slot) {
       }
     }
     state = s;
+
+    // Save migration: if save was made before Caverns biome (MAX_FLOOR was 20)
+    // and floor >= 5, shift floor numbers up by 4 to match new 24-floor layout
+    if (state._savedMaxFloor && state._savedMaxFloor < 24 && state.floor >= 5) {
+      state.floor = Math.min(state.floor + 4, 24);
+    }
+    state._savedMaxFloor = MAX_FLOOR;
 
     // Reset transient state
     inputLocked = false;
@@ -7974,6 +8227,10 @@ function render() {
         ctx.fillStyle = 'rgba(64, 224, 208, 0.12)';
         ctx.fillRect(vx * ts, vy * ts, ts, ts);
       }
+      if (tile === T.WATER && vis) {
+        ctx.fillStyle = 'rgba(20, 60, 100, 0.15)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
 
       // Draw tile glyph
       ctx.font = `${fontSize}px monospace`;
@@ -8063,6 +8320,22 @@ function render() {
           // Avalanche debris — warm brown, impassable
           tileGlyph = '▒';
           tileColor = vis ? '#9a6535' : '#3a2515';
+          break;
+        case T.WATER:
+          tileGlyph = '≈';
+          tileColor = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828');
+          break;
+        case T.BRIDGE:
+          tileGlyph = '═';
+          tileColor = vis ? '#8a6a3a' : '#4a3a1a';
+          break;
+        case T.STEPPING_STONE:
+          tileGlyph = '◦';
+          tileColor = vis ? '#6a8a8a' : '#3a4a4a';
+          break;
+        case T.STALAGMITE:
+          tileGlyph = '▲';
+          tileColor = vis ? '#5a6a70' : '#2a3238';
           break;
         default:
           tileGlyph = ' ';
@@ -10346,6 +10619,10 @@ function startMinimapPulse() {
           case T.WALL_SECRET: ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
           case T.DOOR_LOCKED: ctx.fillStyle = '#c08030'; break;
           case T.SPECIAL: ctx.fillStyle = '#8060c0'; break;
+          case T.WATER: ctx.fillStyle = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'); break;
+          case T.BRIDGE: ctx.fillStyle = vis ? '#8a6a3a' : '#4a3a1a'; break;
+          case T.STEPPING_STONE: ctx.fillStyle = vis ? '#3a5a5a' : '#1a2a2a'; break;
+          case T.STALAGMITE: ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
           default: continue;
         }
         ctx.fillRect(tx * scale, ty * scale, scale, scale);
@@ -10447,6 +10724,18 @@ function renderMinimap() {
           break;
         case T.RUBBLE:
           ctx.fillStyle = vis ? '#9a6535' : '#4a2e12';
+          break;
+        case T.WATER:
+          ctx.fillStyle = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828');
+          break;
+        case T.BRIDGE:
+          ctx.fillStyle = vis ? '#8a6a3a' : '#4a3a1a';
+          break;
+        case T.STEPPING_STONE:
+          ctx.fillStyle = vis ? '#3a5a5a' : '#1a2a2a';
+          break;
+        case T.STALAGMITE:
+          ctx.fillStyle = vis ? biome.wallVis : biome.wallDim;
           break;
         default:
           continue;
@@ -10942,11 +11231,12 @@ function showFloorCard(floor, biomeKey, onDone) {
 }
 
 function getBiomeKey(floor) {
-  if (floor >= 20) return 'boss';
-  if (floor >= 17) return 'sanctum';
-  if (floor >= 13) return 'abyss';
-  if (floor >= 9)  return 'citadel';
-  if (floor >= 5)  return 'crypt';
+  if (floor >= 24) return 'boss';
+  if (floor >= 21) return 'sanctum';
+  if (floor >= 17) return 'abyss';
+  if (floor >= 13) return 'citadel';
+  if (floor >= 9)  return 'crypt';
+  if (floor >= 5)  return 'caverns';
   return 'sewers';
 }
 
@@ -10959,20 +11249,28 @@ function getFloorBiome(floor) {
     bg: '#080f08'
   };
   if (floor <= 8) return {
+    name: 'The Caverns',
+    wallVis: '#3a5060', wallDim: '#182028',
+    floorVis: '#2a3a48', floorDim: '#121c24',
+    corrVis:  '#223040', corrDim:  '#0e161e',
+    bg: '#060c12',
+    waterVis: '#1a3050', waterDim: '#0c1828'
+  };
+  if (floor <= 12) return {
     name: 'The Crypt',
     wallVis: '#5a5a72', wallDim: '#282838',
     floorVis: '#40405a', floorDim: '#1e1e2c',
     corrVis:  '#38384e', corrDim:  '#181820',
     bg: '#0c0c14'
   };
-  if (floor <= 12) return {
+  if (floor <= 16) return {
     name: 'The Citadel',
     wallVis: '#6a3a3a', wallDim: '#301818',
     floorVis: '#4a2424', floorDim: '#201010',
     corrVis:  '#3e1e1e', corrDim:  '#180c0c',
     bg: '#100606'
   };
-  if (floor <= 16) return {
+  if (floor <= 20) return {
     name: 'The Abyss',
     wallVis: '#3a5a6a', wallDim: '#152030',
     floorVis: '#24405a', floorDim: '#101828',

@@ -299,6 +299,12 @@ const Audio = (() => {
       { type: 'sine', freq: 220, gain: 0.05 },
       { type: 'noise', freq: 400, gain: 0.05, filter: 'bandpass' }
     ],
+    caverns: [
+      { type: 'sine', freq: 65, gain: 0.035 },
+      { type: 'sine', freq: 98, gain: 0.02, detune: -8 },
+      { type: 'noise', freq: 250, gain: 0.018, filter: 'lowpass' },
+      { type: 'triangle', freq: 196, gain: 0.008, lfo: { rate: 0.5, depth: 12 } }
+    ],
     crypt: [
       { type: 'sine', freq: 73.4, gain: 0.10 },
       { type: 'triangle', freq: 110, gain: 0.07, detune: 5 },
