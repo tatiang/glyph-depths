@@ -1230,6 +1230,8 @@ function createPlayer(classId = 'adventurer') {
     teleportSight: ['ninja', 'rogue', 'escapeartist'].includes(classId),
     // Wall trap: pending bolt trap on room entry { axis: 'x'|'y' } or null
     wallTrap: null,
+    // Web slow: parity toggle — true = skip next move while web_slowed
+    webSlowSkip: false,
     // Sage
     sageClass: classId === 'sage',
     scrollMastery: classId === 'sage',
@@ -1578,7 +1580,8 @@ const ENEMY_TIERS = {
     { name: 'Wraith', glyph: '🌑', hp: 10, attack: 5, defense: 1, ai: 'chase', xp: 15, special: 'drain', detect: 8 },
     { name: 'Mimic', glyph: '📦', hp: 12, attack: 4, defense: 3, ai: 'ambush', xp: 18, special: 'mimic', detect: 3 },
     { name: 'Necromancer', glyph: '☠️', hp: 8, attack: 2, defense: 1, ai: 'flee', xp: 20, special: 'summon', detect: 8 },
-    { name: 'Demon', glyph: '😈', hp: 18, attack: 5, defense: 3, ai: 'chase', xp: 22, special: 'fire_trail', detect: 7 }
+    { name: 'Demon', glyph: '😈', hp: 18, attack: 5, defense: 3, ai: 'chase', xp: 22, special: 'fire_trail', detect: 7 },
+    { name: 'Orb-Weaver', glyph: '🕷️', hp: 16, attack: 4, defense: 2, ai: 'wander', xp: 20, special: 'web_spinner', detect: 5, slowMove: true }
   ],
   4: [
     { name: 'Dark Knight', glyph: '🗡️', hp: 25, attack: 7, defense: 4, ai: 'chase', xp: 28, special: null, detect: 8 },
@@ -4537,6 +4540,29 @@ function chaseAI(enemy) {
     });
   }
 
+  // Orb-Weaver web spinner: every 2 turns spin webs on adjacent floor tiles
+  if (enemy.special === 'web_spinner') {
+    enemy.webSpinCooldown = (enemy.webSpinCooldown || 0) - 1;
+    if (enemy.webSpinCooldown <= 0) {
+      enemy.webSpinCooldown = 2;
+      const WEB_RADIUS = 2;
+      for (let wy = enemy.y - WEB_RADIUS; wy <= enemy.y + WEB_RADIUS; wy++) {
+        for (let wx = enemy.x - WEB_RADIUS; wx <= enemy.x + WEB_RADIUS; wx++) {
+          if (wx < 0 || wx >= MAP_W || wy < 0 || wy >= MAP_H) continue;
+          const tile = getTile(wx, wy);
+          if (tile !== T.FLOOR && tile !== T.CORRIDOR) continue;
+          // Don't stack webs — refresh if one already exists
+          const existing = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === wx && e.y === wy);
+          if (existing) {
+            existing.turns = 20;
+          } else {
+            state.entities.push({ type: 'hazard', x: wx, y: wy, glyph: '🕸', name: 'Spider Web', hazardType: 'web', turns: 20 });
+          }
+        }
+      }
+    }
+  }
+
   const step = findPath(enemy.x, enemy.y, tx, ty, enemy.special === 'phase');
   if (step) {
     tryMoveEnemy(enemy, enemy.x + step.x, enemy.y + step.y);
@@ -4936,6 +4962,19 @@ function playerMove(dx, dy) {
     return;
   }
 
+  // Web-Slowed — skip every other move
+  if (hasStatusEffect(p, 'web_slowed')) {
+    if (p.webSlowSkip) {
+      p.webSlowSkip = false;
+      addMessage('The webs cling to you, slowing your movement...', '');
+      endTurn();
+      return;
+    }
+    p.webSlowSkip = true;
+  } else {
+    p.webSlowSkip = false;
+  }
+
   // Check for friendly ally at destination — swap positions
   const ally = allyAt(nx, ny);
   if (ally) {
@@ -5208,6 +5247,11 @@ function playerMove(dx, dy) {
     state.player.hp -= 1;
     addMessage('You step in fire! (-1 HP)', 'damage');
     if (state.player.hp <= 0) { playerDeath('fire', '🔥'); return; }
+  }
+  if (hazard && hazard.hazardType === 'web') {
+    const alreadySlowed = hasStatusEffect(state.player, 'web_slowed');
+    applyStatusEffect(state.player, 'web_slowed', 3);
+    if (!alreadySlowed) addMessage('🕸 You step into a spider web! You are slowed.', 'damage');
   }
 
   // Check for NPC (friendly shade — cannot be attacked, gives lore)
@@ -8097,6 +8141,26 @@ function render() {
     requestAnimationFrame(() => { if (state.fortifyMode) render(); });
   }
 
+  // Draw web hazards as a subtle floor overlay (before other entities so they appear underneath)
+  ctx.save();
+  ctx.font = `${Math.floor(ts * 0.75)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const e of state.entities) {
+    if (e.type !== 'hazard' || e.hazardType !== 'web') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+    // Fade slightly as turns run low
+    ctx.globalAlpha = Math.min(0.55, 0.3 + (e.turns / 20) * 0.25);
+    ctx.fillStyle = '#c8c0a0';
+    ctx.fillText('░', sx, sy);
+  }
+  ctx.globalAlpha = 1.0;
+  ctx.restore();
+
   // Draw items (only visible ones)
   for (const e of state.entities) {
     if (e.type !== 'item' && e.type !== 'hazard' && e.type !== 'ice_trap' && e.type !== 'illusion' && e.type !== 'wall_block') continue;
@@ -8106,6 +8170,9 @@ function render() {
     const sx = (e.x - camX) * ts + ts / 2;
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
+
+    // Skip web hazards — already drawn above
+    if (e.type === 'hazard' && e.hazardType === 'web') continue;
 
     // Ice traps render in cyan
     if (e.type === 'ice_trap') {
@@ -9837,6 +9904,7 @@ function showSettings() {
     burning:      { icon: '🔥', text: 'Burning',     color: '#ff6020' },
     poison:       { icon: '☠️', text: 'Poisoned',    color: '#50c040' },
     webbed:       { icon: '🕸', text: 'Webbed',      color: '#c0b060' },
+    web_slowed:   { icon: '🕸', text: 'Web-Slowed',  color: '#a09040' },
     invisibility: { icon: '👁', text: 'Invisible',   color: '#6080ff' },
     strength:     { icon: '💪', text: 'Strengthened',color: '#ff8040' },
     frozen:       { icon: '❄️', text: 'Frozen',      color: '#40c0ff' },
@@ -10408,6 +10476,15 @@ function renderMinimap() {
         ctx.fillText('▼', x * scale + scale / 2, y * scale + scale / 2);
       }
     }
+  }
+
+  // Draw web hazards as dim tan overlay on minimap
+  for (const e of state.entities) {
+    if (e.type !== 'hazard' || e.hazardType !== 'web') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.explored[idx]) continue;
+    ctx.fillStyle = state.visible[idx] ? 'rgba(200,192,128,0.5)' : 'rgba(120,115,70,0.3)';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
   // Draw items on explored tiles
