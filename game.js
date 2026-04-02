@@ -1619,6 +1619,12 @@ const MINI_BOSSES = {
   23: { name: 'Glyph Guardian', glyph: '⚔️', hp: 55, attack: 9, defense: 6, ai: 'chase', xp: 90, special: 'boss',      detect: 12 },
 };
 
+// Water monsters — spawn directly on water tiles in the Caverns biome (floors 5–8)
+const WATER_ENEMIES = [
+  { name: 'River Leech', glyph: '🐛', hp: 6,  attack: 2, defense: 0, ai: 'chase',  xp: 7,  special: 'aquatic', detect: 4 },
+  { name: 'Mud Lurker',  glyph: '🐊', hp: 12, attack: 4, defense: 1, ai: 'ambush', xp: 14, special: 'aquatic', detect: 5 },
+];
+
 // === DUNGEON GENERATION (BSP) ===
 function generateFloor() {
   const p = state.player;
@@ -2080,6 +2086,45 @@ function carveWaterFeatures() {
     }
   }
 
+  // 3b. Bridge spans: convert water tiles that bridge two walkable areas (river crossings only).
+  // Scan rows and columns for contiguous water strips flanked by walkable tiles on both ends.
+  // Max span of 6 prevents bridging across the lake (added in step 4).
+  const MAX_BRIDGE_SPAN = 6;
+  // Horizontal spans
+  for (let hy = 1; hy < MAP_H - 1; hy++) {
+    let hx = 1;
+    while (hx < MAP_W - 1) {
+      if (getTile(hx, hy) !== T.WATER) { hx++; continue; }
+      const spanStart = hx;
+      while (hx < MAP_W - 1 && (getTile(hx, hy) === T.WATER || getTile(hx, hy) === T.BRIDGE)) hx++;
+      const spanLen = hx - spanStart;
+      const leftOk = spanStart > 0 && isWalkable(spanStart - 1, hy);
+      const rightOk = hx <= MAP_W - 1 && isWalkable(hx, hy);
+      if (leftOk && rightOk && spanLen <= MAX_BRIDGE_SPAN) {
+        for (let bx = spanStart; bx < hx; bx++) {
+          if (getTile(bx, hy) === T.WATER) setTile(bx, hy, T.BRIDGE);
+        }
+      }
+    }
+  }
+  // Vertical spans
+  for (let vx = 1; vx < MAP_W - 1; vx++) {
+    let vy = 1;
+    while (vy < MAP_H - 1) {
+      if (getTile(vx, vy) !== T.WATER) { vy++; continue; }
+      const spanStart = vy;
+      while (vy < MAP_H - 1 && (getTile(vx, vy) === T.WATER || getTile(vx, vy) === T.BRIDGE)) vy++;
+      const spanLen = vy - spanStart;
+      const topOk = spanStart > 0 && isWalkable(vx, spanStart - 1);
+      const botOk = vy <= MAP_H - 1 && isWalkable(vx, vy);
+      if (topOk && botOk && spanLen <= MAX_BRIDGE_SPAN) {
+        for (let by = spanStart; by < vy; by++) {
+          if (getTile(vx, by) === T.WATER) setTile(vx, by, T.BRIDGE);
+        }
+      }
+    }
+  }
+
   // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
   const eligibleRooms = state.rooms.filter(r => {
     const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
@@ -2337,10 +2382,32 @@ function removeEntity(e) {
 }
 
 // === SPAWNING ===
+function spawnWaterEnemies() {
+  // Gather all water tiles that are at least 5 tiles from the player start
+  const waterTiles = [];
+  for (let wy = 0; wy < MAP_H; wy++) {
+    for (let wx = 0; wx < MAP_W; wx++) {
+      if (getTile(wx, wy) !== T.WATER) continue;
+      if (Math.abs(wx - state.player.x) + Math.abs(wy - state.player.y) <= 5) continue;
+      waterTiles.push({ x: wx, y: wy });
+    }
+  }
+  if (waterTiles.length === 0) return;
+  const shuffled = shuffle([...waterTiles]);
+  const count = Math.min(2, shuffled.length);
+  for (let i = 0; i < count; i++) {
+    const pos = shuffled[i];
+    const template = WATER_ENEMIES[Math.floor(Math.random() * WATER_ENEMIES.length)];
+    state.entities.push(createEnemy(template, pos.x, pos.y));
+  }
+}
+
 function spawnEnemies() {
   if (state.floor === MAX_FLOOR) return; // Boss already placed
   // Spawn mini-boss on milestone floors
   if (MINI_BOSSES[state.floor]) spawnMiniBoss();
+  // Spawn water monsters on Caverns floors
+  if (state.floor >= 5 && state.floor <= 8) spawnWaterEnemies();
   const floorConfig = getFloorConfig(state.floor);
   const count = floorConfig.minEnemies + Math.floor(Math.random() * (floorConfig.maxEnemies - floorConfig.minEnemies + 1));
   const tier = floorConfig.tier;
@@ -5404,8 +5471,13 @@ function playerMove(dx, dy) {
 
   // Check walkable (phasing ghosts can walk through walls)
   if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) {
-    if (getTile(nx, ny) === T.WATER) {
+    const blockedTile = getTile(nx, ny);
+    if (blockedTile === T.WATER) {
       addMessage('The water is too deep to enter.', '');
+    } else if (blockedTile === T.STALAGMITE) {
+      addMessage('The stalagmite blocks your path.', '');
+    } else if (blockedTile === T.RUBBLE) {
+      addMessage('The rubble is impassable.', '');
     } else {
       addMessage('You bump into a wall.', '');
     }
