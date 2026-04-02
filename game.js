@@ -15,7 +15,7 @@ const HUNGER_TICK = 10; // lose 1 hunger every N turns
 const HUNGER_DAMAGE_TICK = 5; // lose 1 HP every N turns at 0 hunger
 
 // Tile types
-const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13, RUBBLE: 14, WATER: 15, BRIDGE: 16, STEPPING_STONE: 17, STALAGMITE: 18 };
+const T = { WALL: 0, FLOOR: 1, CORRIDOR: 2, STAIRS_DOWN: 3, STAIRS_UP: 4, DOOR_CLOSED: 5, DOOR_OPEN: 6, SPECIAL: 7, DOOR_ONEWAY: 8, DOOR_SEALED: 9, WALL_SECRET: 10, DOOR_LOCKED: 11, TELEPORT: 12, TELEPORT_VIS: 13, RUBBLE: 14, WATER: 15, BRIDGE: 16, STEPPING_STONE: 17, STALAGMITE: 18, WATERFALL: 19, MOUND: 20, ICY_PATH: 21, FIRE_PATH: 22, CHASM: 23 };
 
 // === GAME STATE ===
 let state = null; // main game state object
@@ -24,7 +24,7 @@ let tileSize = 25;
 let inputLocked = false;
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
-const GAME_VERSION = 'v0.9.7 — identification persistence, instrument loot, sage DEF'; // updated each push
+const GAME_VERSION = 'v0.9.8 — waterfall, mound, icy path, fire path, enchanted wall, chasm'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
@@ -1233,6 +1233,8 @@ function createPlayer(classId = 'adventurer') {
     wallTrap: null,
     // Web slow: parity toggle — true = skip next move while web_slowed
     webSlowSkip: false,
+    // Mound slow: true = skip next move after entering a mound (2-turn entry cost)
+    moundSlowPending: false,
     // Sage
     sageClass: classId === 'sage',
     scrollMastery: classId === 'sage',
@@ -1760,6 +1762,14 @@ function generateFloor() {
     spawnTeleportTiles();
   }
 
+  // Special terrain features
+  spawnWaterfalls();
+  spawnMounds();
+  spawnIcyPaths();
+  spawnFirePaths();
+  spawnChasms();
+  spawnEnchantedWalls();
+
   // Avalanche event (25% chance on floors 4+, never boss floor)
   if (state.floor >= 4 && state.floor < MAX_FLOOR && Math.random() < 0.25) {
     triggerAvalanche();
@@ -2286,14 +2296,20 @@ function setTile(x, y, t) {
 
 function isWalkable(x, y) {
   const t = getTile(x, y);
-  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.WATER && t !== T.STALAGMITE;
-  // TELEPORT, TELEPORT_VIS, BRIDGE, STEPPING_STONE are walkable (floor-like)
+  if (t === T.CHASM) {
+    // Chasm is passable only if a bridge entity spans it
+    return state.entities.some(e => e.type === 'bridge' && e.x === x && e.y === y && e.hp > 0);
+  }
+  return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.WATER && t !== T.STALAGMITE && t !== T.WATERFALL;
+  // TELEPORT, TELEPORT_VIS, BRIDGE, STEPPING_STONE, MOUND, ICY_PATH, FIRE_PATH are walkable (floor-like)
 }
 
 function isTransparent(x, y) {
   const t = getTile(x, y);
+  // WATERFALL, CHASM, and WATER are transparent (FOV passes through)
+  if (t === T.WATERFALL || t === T.CHASM || t === T.WATER) return true;
   return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.STALAGMITE;
-  // One-way doors and WATER are visible (transparent) but handled specially
+  // One-way doors are visible (transparent) but handled specially for movement
 }
 
 function getFarthestRoom(fromX, fromY) {
@@ -3422,6 +3438,203 @@ function spawnTeleportTiles() {
   }
 }
 
+// === SPECIAL TERRAIN SPAWNERS ===
+
+// Waterfall: impassable FOV-transparent tile that sprays adjacent corridors with wet status.
+// Appears on floors 3+ (1-2 per floor). Placed on WALL tiles adjacent to a corridor.
+function spawnWaterfalls() {
+  if (state.floor < 3 || state.floor >= MAX_FLOOR) return;
+  const count = 1 + (Math.random() < 0.4 ? 1 : 0);
+  let placed = 0;
+  for (let attempts = 0; attempts < 80 && placed < count; attempts++) {
+    const x = 1 + Math.floor(Math.random() * (MAP_W - 2));
+    const y = 1 + Math.floor(Math.random() * (MAP_H - 2));
+    if (getTile(x, y) !== T.WALL) continue;
+    // Must have at least one adjacent corridor tile
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    const adjCorridor = dirs.some(([dx,dy]) => getTile(x+dx, y+dy) === T.CORRIDOR);
+    if (!adjCorridor) continue;
+    // Must not be adjacent to player start
+    if (Math.abs(x - state.player.x) <= 2 && Math.abs(y - state.player.y) <= 2) continue;
+    setTile(x, y, T.WATERFALL);
+    placed++;
+  }
+}
+
+// Mound: passable elevated terrain. Entry costs 2 movement turns; grants +1 FOV and +1 range.
+// Appears on floors 2+ in room centers (2-4 per floor).
+function spawnMounds() {
+  if (state.floor < 2 || state.floor >= MAX_FLOOR) return;
+  const count = 2 + Math.floor(Math.random() * 3);
+  let placed = 0;
+  for (let attempts = 0; attempts < 100 && placed < count; attempts++) {
+    const pos = randomRoomFloorTile();
+    if (!pos) break;
+    if (getTile(pos.x, pos.y) !== T.FLOOR) continue;
+    // Not on player or stairs
+    if (pos.x === state.player.x && pos.y === state.player.y) continue;
+    if (getTile(pos.x, pos.y) === T.STAIRS_DOWN) continue;
+    setTile(pos.x, pos.y, T.MOUND);
+    placed++;
+  }
+}
+
+// Icy Path: clusters of 3-5 connected ICY_PATH tiles in Crypt biome (floors 5-8).
+// Player slides 1 extra tile in movement direction on entry (unless blocked).
+function spawnIcyPaths() {
+  if (state.floor < 5 || state.floor > 8 || state.floor >= MAX_FLOOR) return;
+  const clusterCount = 1 + Math.floor(Math.random() * 3);
+  for (let c = 0; c < clusterCount; c++) {
+    // Start from a random corridor or floor tile
+    let startPos = null;
+    for (let attempts = 0; attempts < 50; attempts++) {
+      const x = 2 + Math.floor(Math.random() * (MAP_W - 4));
+      const y = 2 + Math.floor(Math.random() * (MAP_H - 4));
+      const t = getTile(x, y);
+      if (t === T.CORRIDOR || t === T.FLOOR) {
+        if (Math.abs(x - state.player.x) > 3 || Math.abs(y - state.player.y) > 3) {
+          startPos = { x, y };
+          break;
+        }
+      }
+    }
+    if (!startPos) continue;
+    // Flood-fill up to 5 connected tiles
+    const tileCount = 3 + Math.floor(Math.random() * 3);
+    const frontier = [startPos];
+    const visited = new Set();
+    visited.add(startPos.y * MAP_W + startPos.x);
+    let count = 0;
+    while (frontier.length > 0 && count < tileCount) {
+      const idx = Math.floor(Math.random() * frontier.length);
+      const cur = frontier.splice(idx, 1)[0];
+      const t = getTile(cur.x, cur.y);
+      if (t !== T.CORRIDOR && t !== T.FLOOR) continue;
+      setTile(cur.x, cur.y, T.ICY_PATH);
+      count++;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        const key = ny * MAP_W + nx;
+        if (!visited.has(key) && nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1) {
+          visited.add(key);
+          const nt = getTile(nx, ny);
+          if (nt === T.CORRIDOR || nt === T.FLOOR) frontier.push({ x: nx, y: ny });
+        }
+      }
+    }
+  }
+}
+
+// Fire Path: clusters of T.FIRE_PATH tiles in Citadel (9-12) and Abyss (13-16) biomes.
+// Deals 1 HP/turn while standing. Extinguished by frozen/ice status.
+function spawnFirePaths() {
+  if (state.floor < 9 || state.floor > 16 || state.floor >= MAX_FLOOR) return;
+  const clusterCount = 1 + Math.floor(Math.random() * 2);
+  for (let c = 0; c < clusterCount; c++) {
+    let startPos = null;
+    for (let attempts = 0; attempts < 50; attempts++) {
+      const pos = randomRoomFloorTile();
+      if (!pos) break;
+      if (getTile(pos.x, pos.y) !== T.FLOOR) continue;
+      if (Math.abs(pos.x - state.player.x) > 3 || Math.abs(pos.y - state.player.y) > 3) {
+        startPos = pos;
+        break;
+      }
+    }
+    if (!startPos) continue;
+    const tileCount = 2 + Math.floor(Math.random() * 3);
+    const frontier = [startPos];
+    const visited = new Set();
+    visited.add(startPos.y * MAP_W + startPos.x);
+    let count = 0;
+    while (frontier.length > 0 && count < tileCount) {
+      const idx = Math.floor(Math.random() * frontier.length);
+      const cur = frontier.splice(idx, 1)[0];
+      if (getTile(cur.x, cur.y) !== T.FLOOR) continue;
+      setTile(cur.x, cur.y, T.FIRE_PATH);
+      count++;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        const key = ny * MAP_W + nx;
+        if (!visited.has(key) && nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1) {
+          visited.add(key);
+          if (getTile(nx, ny) === T.FLOOR) frontier.push({ x: nx, y: ny });
+        }
+      }
+    }
+  }
+}
+
+// Chasm: impassable void tile in Abyss biome (floors 13-16). FOV-transparent.
+// A bridge entity (3 HP) spans it; destroying the bridge makes it permanently impassable.
+function spawnChasms() {
+  if (state.floor < 13 || state.floor > 16 || state.floor >= MAX_FLOOR) return;
+  const count = 1 + (Math.random() < 0.5 ? 1 : 0);
+  let placed = 0;
+  for (let attempts = 0; attempts < 100 && placed < count; attempts++) {
+    // Find a corridor tile that has walkable tiles on both ends to bridge
+    const x = 3 + Math.floor(Math.random() * (MAP_W - 6));
+    const y = 3 + Math.floor(Math.random() * (MAP_H - 6));
+    const t = getTile(x, y);
+    if (t !== T.CORRIDOR) continue;
+    // Must have walkable tiles on both horizontal or vertical sides
+    const hBridge = isWalkable(x-1, y) && isWalkable(x+1, y) &&
+                    getTile(x-1, y) !== T.CHASM && getTile(x+1, y) !== T.CHASM;
+    const vBridge = isWalkable(x, y-1) && isWalkable(x, y+1) &&
+                    getTile(x, y-1) !== T.CHASM && getTile(x, y+1) !== T.CHASM;
+    if (!hBridge && !vBridge) continue;
+    // Not near player
+    if (Math.abs(x - state.player.x) <= 3 && Math.abs(y - state.player.y) <= 3) continue;
+    setTile(x, y, T.CHASM);
+    // Place bridge entity on the chasm
+    state.entities.push({
+      type: 'bridge',
+      x, y,
+      glyph: '═',
+      name: 'Stone Bridge',
+      hp: 3,
+      maxHp: 3
+    });
+    placed++;
+  }
+}
+
+// Enchanted Wall: entity on a WALL tile inside a room boundary.
+// Teleports to another WALL tile in the room each time player moves in the same room.
+function spawnEnchantedWalls() {
+  if (state.floor < 3 || state.floor >= MAX_FLOOR) return;
+  if (state.rooms.length < 2) return;
+  const count = 1 + (Math.random() < 0.4 ? 1 : 0);
+  // Don't place in the player's starting room
+  const playerRoom = state.rooms.find(r =>
+    state.player.x >= r.x && state.player.x < r.x + r.w &&
+    state.player.y >= r.y && state.player.y < r.y + r.h
+  );
+  const candidates = state.rooms.filter(r => r !== playerRoom && r.w >= 4 && r.h >= 4);
+  if (candidates.length === 0) return;
+  let placed = 0;
+  for (let c = 0; c < count && placed < count; c++) {
+    const room = candidates[Math.floor(Math.random() * candidates.length)];
+    // Find wall tiles on the room perimeter
+    const wallTiles = [];
+    for (let ry = room.y - 1; ry <= room.y + room.h; ry++) {
+      for (let rx = room.x - 1; rx <= room.x + room.w; rx++) {
+        if (getTile(rx, ry) === T.WALL) wallTiles.push({ x: rx, y: ry });
+      }
+    }
+    if (wallTiles.length === 0) continue;
+    const pos = wallTiles[Math.floor(Math.random() * wallTiles.length)];
+    state.entities.push({
+      type: 'enchanted_wall',
+      x: pos.x, y: pos.y,
+      glyph: '▓',
+      name: 'Enchanted Wall',
+      roomIdx: state.rooms.indexOf(room)
+    });
+    placed++;
+  }
+}
+
 // Avalanche: fill part of a random room with rocks (WALL tiles)
 // Never affects the player's current tile, stairs, doors, or entities
 function triggerAvalanche() {
@@ -3799,7 +4012,8 @@ function computeFOV() {
   const p = state.player;
   const rangedSightBonus = (state.player.equipped.ranged?.special === 'sight') ? 1 : 0;
   const lanternBonus = hasStatusEffect(state.player, 'lanternLit') ? 3 : 0;
-  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus + lanternBonus;
+  const moundBonus = (state.map && getTile(state.player.x, state.player.y) === T.MOUND) ? 1 : 0;
+  const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus + lanternBonus + moundBonus;
   state.visible.fill(0);
 
   // Player's tile is always visible
@@ -4600,7 +4814,16 @@ function processEntityEffects(entity) {
   for (let i = entity.statusEffects.length - 1; i >= 0; i--) {
     const eff = entity.statusEffects[i];
     switch (eff.type) {
+      case 'wet':
+        // Wet extinguishes burning
+        if (hasStatusEffect(entity, 'burning')) {
+          entity.statusEffects = entity.statusEffects.filter(s => s.type !== 'burning');
+          if (isPlayer) addMessage('The water douses the flames!', 'good');
+        }
+        break;
       case 'burning':
+        // Burning is suppressed by wet
+        if (hasStatusEffect(entity, 'wet')) break;
         entity.hp -= 2;
         if (isPlayer) addMessage('You burn! (-2 HP)', 'damage');
         // Soulfire synergy: player heals from enemy burn damage
@@ -4630,6 +4853,7 @@ function processEntityEffects(entity) {
       if (isPlayer && eff.type === 'plenty') addMessage('The Song of Plenty fades.', '');
       if (isPlayer && eff.type === 'lanternLit') { addMessage('🔦 The lantern flickers out.', ''); computeFOV(); }
       if (isPlayer && eff.type === 'phasing') addMessage('You solidify again.', '');
+      if (isPlayer && eff.type === 'wet') addMessage('You dry off.', '');
     }
   }
 
@@ -5289,6 +5513,14 @@ function playerMove(dx, dy) {
     p.webSlowSkip = false;
   }
 
+  // Mound-Slow — entering a mound costs 2 turns; first move after entry is skipped
+  if (p.moundSlowPending) {
+    p.moundSlowPending = false;
+    addMessage('The uneven ground slows you.', '');
+    endTurn();
+    return;
+  }
+
   // Check for friendly ally at destination — swap positions
   const ally = allyAt(nx, ny);
   if (ally) {
@@ -5478,6 +5710,10 @@ function playerMove(dx, dy) {
       addMessage('The stalagmite blocks your path.', '');
     } else if (blockedTile === T.RUBBLE) {
       addMessage('The rubble is impassable.', '');
+    } else if (blockedTile === T.CHASM) {
+      addMessage('A vast chasm blocks your path.', '');
+    } else if (blockedTile === T.WATERFALL) {
+      addMessage('A roaring waterfall blocks your path.', '');
     } else {
       addMessage('You bump into a wall.', '');
     }
@@ -5491,6 +5727,54 @@ function playerMove(dx, dy) {
   p.movedLastTurn = true;
   Audio.step();
   haptic(10);
+
+  // === SPECIAL TERRAIN ENTRY EFFECTS ===
+
+  // ICY PATH — slide one extra tile in the same direction (unless blocked)
+  if (getTile(nx, ny) === T.ICY_PATH) {
+    const slideX = nx + dx, slideY = ny + dy;
+    if (isWalkable(slideX, slideY) && !enemyAt(slideX, slideY)) {
+      p.x = slideX;
+      p.y = slideY;
+      Audio.step();
+      addMessage('You slip on the ice!', '');
+    }
+  }
+
+  // MOUND — set pending slow flag (costs 2 turns to enter)
+  if (getTile(p.x, p.y) === T.MOUND && !p.moundSlowPending) {
+    p.moundSlowPending = true;
+  }
+
+  // FIRE PATH — extinguish if player has frozen status; otherwise just damage in endTurn
+  if (getTile(p.x, p.y) === T.FIRE_PATH && hasStatusEffect(p, 'frozen')) {
+    setTile(p.x, p.y, T.FLOOR);
+    addMessage('Your icy aura extinguishes the fire!', 'good');
+  }
+
+  // ENCHANTED WALL — when player moves within a room, teleport enchanted_wall to another wall tile in that room
+  const nowRoom = state.rooms.find(r =>
+    p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
+  );
+  if (nowRoom) {
+    const nowRoomIdx = state.rooms.indexOf(nowRoom);
+    for (const ew of state.entities.filter(e => e.type === 'enchanted_wall' && e.roomIdx === nowRoomIdx)) {
+      // Find a random wall tile in this room (different from current position)
+      const wallTiles = [];
+      for (let ry = nowRoom.y - 1; ry <= nowRoom.y + nowRoom.h; ry++) {
+        for (let rx = nowRoom.x - 1; rx <= nowRoom.x + nowRoom.w; rx++) {
+          if (getTile(rx, ry) === T.WALL && (rx !== ew.x || ry !== ew.y)) {
+            wallTiles.push({ x: rx, y: ry });
+          }
+        }
+      }
+      if (wallTiles.length > 0) {
+        const dest = wallTiles[Math.floor(Math.random() * wallTiles.length)];
+        ew.x = dest.x;
+        ew.y = dest.y;
+      }
+    }
+  }
 
   // Escape Artist ice trap: leave a trap at old tile if enemies were adjacent (up to 3 active)
   if (p.iceTrapPassive) {
@@ -5574,9 +5858,15 @@ function playerMove(dx, dy) {
   // Check for hazards
   const hazard = state.entities.find(e => e.type === 'hazard' && e.x === nx && e.y === ny);
   if (hazard && hazard.hazardType === 'fire') {
-    state.player.hp -= 1;
-    addMessage('You step in fire! (-1 HP)', 'damage');
-    if (state.player.hp <= 0) { playerDeath('fire', '🔥'); return; }
+    if (hasStatusEffect(state.player, 'wet')) {
+      // Wet status extinguishes fire hazard
+      removeEntity(hazard);
+      addMessage('Your wet body douses the fire!', 'good');
+    } else {
+      state.player.hp -= 1;
+      addMessage('You step in fire! (-1 HP)', 'damage');
+      if (state.player.hp <= 0) { playerDeath('fire', '🔥'); return; }
+    }
   }
   if (hazard && hazard.hazardType === 'web') {
     const alreadySlowed = hasStatusEffect(state.player, 'web_slowed');
@@ -7171,6 +7461,39 @@ function endTurn() {
   // Lantern fuel tick
   tickLanternFuel();
 
+  // === SPECIAL TERRAIN EFFECTS (per-turn) ===
+
+  // FIRE PATH — 1 HP/turn while standing on it
+  if (getTile(state.player.x, state.player.y) === T.FIRE_PATH) {
+    if (hasStatusEffect(state.player, 'wet')) {
+      // Wet extinguishes fire path tile
+      setTile(state.player.x, state.player.y, T.FLOOR);
+      addMessage('Your wet body douses the fire path!', 'good');
+    } else {
+      state.player.hp -= 1;
+      addMessage('The fire scorches you! (-1 HP)', 'damage');
+      if (state.player.hp <= 0) { playerDeath('fire path', '🔥'); return; }
+    }
+  }
+
+  // WATERFALL SPRAY — apply wet status to player if on an adjacent corridor tile
+  for (let wy = 0; wy < MAP_H; wy++) {
+    for (let wx = 0; wx < MAP_W; wx++) {
+      if (getTile(wx, wy) !== T.WATERFALL) continue;
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const tx = wx + ddx, ty = wy + ddy;
+        if (getTile(tx, ty) !== T.CORRIDOR) continue;
+        if (state.player.x === tx && state.player.y === ty) {
+          addStatusEffect(state.player, 'wet', 2);
+          // Wet amplifies frozen: if already frozen, extend duration
+          const frozenEff = state.player.statusEffects?.find(s => s.type === 'frozen');
+          if (frozenEff) frozenEff.turns = Math.min(frozenEff.turns + 1, 6);
+          break;
+        }
+      }
+    }
+  }
+
   // Enemy turns
   processEnemies();
   // Reset movement tracking after enemies have processed
@@ -8433,6 +8756,31 @@ function render() {
           tileGlyph = '▲';
           tileColor = vis ? '#5a6a70' : '#2a3238';
           break;
+        case T.WATERFALL:
+          tileGlyph = '≋';
+          tileColor = vis ? '#a0d8ff' : '#304860';
+          break;
+        case T.MOUND:
+          tileGlyph = '^';
+          tileColor = vis ? '#8a6030' : '#3a2810';
+          break;
+        case T.ICY_PATH:
+          tileGlyph = '·';
+          tileColor = vis ? '#a0e8f8' : '#304858';
+          break;
+        case T.FIRE_PATH:
+          tileGlyph = '▒';
+          tileColor = vis ? '#e05010' : '#501808';
+          break;
+        case T.CHASM:
+          tileGlyph = ' ';
+          tileColor = '#000';
+          // Draw a dark void background when visible
+          if (vis) {
+            ctx.fillStyle = 'rgba(5,0,15,0.85)';
+            ctx.fillRect(vx * ts, vy * ts, ts, ts);
+          }
+          break;
         default:
           tileGlyph = ' ';
           tileColor = '#000';
@@ -8448,7 +8796,8 @@ function render() {
   // Targeting overlay when in throw/fire mode
   if (state.throwMode) {
     const throwItem = state.throwItem?.item;
-    const maxRange = throwItem?.itemType === 'aimed_shot' ? 15 : (throwItem?.range || 8);
+    const moundRangeBonus = getTile(state.player.x, state.player.y) === T.MOUND ? 1 : 0;
+    const maxRange = (throwItem?.itemType === 'aimed_shot' ? 15 : (throwItem?.range || 8)) + moundRangeBonus;
     const isBlast = throwItem?.itemType === 'special_arrow' && throwItem?.arrowType === 'blast';
     // If a special arrow is loaded, check for blast
     const loadedArrow = state.player.loadedSpecialArrow;
@@ -8679,6 +9028,43 @@ function render() {
     ctx.globalAlpha = 1.0;
     ctx.font = `${Math.floor(ts * 0.65)}px serif`;
     ctx.fillText('⚠', sx, sy);
+  }
+
+  // Draw enchanted walls (pulsing purple ▓ on wall tiles)
+  for (const e of state.entities) {
+    if (e.type !== 'enchanted_wall') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.explored[idx]) continue; // show if explored (wall tile)
+    const vx = e.x - camX, vy = e.y - camY;
+    if (vx < 0 || vx >= VIEW_COLS || vy < 0 || vy >= VIEW_ROWS) continue;
+    const sx = vx * ts + ts / 2;
+    const sy = vy * ts + ts / 2;
+    const pulse = 0.4 + 0.3 * Math.sin(Date.now() / 400);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#5010a0';
+    ctx.fillRect(vx * ts, vy * ts, ts, ts);
+    ctx.globalAlpha = 1.0;
+    ctx.font = `${fontSize}px monospace`;
+    ctx.fillStyle = '#c060ff';
+    ctx.fillText('▓', sx, sy);
+    // Continuous redraw for pulse
+    requestAnimationFrame(() => { if (!state.gameOver && !state.victory) render(); });
+  }
+
+  // Draw bridge entities (═ glyph on chasm tiles)
+  for (const e of state.entities) {
+    if (e.type !== 'bridge') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const vx = e.x - camX, vy = e.y - camY;
+    if (vx < 0 || vx >= VIEW_COLS || vy < 0 || vy >= VIEW_ROWS) continue;
+    const sx = vx * ts + ts / 2;
+    const sy = vy * ts + ts / 2;
+    // Crack effect as HP decreases
+    const hpFrac = e.hp / e.maxHp;
+    ctx.font = `${fontSize}px monospace`;
+    ctx.fillStyle = hpFrac > 0.66 ? '#c8a060' : hpFrac > 0.33 ? '#a07030' : '#804010';
+    ctx.fillText('═', sx, sy);
   }
 
   // Draw Conjurer illusions (shimmering magenta tint)
@@ -10310,6 +10696,8 @@ function showSettings() {
     plenty:       { icon: '🎵', text: 'Plenty',      color: '#60c040' },
     lanternLit:   { icon: '🔦', text: 'Lantern',     color: '#ffc040' },
     phasing:      { icon: '👻', text: 'Phasing',     color: '#a080ff' },
+    wet:          { icon: '💧', text: 'Wet',         color: '#40a0ff' },
+    mound_slow:   { icon: '^',  text: 'Mound-Slow',  color: '#8a6030' },
   };
   const effects = p ? (p.statusEffects || []) : [];
   if (effects.length > 0) {
@@ -10847,6 +11235,21 @@ function renderMinimap() {
           break;
         case T.STALAGMITE:
           ctx.fillStyle = vis ? biome.wallVis : biome.wallDim;
+          break;
+        case T.WATERFALL:
+          ctx.fillStyle = vis ? '#80c0f0' : '#203040';
+          break;
+        case T.MOUND:
+          ctx.fillStyle = vis ? '#8a6030' : '#3a2810';
+          break;
+        case T.ICY_PATH:
+          ctx.fillStyle = vis ? '#80d8f0' : '#203040';
+          break;
+        case T.FIRE_PATH:
+          ctx.fillStyle = vis ? '#e05010' : '#501808';
+          break;
+        case T.CHASM:
+          ctx.fillStyle = vis ? '#100820' : '#080410';
           break;
         default:
           continue;
