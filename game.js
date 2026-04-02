@@ -4767,18 +4767,30 @@ function chaseAI(enemy) {
     if (enemy.webSpinCooldown <= 0) {
       enemy.webSpinCooldown = 2;
       const WEB_RADIUS = 2;
+      const DOOR_TYPES = new Set([T.DOOR_CLOSED, T.DOOR_OPEN, T.DOOR_ONEWAY, T.DOOR_SEALED, T.DOOR_LOCKED]);
+      const candidates = [];
       for (let wy = enemy.y - WEB_RADIUS; wy <= enemy.y + WEB_RADIUS; wy++) {
         for (let wx = enemy.x - WEB_RADIUS; wx <= enemy.x + WEB_RADIUS; wx++) {
           if (wx < 0 || wx >= MAP_W || wy < 0 || wy >= MAP_H) continue;
           const tile = getTile(wx, wy);
           if (tile !== T.FLOOR && tile !== T.CORRIDOR) continue;
-          // Don't stack webs — refresh if one already exists
-          const existing = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === wx && e.y === wy);
-          if (existing) {
-            existing.turns = 20;
-          } else {
-            state.entities.push({ type: 'hazard', x: wx, y: wy, glyph: '🕸', name: 'Spider Web', hazardType: 'web', turns: 20 });
-          }
+          // Skip tiles adjacent to any door
+          const nearDoor = [[0,-1],[0,1],[-1,0],[1,0]].some(([ddx, ddy]) => DOOR_TYPES.has(getTile(wx + ddx, wy + ddy)));
+          if (nearDoor) continue;
+          // Count wall neighbors to score corner-preference
+          const wallCount = [[0,-1],[0,1],[-1,0],[1,0]].filter(([ddx, ddy]) => getTile(wx + ddx, wy + ddy) === T.WALL).length;
+          candidates.push({ wx, wy, wallCount });
+        }
+      }
+      // Place webs, biased toward corners (more wall neighbors)
+      for (const { wx, wy, wallCount } of candidates) {
+        // Spiders prefer corners: skip open tiles 60% of the time unless they have 2+ wall neighbors
+        if (wallCount < 2 && Math.random() < 0.60) continue;
+        const existing = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === wx && e.y === wy);
+        if (existing) {
+          existing.turns = 20;
+        } else {
+          state.entities.push({ type: 'hazard', x: wx, y: wy, glyph: '🕸', name: 'Spider Web', hazardType: 'web', turns: 20 });
         }
       }
     }
@@ -5392,7 +5404,11 @@ function playerMove(dx, dy) {
 
   // Check walkable (phasing ghosts can walk through walls)
   if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) {
-    addMessage('You bump into a wall.', '');
+    if (getTile(nx, ny) === T.WATER) {
+      addMessage('The water is too deep to enter.', '');
+    } else {
+      addMessage('You bump into a wall.', '');
+    }
     endTurn();
     return;
   }
@@ -5517,6 +5533,14 @@ function playerMove(dx, dy) {
     } else {
       addMessage(`${npc.name} drifts silently, its message already given.`, '');
     }
+    endTurn();
+    return;
+  }
+
+  // Check for warning sign (readable every time)
+  const sign = state.entities.find(e => e.type === 'sign' && e.x === nx && e.y === ny);
+  if (sign) {
+    addMessage(sign.message, 'damage');
     endTurn();
     return;
   }
@@ -8228,7 +8252,7 @@ function render() {
         ctx.fillRect(vx * ts, vy * ts, ts, ts);
       }
       if (tile === T.WATER && vis) {
-        ctx.fillStyle = 'rgba(20, 60, 100, 0.15)';
+        ctx.fillStyle = 'rgba(30, 110, 210, 0.30)';
         ctx.fillRect(vx * ts, vy * ts, ts, ts);
       }
 
@@ -8568,6 +8592,21 @@ function render() {
     ctx.font = `${Math.floor(ts * 0.7)}px serif`;
     ctx.fillText(e.glyph, sx, sy);
     ctx.globalAlpha = 1.0;
+  }
+
+  // Draw warning signs (amber background, ⚠ glyph)
+  for (const e of state.entities) {
+    if (e.type !== 'sign') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.visible[idx]) continue;
+    const sx = (e.x - camX) * ts + ts / 2;
+    const sy = (e.y - camY) * ts + ts / 2;
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = '#c08000';
+    ctx.fillRect((e.x - camX) * ts + 1, (e.y - camY) * ts + 1, ts - 2, ts - 2);
+    ctx.globalAlpha = 1.0;
+    ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+    ctx.fillText('⚠', sx, sy);
   }
 
   // Draw Conjurer illusions (shimmering magenta tint)
@@ -10854,6 +10893,15 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
   }
 
+  // Draw warning signs as amber dots on minimap
+  for (const e of state.entities) {
+    if (e.type !== 'sign') continue;
+    const idx = e.y * MAP_W + e.x;
+    if (!state.explored[idx]) continue;
+    ctx.fillStyle = '#c08000';
+    ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
   // Draw sage as purple dot
   for (const e of state.entities) {
     if (e.type !== 'sage') continue;
@@ -11254,7 +11302,7 @@ function getFloorBiome(floor) {
     floorVis: '#2a3a48', floorDim: '#121c24',
     corrVis:  '#223040', corrDim:  '#0e161e',
     bg: '#060c12',
-    waterVis: '#1a3050', waterDim: '#0c1828'
+    waterVis: '#2878c0', waterDim: '#0e2a4a'
   };
   if (floor <= 12) return {
     name: 'The Crypt',
@@ -11622,19 +11670,48 @@ function throwProjectile(dx, dy, isSecondShot) {
   }
 }
 
+const MINI_BOSS_SIGN_MESSAGES = {
+  4:  '⚠ Something massive claims the deepest chamber. Crushed bones mark its path.',
+  8:  '⚠ The ancient wyrm nests in the flooded dark. It cannot be drowned.',
+  12: '⚠ The Lich has returned to its tomb. Death is a minor inconvenience to it.',
+  16: '⚠ The demon\'s fire has scorched these stones for centuries. Do not face it unprepared.',
+  20: '⚠ Beyond this point, the Void has taken form. It does not forget faces.',
+  23: '⚠ The Glyph King awaits. His madness is absolute. Turn back — or finish this.',
+};
+
 // === MINI-BOSS SPAWNING ===
 function spawnMiniBoss() {
   const template = MINI_BOSSES[state.floor];
   if (!template) return;
 
   const room = getFarthestRoom(state.player.x, state.player.y);
-  const x = room.x + Math.floor(room.w / 2);
-  const y = room.y + Math.floor(room.h / 2);
+  const bossX = room.x + Math.floor(room.w / 2);
+  const bossY = room.y + Math.floor(room.h / 2);
 
-  const miniBoss = createEnemy(template, x, y);
+  const miniBoss = createEnemy(template, bossX, bossY);
   miniBoss.isMiniBoss = true;
   state.entities.push(miniBoss);
   addMessage(`⚠ A ${template.name} guards this floor!`, 'damage');
+
+  // Place a warning sign in the room closest to the mini-boss room (but not the boss room itself)
+  const msg = MINI_BOSS_SIGN_MESSAGES[state.floor];
+  if (msg && state.rooms.length >= 2) {
+    const sorted = state.rooms
+      .filter(r => r !== room)
+      .sort((a, b) => {
+        const da = Math.abs((a.x + Math.floor(a.w / 2)) - bossX) + Math.abs((a.y + Math.floor(a.h / 2)) - bossY);
+        const db = Math.abs((b.x + Math.floor(b.w / 2)) - bossX) + Math.abs((b.y + Math.floor(b.h / 2)) - bossY);
+        return da - db;
+      });
+    const signRoom = sorted[0];
+    if (signRoom) {
+      const sx = signRoom.x + Math.floor(signRoom.w / 2);
+      const sy = signRoom.y + Math.floor(signRoom.h / 2);
+      if (getTile(sx, sy) === T.FLOOR) {
+        state.entities.push({ type: 'sign', x: sx, y: sy, glyph: '⚠', message: msg });
+      }
+    }
+  }
 }
 
 // === CLASS SPECIAL ABILITIES ===
