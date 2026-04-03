@@ -1,5 +1,8 @@
 # Changelog
 
+Apr 3, 2026 — 1:30 PM PT — Added agent handoff notes for switching computers
+- Added `AGENT_HANDOFF.md` with completed work summary, current state, open issues, and restart steps.
+
 Apr 3, 2026 — 11:37 AM PT — Clarified Escape Route availability text in the UI
 - Escape Artist special button now shows `ESCAPE` when available instead of `0/1`.
 - Escape Route ability text now shows clear `Ready/Used` status (and `X left` with mastery).
