@@ -1666,8 +1666,20 @@ function generateFloor() {
   if (state.floor < MAX_FLOOR) {
     const farthestRoom = getFarthestRoom(p.x, p.y);
     if (farthestRoom) {
-      const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
-      const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+      let sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
+      let sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+      // If center is water/stepping stone, find nearest non-water floor tile in the room
+      if (getTile(sx, sy) === T.WATER || getTile(sx, sy) === T.STEPPING_STONE) {
+        let found = false;
+        outer: for (let dy = 0; dy < farthestRoom.h; dy++) {
+          for (let dx = 0; dx < farthestRoom.w; dx++) {
+            const cx = farthestRoom.x + dx, cy = farthestRoom.y + dy;
+            const t = getTile(cx, cy);
+            if (t === T.FLOOR || t === T.CORRIDOR) { sx = cx; sy = cy; found = true; break outer; }
+          }
+        }
+        if (!found) { sx = farthestRoom.x; sy = farthestRoom.y; } // fallback to corner
+      }
       setTile(sx, sy, T.STAIRS_DOWN);
     }
     // One-way doors must run after stairs are placed (needs valid stair pos)
@@ -2081,10 +2093,12 @@ function carveWaterFeatures() {
   }
 
   // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
+  const farthestForLake = getFarthestRoom(p.x, p.y);
   const eligibleRooms = state.rooms.filter(r => {
     const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
     const isStart = (Math.abs(cx2 - p.x) + Math.abs(cy2 - p.y)) < 3;
-    return !isStart && r.w >= 5 && r.h >= 5;
+    const isFarthest = farthestForLake && r === farthestForLake;
+    return !isStart && !isFarthest && r.w >= 5 && r.h >= 5;
   });
   if (eligibleRooms.length > 0) {
     const lakeRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
@@ -7513,6 +7527,30 @@ function fixBlockedStairs() {
       if (state.map[i] === T.RUBBLE) { state.map[i] = T.FLOOR; cleared++; }
     }
     if (cleared > 0) addMessage('Rubble crumbles, revealing a passable path!', 'good');
+  }
+  // Second pass: if stairs are still unreachable (e.g. water bug), convert
+  // water tiles around the stairs to bridges and move player to stairs
+  if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
+    for (let r = 1; r <= 3; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const tx = sx + dx, ty = sy + dy;
+          if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
+          if (state.map[ty * MAP_W + tx] === T.WATER || state.map[ty * MAP_W + tx] === T.STEPPING_STONE) {
+            state.map[ty * MAP_W + tx] = T.BRIDGE;
+          }
+        }
+      }
+      if (bfsReachable(state.player.x, state.player.y, sx, sy)) break;
+    }
+    // If still unreachable, teleport player directly to stairs
+    if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
+      state.player.x = sx;
+      state.player.y = sy;
+      addMessage('The water recedes — you find yourself at the stairs.', 'gold');
+    } else {
+      addMessage('The water parts, revealing a path.', 'gold');
+    }
   }
 }
 
