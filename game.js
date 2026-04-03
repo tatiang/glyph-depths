@@ -7529,28 +7529,36 @@ function fixBlockedStairs() {
     }
     if (cleared > 0) addMessage('Rubble crumbles, revealing a passable path!', 'good');
   }
-  // Second pass: if stairs are still unreachable (e.g. water bug), convert
-  // water tiles around the stairs to bridges and move player to stairs
+  // Second pass: if stairs are still unreachable (e.g. water bug), flood-fill
+  // all water/stepping-stone tiles connected to the stairs and convert to bridges,
+  // then teleport the player to the stairs as a last resort.
   if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
-    for (let r = 1; r <= 3; r++) {
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const tx = sx + dx, ty = sy + dy;
-          if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
-          if (state.map[ty * MAP_W + tx] === T.WATER || state.map[ty * MAP_W + tx] === T.STEPPING_STONE) {
-            state.map[ty * MAP_W + tx] = T.BRIDGE;
-          }
+    // Flood-fill from stairs, bridging every connected water tile
+    const visited = new Set();
+    const queue = [[sx, sy]];
+    visited.add(sy * MAP_W + sx);
+    while (queue.length) {
+      const [cx, cy] = queue.shift();
+      for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+        const nx = cx + ddx, ny = cy + ddy;
+        if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) continue;
+        const nidx = ny * MAP_W + nx;
+        if (visited.has(nidx)) continue;
+        visited.add(nidx);
+        const nt = state.map[nidx];
+        if (nt === T.WATER || nt === T.STEPPING_STONE) {
+          state.map[nidx] = T.BRIDGE;
+          queue.push([nx, ny]);
         }
       }
-      if (bfsReachable(state.player.x, state.player.y, sx, sy)) break;
     }
-    // If still unreachable, teleport player directly to stairs
+    // Teleport player to stairs if still blocked (e.g. river cuts off path entirely)
     if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
       state.player.x = sx;
       state.player.y = sy;
       addMessage('The water recedes — you find yourself at the stairs.', 'gold');
     } else {
-      addMessage('The water parts, revealing a path.', 'gold');
+      addMessage('The water parts, revealing a path to the stairs.', 'gold');
     }
   }
 }
