@@ -173,6 +173,17 @@ const Audio = (() => {
     osc('sine', 120, 0.08, [0.005, 0.02, 0.3, 0.04]);
   }
 
+  function keyUnlock() {
+    if (!ctx || !enabled) return;
+    resume();
+    osc('sine', 660, 0.10, [0.01, 0.03, 0.5, 0.08]);
+    setTimeout(() => osc('sine', 880, 0.08, [0.005, 0.02, 0.4, 0.06]), 80);
+    setTimeout(() => {
+      osc('sine', 440, 0.16, [0.01, 0.05, 0.6, 0.15]);
+      osc('sine', 554, 0.10, [0.01, 0.04, 0.5, 0.12]);
+    }, 200);
+  }
+
   function miss() {
     if (!ctx || !enabled) return;
     resume();
@@ -476,7 +487,7 @@ const Audio = (() => {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, miss, crit, merchant, boss, danger, titleMusic,
+    door, keyUnlock, miss, crit, merchant, boss, danger, titleMusic,
     startAmbient, stopAmbient, setAmbientMuted
   };
 })();

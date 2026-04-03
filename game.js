@@ -4385,7 +4385,7 @@ function getEffectiveAttack(entity) {
     if (state.player.classId === 'berserker' && state.player.hp < state.player.maxHp * 0.4) atk += 3;
     return Math.max(1, atk);
   }
-  return entity.attack;
+  return entity.attack + (hasStatusEffect(entity, 'strength') ? 2 : 0);
 }
 
 function getEffectiveDefense(entity) {
@@ -4405,6 +4405,20 @@ function getEffectiveDefense(entity) {
 function applyWeaponSpecial(weapon, target) {
   if (!weapon.special || target.hp <= 0) return;
   switch (weapon.special) {
+    case 'cleave': {
+      const cleaveDmg = Math.max(1, Math.floor(getEffectiveAttack(state.player) * 0.5));
+      const adjacent = state.entities.filter(e =>
+        e.type === 'enemy' && e.hp > 0 && e !== target &&
+        Math.abs(e.x - target.x) <= 1 && Math.abs(e.y - target.y) <= 1
+      );
+      if (adjacent.length > 0) {
+        const splash = adjacent[Math.floor(Math.random() * adjacent.length)];
+        splash.hp -= cleaveDmg;
+        addMessage(`Cleave hits ${splash.name} for ${cleaveDmg}!`, 'damage');
+        if (splash.hp <= 0) killEnemy(splash);
+      }
+      break;
+    }
     case 'burn':
       addStatusEffect(target, 'burning', 3);
       addMessage(`${target.name} catches fire!`, 'damage');
@@ -4845,6 +4859,7 @@ function processEntityEffects(entity) {
     if (eff.turns <= 0) {
       entity.statusEffects.splice(i, 1);
       if (isPlayer && eff.type === 'invisibility') addMessage('You become visible again.', '');
+      if (!isPlayer && eff.type === 'invisible') addMessage(`${entity.name} becomes visible again!`, '');
       if (isPlayer && eff.type === 'strength') addMessage('Your strength fades.', '');
       if (isPlayer && eff.type === 'blessed') addMessage('The sage\'s blessing fades.', '');
       if (isPlayer && eff.type === 'courage') addMessage('The Song of Courage fades.', '');
@@ -5600,8 +5615,13 @@ function playerMove(dx, dy) {
       state.player.x = nx;
       state.player.y = ny;
     }
-    setTile(nx, ny, T.DOOR_SEALED);
-    addMessage('The door slams shut behind you! Bash it 5 times to break through.', 'damage');
+    if (state.player.classId === 'rogue') {
+      setTile(nx, ny, T.DOOR_OPEN);
+      addMessage('You deftly pick the one-way lock.', 'good');
+    } else {
+      setTile(nx, ny, T.DOOR_SEALED);
+      addMessage('The door slams shut behind you! Bash it 5 times to break through.', 'damage');
+    }
     Audio.door();
     haptic(50);
     if (state.runStats) {
@@ -5690,9 +5710,9 @@ function playerMove(dx, dy) {
     if (keyIdx >= 0) {
       p.inventory.splice(keyIdx, 1);
       setTile(nx, ny, T.DOOR_OPEN);
-      addMessage('You use the Bone Key! The lock clicks open.', 'gold');
-      Audio.door();
-      haptic(30);
+      addMessage('🗝️ The bone key dissolves into the lock... ancient treasures lie within!', 'gold');
+      Audio.keyUnlock();
+      haptic(60);
       computeFOV();
     } else {
       addMessage('This door is locked. You need a key.', 'damage');
@@ -6080,6 +6100,20 @@ function pickupItem(itemEntity) {
     }
     return;
   }
+  // Stack special arrows of the same type
+  if (itemEntity.item.itemType === 'special_arrow') {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === 'special_arrow' && i.arrowType === itemEntity.item.arrowType
+    );
+    if (existing) {
+      existing.ammo += itemEntity.item.ammo;
+      state.itemsFound++;
+      addMessage(`+${itemEntity.item.ammo} ${itemEntity.item.name}. (${existing.ammo} total)`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
   // Stack potions and scrolls of the same type
   if (itemEntity.item.itemType === 'potion' || itemEntity.item.itemType === 'scroll') {
     const existing = state.player.inventory.find(i =>
@@ -6111,7 +6145,11 @@ function pickupItem(itemEntity) {
   if (it.itemType === 'ring' && it.ringEffect) pickupMsg += ` [${it.ringEffect}]`;
   if (it.special) pickupMsg += ` {${it.special}}`;
   pickupMsg += '.';
-  addMessage(pickupMsg, 'good');
+  if (it.itemType === 'key' && it.keyType === 'bone') {
+    addMessage('🗝️ An ancient bone key... it hums faintly, drawn to something nearby.', 'gold');
+  } else {
+    addMessage(pickupMsg, 'good');
+  }
   // Show hint on first item pickup
   if (state.itemsFound === 1) {
     addMessage('Tip: Tap an item in the bar below to Equip, Use, or Drop it.', 'gold');
@@ -7133,10 +7171,15 @@ function renderShopItems(merchant) {
     else if (it.itemType === 'ranged') statTag = ` <span style="color:#4a9;font-size:11px;">[${it.damage} DMG, ${it.range} rng]</span>`;
     else if (it.itemType === 'armor' && it.defense != null) statTag = ` <span style="color:#60c0ff;font-size:11px;">[+${it.defense} DEF]</span>`;
     else if (it.cursed && it.curseRevealed) statTag = ` <span style="color:#ff4040;font-size:11px;">[CURSED]</span>`;
+    const tierTag = (it.tier >= 3 && it.special)
+      ? ` <span style="color:#ffcc00;font-size:11px;">[Epic]</span>`
+      : (it.tier === 3)
+      ? ` <span style="color:#aa44ff;font-size:11px;">[Rare]</span>`
+      : '';
     const localPrice = getLocalPrice(merchant, it.name, shopItem.price);
     const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(localPrice * 0.75)) : localPrice;
     const exclusiveTag = shopItem.artificerOnly ? ` <span style="color:#f0a030;font-size:11px;">[⚒️ Forged]</span>` : '';
-    const collapsedHTML = `<span>${it.glyph} ${it.name}${statTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
+    const collapsedHTML = `<span>${it.glyph} ${it.name}${statTag}${tierTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
     div.innerHTML = collapsedHTML;
 
     const buyHandler = () => {
@@ -7154,6 +7197,22 @@ function renderShopItems(merchant) {
         } else if (shopItem.item.itemType === 'arrows') {
           state.player.arrows += shopItem.item.count;
           addMessage(`You buy ${shopItem.item.count} arrows! (${state.player.arrows} total)`, 'good');
+        } else if (shopItem.item.itemType === 'special_arrow') {
+          const existing = state.player.inventory.find(i =>
+            i.itemType === 'special_arrow' && i.arrowType === shopItem.item.arrowType
+          );
+          if (existing) {
+            existing.ammo += shopItem.item.ammo;
+            addMessage(`You buy ${shopItem.item.name}. (${existing.ammo} total)`, 'good');
+          } else if (state.player.inventory.length >= MAX_INVENTORY) {
+            const bought = { ...shopItem.item };
+            state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: bought.glyph, item: bought });
+            addMessage(`Inventory full — ${bought.name} dropped at your feet.`, 'damage');
+          } else {
+            state.player.inventory.push({ ...shopItem.item });
+            addMessage(`You buy ${shopItem.item.name}.`, 'good');
+            if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
+          }
         } else if (state.player.inventory.length >= MAX_INVENTORY) {
           // Drop purchased item on the ground at player's feet
           const bought = { ...shopItem.item };
@@ -7176,6 +7235,7 @@ function renderShopItems(merchant) {
               if (state.player.inventory.length < MAX_INVENTORY) {
                 state.player.inventory.push(freeItem);
                 addMessage(`🎁 Sharp Dealer! Free ${freeItem.name}!`, 'gold');
+                if (settings.autoEquip) tryAutoEquip(freeItem);
               } else {
                 state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: freeItem.glyph || '?', item: freeItem });
                 addMessage(`🎁 Sharp Dealer! ${freeItem.name} dropped at your feet!`, 'gold');
@@ -8870,6 +8930,27 @@ function render() {
     requestAnimationFrame(() => { if (state.fortifyMode) render(); });
   }
 
+  // Pulsing outline on visible locked doors
+  {
+    let hasLockedDoor = false;
+    for (let vy = 0; vy < VIEW_ROWS; vy++) {
+      for (let vx = 0; vx < VIEW_COLS; vx++) {
+        const mx = camX + vx, my = camY + vy;
+        if (mx < 0 || mx >= MAP_W || my < 0 || my >= MAP_H) continue;
+        const idx = my * MAP_W + mx;
+        if (state.map[idx] === T.DOOR_LOCKED && state.visible[idx]) {
+          hasLockedDoor = true;
+          const pulse = 0.20 + 0.15 * Math.sin(Date.now() / 350);
+          ctx.globalAlpha = pulse;
+          ctx.fillStyle = '#ffc040';
+          ctx.fillRect(vx * ts, vy * ts, ts, ts);
+          ctx.globalAlpha = 1.0;
+        }
+      }
+    }
+    if (hasLockedDoor) requestAnimationFrame(() => { if (!state.gameOver) render(); });
+  }
+
   // Draw web hazards as a subtle floor overlay (before other entities so they appear underneath)
   ctx.save();
   ctx.font = `${Math.floor(ts * 0.75)}px monospace`;
@@ -9090,6 +9171,9 @@ function render() {
     if (e.hp <= 0) continue;
     const idx = e.y * MAP_W + e.x;
     if (!state.visible[idx]) continue;
+
+    // Potion of Invisibility thrown on enemy
+    if (hasStatusEffect(e, 'invisible')) continue;
 
     // Stealth enemies are invisible until within 3 tiles (or hostile)
     if (e.special === 'stealth' && e.alertness < 2) {
@@ -9517,6 +9601,9 @@ function renderInventory() {
     const item = state.player.inventory[i];
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
+    if (item.tier >= 3 && item.special) slot.style.borderColor = '#ffcc00';
+    else if (item.tier === 3) slot.style.borderColor = '#aa44ff';
+    else if (item.tier === 2) slot.style.borderColor = '#4488ff';
     if (item.itemType === 'thrown' || item.itemType === 'special_arrow') {
       const countLabel = item.ammo != null ? item.ammo : '';
       const isLoaded = item.itemType === 'special_arrow' && state.player.loadedSpecialArrow === item;
@@ -9556,16 +9643,22 @@ function showItemMenu(item, index, event) {
 
   const nameDiv = document.createElement('div');
   nameDiv.className = 'item-name';
-  nameDiv.textContent = `${item.glyph} ${item.name}`;
+  const rarityTag = (item.tier >= 3 && item.special)
+    ? ` <span style="color:#ffcc00;font-size:11px;">[Epic]</span>`
+    : (item.tier === 3)
+    ? ` <span style="color:#aa44ff;font-size:11px;">[Rare]</span>`
+    : '';
+  let nameText = `${item.glyph} ${item.name}`;
   if (item.desc && item.desc !== '???') {
-    nameDiv.textContent += ` — ${item.desc}`;
+    nameText += ` — ${item.desc}`;
   } else if (item.itemType === 'ranged') {
-    nameDiv.textContent += ` (${item.damage} DMG, ${item.range} range)`;
+    nameText += ` (${item.damage} DMG, ${item.range} range)`;
   } else if (item.attack) {
-    nameDiv.textContent += ` (+${item.attack} ATK)`;
+    nameText += ` (+${item.attack} ATK)`;
   } else if (item.defense) {
-    nameDiv.textContent += ` (+${item.defense} DEF)`;
+    nameText += ` (+${item.defense} DEF)`;
   }
+  nameDiv.innerHTML = nameText + rarityTag;
   menu.innerHTML = '';
   menu.appendChild(nameDiv);
 
@@ -9596,6 +9689,23 @@ function showItemMenu(item, index, event) {
     }, 100);
     return;
   }
+  // Rogue/Ninja: throw equipped dagger or knife as a projectile (consumes weapon)
+  if ((state.player.classId === 'rogue' || state.player.classId === 'ninja') &&
+      item.itemType === 'weapon' &&
+      (item.name.includes('Dagger') || item.name.includes('Knife'))) {
+    actions.push({ label: 'Throw', fn: () => {
+      state.player.inventory.splice(index, 1);
+      state.throwMode = true;
+      state.throwItem = {
+        item: { name: item.name, glyph: item.glyph, itemType: 'thrown', ammo: Infinity, damage: item.attack || 1, range: 5, meleeWeapon: true },
+        index: -1
+      };
+      addMessage(`${item.glyph} Choose a direction to throw! (sacrifices weapon)`, 'good');
+      updateUI();
+      render();
+      closeItemMenu();
+    }});
+  }
   if (['weapon', 'ranged'].includes(item.itemType)) {
     actions.push({ label: 'Wield', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'armor') {
@@ -9606,6 +9716,19 @@ function showItemMenu(item, index, event) {
     actions.push({ label: 'Eat', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'potion') {
     actions.push({ label: 'Drink', fn: () => { useItem(item, index); closeItemMenu(); }});
+    if (state.player.classId === 'sage') {
+      actions.push({ label: 'Throw', fn: () => {
+        state.throwMode = true;
+        state.throwItem = {
+          item: { name: item.name, glyph: item.glyph, itemType: 'thrown_potion', effectId: item.effectId, range: 5, ammo: Infinity },
+          index
+        };
+        addMessage(`${item.glyph} Choose a direction to throw!`, 'good');
+        updateUI();
+        render();
+        closeItemMenu();
+      }});
+    }
   } else if (item.itemType === 'scroll') {
     actions.push({ label: 'Read', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'thrown') {
@@ -11116,7 +11239,7 @@ function startMinimapPulse() {
           case T.DOOR_ONEWAY: ctx.fillStyle = '#c06030'; break;
           case T.DOOR_SEALED: ctx.fillStyle = '#6a2020'; break;
           case T.WALL_SECRET: ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
-          case T.DOOR_LOCKED: ctx.fillStyle = '#c08030'; break;
+          case T.DOOR_LOCKED: ctx.fillStyle = '#ffc040'; break;
           case T.SPECIAL: ctx.fillStyle = '#8060c0'; break;
           case T.WATER: ctx.fillStyle = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'); break;
           case T.BRIDGE: ctx.fillStyle = vis ? '#8a6a3a' : '#4a3a1a'; break;
@@ -11922,13 +12045,73 @@ function fireRangedWeapon() {
 }
 
 // === RANGED COMBAT — THROWING DAGGERS ===
+function applyThrownPotion(item, potIndex, dx, dy) {
+  const p = state.player;
+  let x = p.x + dx, y = p.y + dy;
+  let hit = null;
+  for (let i = 0; i < item.range; i++) {
+    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
+    if (!isTransparent(x, y)) break;
+    const enemy = enemyAt(x, y);
+    if (enemy && enemy.hp > 0) { hit = enemy; break; }
+    x += dx; y += dy;
+  }
+  // Consume one potion from inventory
+  const potItem = p.inventory[potIndex];
+  if (potItem && potItem.itemType === 'potion') {
+    potItem.count = (potItem.count || 1) - 1;
+    if (potItem.count <= 0) p.inventory.splice(potIndex, 1);
+  }
+  if (hit) {
+    addMessage(`The potion shatters on ${hit.name}!`, 'good');
+    switch (item.effectId) {
+      case 'healing':
+        hit.hp = Math.min(hit.maxHp, hit.hp + 10);
+        addMessage(`${hit.name} is healed! (+10 HP)`, 'damage');
+        break;
+      case 'strength':
+        addStatusEffect(hit, 'strength', 30);
+        addMessage(`${hit.name} grows stronger!`, 'damage');
+        break;
+      case 'invisibility':
+        addStatusEffect(hit, 'invisible', 15);
+        addMessage(`${hit.name} turns invisible!`, 'damage');
+        break;
+      case 'poison':
+        addStatusEffect(hit, 'poison', 5);
+        addMessage(`${hit.name} is poisoned!`, 'good');
+        break;
+      case 'teleport': {
+        const pos = randomFloorTile();
+        if (pos) { hit.x = pos.x; hit.y = pos.y; }
+        addMessage(`${hit.name} is teleported away!`, 'good');
+        break;
+      }
+      default:
+        addMessage(`The potion splatters harmlessly on ${hit.name}.`, '');
+        break;
+    }
+    Audio.hit();
+    haptic(20);
+  } else {
+    addMessage('The potion shatters on the ground.', '');
+  }
+  updateUI();
+  render();
+  endTurn();
+}
+
 function throwProjectile(dx, dy, isSecondShot) {
   state.throwMode = false;
   const throwData = isSecondShot ? isSecondShot : state.throwItem;
   if (!isSecondShot) state.throwItem = null;
   if (!throwData) { endTurn(); return; }
 
-  const { item } = throwData;
+  const { item, index: throwIndex } = throwData;
+  if (item.itemType === 'thrown_potion') {
+    applyThrownPotion(item, throwIndex, dx, dy);
+    return;
+  }
   const isAimedShot = item.itemType === 'aimed_shot';
   const isRangedShot = item.itemType === 'ranged_shot';
   const isAcidBolt = item.itemType === 'acid_bolt';
@@ -12097,6 +12280,10 @@ function throwProjectile(dx, dy, isSecondShot) {
       }
       p.loadedSpecialArrow = null;
     }
+  } else if (item.meleeWeapon) {
+    // Thrown melee weapon (Rogue/Ninja) — already removed from inventory at throw initiation
+    if (!hit) addMessage(`Your ${item.name} clatters harmlessly away.`, '');
+    else addMessage(`Your ${item.name} is destroyed in the throw!`, '');
   } else {
     // Throwing daggers
     if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
