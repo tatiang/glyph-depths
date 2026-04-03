@@ -1215,6 +1215,7 @@ function createPlayer(classId = 'adventurer') {
     flipMode: false,
     // Escape Artist
     stairsTeleportFloorUsed: false,
+    escapeRouteUsesFloor: 0,
     iceTrapPassive: classId === 'escapeartist',
     // Conjurer
     illusionCooldown: 0,
@@ -1409,7 +1410,8 @@ const POTION_EFFECTS = [
   { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
   { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
   { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
-  { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' }
+  { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' },
+  { id: 'waterwalk', name: 'Potion of Water Walking', desc: 'Walk on water for 20 turns' }
 ];
 
 const SCROLL_EFFECTS = [
@@ -1426,8 +1428,11 @@ const SCROLL_EFFECTS = [
 function randomizePotionScrollNames() {
   const pc = shuffle([...POTION_COLORS]);
   const sl = shuffle([...SCROLL_LABELS]);
-  potionNames = POTION_EFFECTS.map((e, i) => ({ ...e, fakeName: pc[i].name, color: pc[i].color }));
-  scrollNames = SCROLL_EFFECTS.map((e, i) => ({ ...e, fakeName: sl[i] }));
+  potionNames = POTION_EFFECTS.map((e, i) => {
+    const c = pc[i % pc.length];
+    return { ...e, fakeName: c.name, color: c.color };
+  });
+  scrollNames = SCROLL_EFFECTS.map((e, i) => ({ ...e, fakeName: sl[i % sl.length] }));
   potionIdentified = {};
   scrollIdentified = {};
 }
@@ -1456,6 +1461,7 @@ const RINGS = [
   { name: 'Ring of Haste', glyph: '💍', itemType: 'ring', special: 'haste', value: 60 },
   { name: 'Ring of Protection', glyph: '💍', itemType: 'ring', special: 'protection', value: 55 },
   { name: 'Ring of Hunger', glyph: '💍', itemType: 'ring', special: 'hunger', value: 45 },
+  { name: 'Ring of Detection', glyph: '💍', itemType: 'ring', special: 'detection', value: 55 },
   { name: 'Soul Amulet', glyph: '📿', itemType: 'ring', special: 'soul', desc: 'Collects soul fragments from kills. Spend for powerful effects.', value: 30 }
 ];
 
@@ -1757,6 +1763,7 @@ function generateFloor() {
   state.masonWalls = new Map();
   // Escape Artist: reset escape route each floor
   state.player.stairsTeleportFloorUsed = false;
+  state.player.escapeRouteUsesFloor = 0;
   // Barterer: reset free refresh and appraise each floor
   if (state.player.classId === 'barterer') { state.player.bartererFreeRefresh = true; state.player.bartererAppraiseUsed = false; }
 
@@ -3619,7 +3626,7 @@ function spawnChasms() {
 function spawnEnchantedWalls() {
   if (state.floor < 3 || state.floor >= MAX_FLOOR) return;
   if (state.rooms.length < 2) return;
-  const count = 1 + (Math.random() < 0.4 ? 1 : 0);
+  const count = 1;
   // Don't place in the player's starting room
   const playerRoom = state.rooms.find(r =>
     state.player.x >= r.x && state.player.x < r.x + r.w &&
@@ -4025,7 +4032,7 @@ const OCTANT_TRANSFORMS = [
 
 function computeFOV() {
   const p = state.player;
-  const rangedSightBonus = (state.player.equipped.ranged?.special === 'sight') ? 1 : 0;
+  const rangedSightBonus = (state.player.equipped?.ranged?.special === 'sight') ? 1 : 0;
   const lanternBonus = hasStatusEffect(state.player, 'lanternLit') ? 3 : 0;
   const moundBonus = (state.map && getTile(state.player.x, state.player.y) === T.MOUND) ? 1 : 0;
   const radius = FOV_RADIUS + (hasRingEffect('sight') ? 2 : 0) + (state.player.fovBonus || 0) + rangedSightBonus + lanternBonus + moundBonus;
@@ -4884,6 +4891,7 @@ function processEntityEffects(entity) {
       if (isPlayer && eff.type === 'lanternLit') { addMessage('🔦 The lantern flickers out.', ''); computeFOV(); }
       if (isPlayer && eff.type === 'phasing') addMessage('You solidify again.', '');
       if (isPlayer && eff.type === 'wet') addMessage('You dry off.', '');
+      if (isPlayer && eff.type === 'waterwalk') addMessage('Your feet feel heavy again.', '');
     }
   }
 
@@ -5535,7 +5543,17 @@ function playerMove(dx, dy) {
   }
 
   const p = state.player;
-  const nx = p.x + dx, ny = p.y + dy;
+  syncPlayerWoozyStatus();
+
+  let moveDx = dx, moveDy = dy;
+  if (moveDx === 0 && moveDy === -1 && hasStatusEffect(p, 'woozy')) {
+    const roll = Math.random();
+    if (roll < 0.25) { moveDx = -1; moveDy = 0; }
+    else if (roll < 0.50) { moveDx = 1; moveDy = 0; }
+    else { moveDx = 0; moveDy = -1; }
+  }
+
+  const nx = p.x + moveDx, ny = p.y + moveDy;
 
   // === WALL TRAP RESOLUTION ===
   // If a bolt trap was primed on the previous turn, resolve it now.
@@ -5543,8 +5561,8 @@ function playerMove(dx, dy) {
   if (p.wallTrap) {
     const trap = p.wallTrap;
     p.wallTrap = null;
-    const dodged = (trap.axis === 'x' && dx === 0 && dy !== 0) ||
-                   (trap.axis === 'y' && dy === 0 && dx !== 0);
+    const dodged = (trap.axis === 'x' && moveDx === 0 && moveDy !== 0) ||
+                   (trap.axis === 'y' && moveDy === 0 && moveDx !== 0);
     if (dodged) {
       addMessage('You sidestep the bolt — it sparks off the wall!', 'good');
     } else {
@@ -5582,9 +5600,13 @@ function playerMove(dx, dy) {
   // Mound-Slow — entering a mound costs 2 turns; first move after entry is skipped
   if (p.moundSlowPending) {
     p.moundSlowPending = false;
-    addMessage('The uneven ground slows you.', '');
-    endTurn();
-    return;
+    if (p.classId === 'ninja' || p.classId === 'daredevil') {
+      addMessage('You nimbly balance on the uneven ground.', 'good');
+    } else {
+      addMessage('The uneven ground slows you.', '');
+      endTurn();
+      return;
+    }
   }
 
   // Check for friendly ally at destination — swap positions
@@ -5773,7 +5795,8 @@ function playerMove(dx, dy) {
   }
 
   // Check walkable (phasing ghosts can walk through walls)
-  if (!isWalkable(nx, ny) && !hasStatusEffect(state.player, 'phasing')) {
+  const waterWalkPassable = getTile(nx, ny) === T.WATER && hasStatusEffect(p, 'waterwalk');
+  if (!hasStatusEffect(state.player, 'phasing') && !waterWalkPassable && !isWalkable(nx, ny)) {
     const blockedTile = getTile(nx, ny);
     if (blockedTile === T.WATER) {
       addMessage('The water is too deep to enter.', '');
@@ -5803,7 +5826,7 @@ function playerMove(dx, dy) {
 
   // ICY PATH — slide one extra tile in the same direction (unless blocked)
   if (getTile(nx, ny) === T.ICY_PATH) {
-    const slideX = nx + dx, slideY = ny + dy;
+    const slideX = nx + moveDx, slideY = ny + moveDy;
     if (isWalkable(slideX, slideY) && !enemyAt(slideX, slideY)) {
       p.x = slideX;
       p.y = slideY;
@@ -5824,9 +5847,7 @@ function playerMove(dx, dy) {
   }
 
   // ENCHANTED WALL — when player moves within a room, teleport enchanted_wall to another wall tile in that room
-  const nowRoom = state.rooms.find(r =>
-    p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
-  );
+  const nowRoom = getRoomAt(p.x, p.y);
   if (nowRoom) {
     const nowRoomIdx = state.rooms.indexOf(nowRoom);
     for (const ew of state.entities.filter(e => e.type === 'enchanted_wall' && e.roomIdx === nowRoomIdx)) {
@@ -5872,7 +5893,7 @@ function playerMove(dx, dy) {
     const nowInRoom = state.rooms.some(r =>
       p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
     if (!wasInRoom && nowInRoom && Math.random() < 0.20) {
-      p.wallTrap = { axis: Math.abs(dx) > 0 ? 'x' : 'y' };
+      p.wallTrap = { axis: Math.abs(moveDx) > 0 ? 'x' : 'y' };
       addMessage('⚠️ A section of wall slides open — a trap is primed!', 'damage');
       animateEntityFlash(p.x, p.y, '#ff8000');
     }
@@ -6324,26 +6345,38 @@ function playerDescend() {
   inputLocked = true;
 
   setTimeout(() => {
-    activeAnimations.length = 0;
-    generateFloor();
-    // Place player at start of new floor
-    if (state.floor < MAX_FLOOR) {
-      const firstRoom = state.rooms[0];
-      state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
-      state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
-    }
-    addMessage(`You descend to floor ${state.floor}...`, '');
-    if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
-    computeFOV();
-    updateUI();
-    render();
-    const newBiome = getBiomeKey(state.floor);
-    Audio.startAmbient(newBiome);
-    $('fade').classList.remove('active');
-    if (newBiome !== getBiomeKey(state.floor - 1)) {
-      showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
-    } else {
+    try {
+      activeAnimations.length = 0;
+      generateFloor();
+      // Place player at start of new floor
+      if (state.floor < MAX_FLOOR) {
+        const firstRoom = state.rooms && state.rooms[0];
+        if (firstRoom) {
+          state.player.x = firstRoom.x + Math.floor(firstRoom.w / 2);
+          state.player.y = firstRoom.y + Math.floor(firstRoom.h / 2);
+        }
+      }
+      const effects = Array.isArray(state.player.statusEffects) ? state.player.statusEffects : [];
+      state.player.statusEffects = effects.filter(e => e && e.type !== 'woozy');
+      addMessage(`You descend to floor ${state.floor}...`, '');
+      if (state.floor === MAX_FLOOR) addMessage('You sense an overwhelming presence...', 'damage');
+      computeFOV();
+      // Render first so a UI error cannot leave the map visually blank
+      render();
+      updateUI();
+      const newBiome = getBiomeKey(state.floor);
+      Audio.startAmbient(newBiome);
+      if (newBiome !== getBiomeKey(state.floor - 1)) {
+        showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
+      } else {
+        inputLocked = false;
+      }
+    } catch (err) {
+      console.error('[Glyph Depths] Descend transition failed:', err);
+      addMessage('The descent wavers, but you regain your footing.', 'damage');
       inputLocked = false;
+    } finally {
+      $('fade').classList.remove('active');
     }
   }, 400);
 }
@@ -6405,6 +6438,7 @@ function useItem(item, index) {
       else if (item.special === 'sight') addMessage('Your vision sharpens.', 'good');
       else if (item.special === 'haste') addMessage('You feel quicker on your feet.', 'good');
       else if (item.special === 'hunger') addMessage('Your hunger fades slightly.', 'good');
+      else if (item.special === 'detection') addMessage('You sense hidden seams in the stone.', 'good');
       else if (item.special === 'lantern') addMessage('The lantern hums softly. Use Oil Flasks to fuel it.', 'good');
       else if (item.special === 'soul') addMessage('The amulet pulses with dark energy.', 'good');
       Audio.useItem();
@@ -6599,6 +6633,10 @@ function applyPotionEffect(potion) {
       if (pos) { p.x = pos.x; p.y = pos.y; }
       addMessage('The world blurs around you!', '');
       computeFOV();
+      break;
+    case 'waterwalk':
+      addStatusEffect(p, 'waterwalk', 20);
+      addMessage('Your steps feel buoyant.', 'good');
       break;
     // Brewed potions (Alchemist's Mortar)
     case 'fortitude':
@@ -7605,6 +7643,8 @@ function endTurn() {
     }
   }
 
+  syncPlayerWoozyStatus();
+
   // Enemy turns
   processEnemies();
   // Reset movement tracking after enemies have processed
@@ -7628,7 +7668,39 @@ function endTurn() {
 
 // === HELPERS ===
 function hasRingEffect(effect) {
-  return state.player.equipped.ring?.special === effect;
+  return state.player.equipped?.ring?.special === effect;
+}
+
+function canDetectSecretWalls() {
+  return state.player.classId === 'rogue' || hasRingEffect('detection');
+}
+
+function getRoomAt(x, y) {
+  return state.rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
+}
+
+function roomHasEnchantedWall(roomIdx) {
+  return state.entities.some(e => e.type === 'enchanted_wall' && e.roomIdx === roomIdx);
+}
+
+function syncPlayerWoozyStatus() {
+  const p = state.player;
+  const room = getRoomAt(p.x, p.y);
+  const roomIdx = room ? state.rooms.indexOf(room) : -1;
+  const inWoozyRoom = roomIdx >= 0 && roomHasEnchantedWall(roomIdx);
+  const effects = Array.isArray(p.statusEffects) ? p.statusEffects : (p.statusEffects = []);
+  const woozy = effects.find(e => e.type === 'woozy');
+  if (inWoozyRoom) {
+    if (!woozy) {
+      addStatusEffect(p, 'woozy', 999);
+      addMessage('You feel kind of woozy all of a sudden.', '');
+    } else {
+      woozy.turns = 999;
+    }
+  } else if (woozy) {
+    p.statusEffects = effects.filter(e => e.type !== 'woozy');
+    addMessage('You feel better.', 'good');
+  }
 }
 
 function addMessage(text, cls) {
@@ -8841,7 +8913,7 @@ function render() {
           const cracked = state.secretBashes && state.secretBashes[sKey];
           tileGlyph = cracked ? '▒' : '▓';
           tileColor = cracked ? '#c09040' : (vis ? biome.wallVis : biome.wallDim);
-          if (!cracked && vis && state.player.classId === 'rogue' && Math.random() < 0.30) {
+          if (!cracked && vis && canDetectSecretWalls() && Math.random() < 0.30) {
             tileColor = '#9090a0';
           }
           break;
@@ -9623,12 +9695,14 @@ function updateUI() {
       }
     } else if (cls === 'escapeartist') {
       spRow.style.display = '';
-      if (p.stairsTeleportFloorUsed && !getMasteryBonuses(cls).extraEscape) {
+      const maxEscape = getMasteryBonuses(cls).extraEscape ? 2 : 1;
+      const usedEscape = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
+      if (usedEscape >= maxEscape) {
         setBtn('💨 ESCAPE ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('💨 ESCAPE ROUTE', true, '#80ffff');
-        setBar(100, '#80ffff');
+        setBtn(`💨 ESCAPE ${usedEscape}/${maxEscape}`, true, '#80ffff');
+        setBar(((maxEscape - usedEscape) / maxEscape) * 100, '#80ffff');
       }
     } else if (cls === 'conjurer') {
       spRow.style.display = '';
@@ -9665,16 +9739,80 @@ function renderInventory() {
     { label: '💍', slot: 'ring', item: state.player.equipped.ring }
   ];
 
-  // Helper: make a slot tappable on mobile (iOS needs touchend, not just click)
-  function makeTappable(el, handler) {
+  function showSlotInfo(item, el) {
+    if (!item) return;
+    let desc = '';
+    if (item.desc && item.desc !== '???') desc = item.desc;
+    else if (item.itemType === 'ranged') desc = `${item.damage || 0} DMG, ${item.range || 0} range`;
+    else if (item.attack) desc = `+${item.attack} Attack`;
+    else if (item.defense) desc = `+${item.defense} Defense`;
+    else if (item.itemType === 'ring' && item.special) desc = `Ring effect: ${item.special}`;
+    else desc = 'No additional details.';
+    $('tip-name').textContent = `${item.glyph} ${item.name}`;
+    $('tip-desc').textContent = desc;
+    const tip = $('inspect-tip');
+    const rect = el.getBoundingClientRect();
+    const cx = Math.max(8, Math.min(rect.left + rect.width / 2 - 100, window.innerWidth - 208));
+    const cy = Math.max(8, rect.top - 68);
+    tip.style.left = `${cx}px`;
+    tip.style.top = `${cy}px`;
+    tip.classList.add('active');
+    setTimeout(() => tip.classList.remove('active'), 2200);
+    haptic(20);
+  }
+
+  // Helper: slot tap for menu, long-press for inspect tooltip
+  function makeTappable(el, tapHandler, longPressHandler) {
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
-    el.addEventListener('click', handler);
+    let holdTimer = null;
+    let sx = 0, sy = 0;
+    let longPressFired = false;
+    let suppressClick = false;
+    el.addEventListener('click', (e) => {
+      if (suppressClick) return;
+      tapHandler(e);
+    });
+    el.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      sx = t.clientX;
+      sy = t.clientY;
+      longPressFired = false;
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        longPressFired = true;
+        suppressClick = true;
+        if (longPressHandler) longPressHandler(e);
+      }, 480);
+    }, { passive: true });
+    el.addEventListener('touchmove', (e) => {
+      if (!holdTimer) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+    }, { passive: true });
     el.addEventListener('touchend', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      handler(e);
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      if (longPressFired) {
+        longPressFired = false;
+        setTimeout(() => { suppressClick = false; }, 350);
+        return;
+      }
+      suppressClick = true;
+      tapHandler(e);
+      setTimeout(() => { suppressClick = false; }, 350);
     }, { passive: false });
+    el.addEventListener('touchcancel', () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      longPressFired = false;
+    }, { passive: true });
   }
 
   for (const eq of equipped) {
@@ -9691,7 +9829,11 @@ function renderInventory() {
       slot.textContent = eq.item ? eq.item.glyph : eq.label;
     }
     if (eq.item) {
-      makeTappable(slot, (e) => showEquippedMenu(eq, e));
+      makeTappable(
+        slot,
+        (e) => showEquippedMenu(eq, e),
+        () => showSlotInfo(eq.item, slot)
+      );
     }
     bar.appendChild(slot);
   }
@@ -9722,7 +9864,11 @@ function renderInventory() {
       slot.textContent = item.glyph;
     }
     const idx = i;
-    makeTappable(slot, (e) => showItemMenu(item, idx, e));
+    makeTappable(
+      slot,
+      (e) => showItemMenu(item, idx, e),
+      () => showSlotInfo(item, slot)
+    );
     bar.appendChild(slot);
   }
 
@@ -10288,6 +10434,14 @@ function setupInput() {
   const doSpecial = () => {
     Audio.resume();
     if (!state) return;
+    if (state.throwMode && state.throwItem?.item?.itemType === 'aimed_shot') {
+      state.throwMode = false;
+      state.throwItem = null;
+      addMessage('Aimed Shot cancelled.', '');
+      updateUI();
+      render();
+      return;
+    }
     if (state.player.classId === 'berserker') activateEnrage();
     else if (state.player.classId === 'wizard') { if (state.player.fireWard) activateWizardMenu(); else castAoeSpell(); }
     else if (state.player.classId === 'ranger') activateAimedShot();
@@ -10313,6 +10467,12 @@ function setupInput() {
   }, { passive: false });
   spBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
+    if (state?.throwMode && state.throwItem?.item?.itemType === 'aimed_shot') {
+      if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
+      doSpecial();
+      spLastTap = 0;
+      return;
+    }
     if (spHoldTimer) {
       clearTimeout(spHoldTimer);
       spHoldTimer = null;
@@ -10757,7 +10917,11 @@ function showSettings() {
           break;
         case 'escapeartist':
           abilities.push({ icon: '❄️', name: 'Ice Traps', desc: 'Drop ice traps when retreating from enemies' });
-          abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to stairs (1/floor)${p.stairsTeleportFloorUsed ? ' — USED' : ' — Ready'}` });
+          {
+            const maxEscape = getMasteryBonuses('escapeartist').extraEscape ? 2 : 1;
+            const usedEscape = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
+            abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to adjacent room (${usedEscape}/${maxEscape} used)` });
+          }
           abilities.push({ icon: '👁', name: '15% Dodge', desc: 'Natural agility' });
           break;
         case 'conjurer':
@@ -10920,6 +11084,8 @@ function showSettings() {
     phasing:      { icon: '👻', text: 'Phasing',     color: '#a080ff' },
     wet:          { icon: '💧', text: 'Wet',         color: '#40a0ff' },
     mound_slow:   { icon: '^',  text: 'Mound-Slow',  color: '#8a6030' },
+    waterwalk:    { icon: '🌊', text: 'Water Walk',  color: '#40c0ff' },
+    woozy:        { icon: '🌀', text: 'Woozy',       color: '#c080ff' },
   };
   const effects = p ? (p.statusEffects || []) : [];
   if (effects.length > 0) {
@@ -12074,7 +12240,9 @@ function renderStatusFX() {
     dirge:        { icon: '🎵', text: 'Dirge',   cls: 'fx-burning' },
     plenty:       { icon: '🎵', text: 'Plenty',  cls: 'fx-strength' },
     lanternLit:   { icon: '🔦', text: 'Lantern', cls: 'fx-strength' },
-    phasing:      { icon: '👻', text: 'Phase',   cls: 'fx-invisibility' }
+    phasing:      { icon: '👻', text: 'Phase',   cls: 'fx-invisibility' },
+    waterwalk:    { icon: '🌊', text: 'Water',   cls: 'fx-invisibility' },
+    woozy:        { icon: '🌀', text: 'Woozy',   cls: 'fx-poison' }
   };
 
   let html = '';
@@ -12957,33 +13125,69 @@ function activateFlip() {
   render();
 }
 
-// === ESCAPE ARTIST: TELEPORT STAIRS ===
+// === ESCAPE ARTIST: TELEPORT TO ADJACENT ROOM ===
 function activateTeleportStairs() {
   if (inputLocked || state.gameOver || state.victory) return;
   const p = state.player;
-  if (p.stairsTeleportFloorUsed && !getMasteryBonuses(p.classId).extraEscape) {
+  const maxUses = getMasteryBonuses(p.classId).extraEscape ? 2 : 1;
+  const used = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
+  if (used >= maxUses) {
     addMessage('Escape Route already used this floor.', '');
     return;
   }
-  const oldX = p.x, oldY = p.y;
-  // Find T.STAIRS_DOWN tile
-  let sx = -1, sy = -1;
-  for (let i = 0; i < MAP_W * MAP_H; i++) {
-    if (state.map[i] === T.STAIRS_DOWN) { sx = i % MAP_W; sy = Math.floor(i / MAP_W); break; }
+
+  const currentRoom = getRoomAt(p.x, p.y);
+  if (!currentRoom) {
+    addMessage('No escape route from here.', '');
+    return;
   }
-  if (sx < 0) { addMessage('No stairs found!', 'damage'); return; }
-  p.x = sx;
-  p.y = sy;
+  const curIdx = state.rooms.indexOf(currentRoom);
+  const adjacentRooms = state.rooms.filter((r, idx) => {
+    if (idx === curIdx) return false;
+    const dxGap = Math.max(0, Math.max(currentRoom.x - (r.x + r.w), r.x - (currentRoom.x + currentRoom.w)));
+    const dyGap = Math.max(0, Math.max(currentRoom.y - (r.y + r.h), r.y - (currentRoom.y + currentRoom.h)));
+    return (dxGap + dyGap) <= 6;
+  });
+  if (adjacentRooms.length === 0) {
+    addMessage('No nearby chamber to escape to.', '');
+    return;
+  }
+
+  const destinations = [];
+  for (const room of adjacentRooms) {
+    for (let y = room.y; y < room.y + room.h; y++) {
+      for (let x = room.x; x < room.x + room.w; x++) {
+        if (!isWalkable(x, y)) continue;
+        if (enemyAt(x, y)) continue;
+        const occupied = state.entities.some(e =>
+          e.x === x && e.y === y &&
+          ['merchant', 'npc', 'hazard', 'enchanted_wall', 'bridge', 'sign'].includes(e.type)
+        );
+        if (!occupied) destinations.push({ x, y });
+      }
+    }
+  }
+  if (destinations.length === 0) {
+    addMessage('No safe escape tile found nearby.', '');
+    return;
+  }
+
+  const oldX = p.x, oldY = p.y;
+  const dest = destinations[Math.floor(Math.random() * destinations.length)];
+  p.x = dest.x;
+  p.y = dest.y;
   // Smoke Screen: leave a smoke hazard at the origin tile
   if (p.smokeScreen) {
     state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '💨', name: 'Smoke', hazardType: 'smoke', turns: 3 });
     addMessage('💨 A smoke cloud billows where you stood!', 'good');
   }
+  p.escapeRouteUsesFloor = used + 1;
   p.stairsTeleportFloorUsed = true;
-  addMessage('💨 You vanish and reappear by the stairs!', 'good');
+  addMessage('💨 You find an escape route to a nearby chamber!', 'good');
   Audio.gold();
   haptic(40);
-  animateEntityFlash(sx, sy, '#80ffff');
+  animateEntityFlash(dest.x, dest.y, '#80ffff');
+  syncPlayerWoozyStatus();
   computeFOV();
   updateUI();
   endTurn();

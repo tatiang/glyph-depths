@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 3, 2026 — 11:10 AM PT — Improved Escape Artist mobility and fixed startup crash on new runs
+- Escape Artist now teleports to a nearby chamber instead of stairs.
+- Added mobile quality-of-life updates, including aimed-shot cancel and long-press gear details.
+- Fixed a startup crash in potion/scroll randomization that caused a black/blank maze after Descend.
+
 Apr 3, 2026 — 9:13 AM PT — 7d86b0b — Added enemy intent indicators with a settings toggle
 - Added a new `Enemy Intent Indicators` toggle in Config → Settings.
 - Added enemy intent icons above visible enemies to preview likely next actions.
