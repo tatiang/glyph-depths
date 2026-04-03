@@ -9701,7 +9701,7 @@ function updateUI() {
         setBtn('💨 ESCAPE ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn(`💨 ESCAPE ${usedEscape}/${maxEscape}`, true, '#80ffff');
+        setBtn('💨 ESCAPE', true, '#80ffff');
         setBar(((maxEscape - usedEscape) / maxEscape) * 100, '#80ffff');
       }
     } else if (cls === 'conjurer') {
@@ -10920,7 +10920,12 @@ function showSettings() {
           {
             const maxEscape = getMasteryBonuses('escapeartist').extraEscape ? 2 : 1;
             const usedEscape = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
-            abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to adjacent room (${usedEscape}/${maxEscape} used)` });
+            if (maxEscape === 1) {
+              abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to adjacent room (1/floor — ${usedEscape >= 1 ? 'Used' : 'Ready'})` });
+            } else {
+              const left = Math.max(0, maxEscape - usedEscape);
+              abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to adjacent room (${maxEscape}/floor, ${left} left)` });
+            }
           }
           abilities.push({ icon: '👁', name: '15% Dodge', desc: 'Natural agility' });
           break;
