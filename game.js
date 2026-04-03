@@ -23,7 +23,7 @@ let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
 let lockedDoorPulseActive = false; // prevents duplicate RAF loops for locked-door pulse
-let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
+let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, showIntents: true, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.8 — waterfall, mound, icy path, fire path, enchanted wall, chasm'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
@@ -4909,6 +4909,42 @@ function processEntityEffects(entity) {
   }
 }
 
+function getEnemyIntent(enemy) {
+  if (!state || !enemy || enemy.type !== 'enemy' || enemy.hp <= 0 || enemy.isAlly) return null;
+
+  const player = state.player;
+  const dist = Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
+
+  if (hasStatusEffect(enemy, 'frozen')) return { glyph: '✽', color: '#60c0ff' };
+  if (enemy.confused > 0) return { glyph: '?', color: '#c090ff' };
+  if (enemy.special === 'blind' && !player.movedLastTurn) return { glyph: '…', color: '#a0a0a0' };
+
+  if (enemy.ai === 'boss') {
+    if (dist === 1) return { glyph: '!', color: '#ff6060' };
+    if (enemy.phase >= 3 && (enemy.aoeCooldown || 0) <= 0 && dist <= 4) return { glyph: '*', color: '#ff70ff' };
+    if (enemy.phase >= 2 && enemy.teleportCooldown <= 0 && dist > 3) return { glyph: '⇄', color: '#c080ff' };
+    if (enemy.summonCooldown <= 0) return { glyph: '+', color: '#ffb050' };
+    if (dist > 1) return { glyph: '→', color: '#ffd060' };
+    return null;
+  }
+
+  if (enemy.ai === 'ambush' && dist <= 1) return { glyph: '!', color: '#ff6060' };
+  if (enemy.ai === 'ambush' && enemy.alertness < 2 && dist > 1) return { glyph: '…', color: '#8a8a8a' };
+  if (enemy.ai === 'flee' && enemy.special === 'summon' && enemy.alertness >= 2 && enemy.summonCooldown <= 0) {
+    return { glyph: '+', color: '#ffb050' };
+  }
+  if (enemy.ai === 'flee' && enemy.alertness >= 2) return { glyph: '↶', color: '#60d0ff' };
+  if (enemy.ai === 'patrol' && enemy.alertness < 2) return { glyph: '→', color: '#8fb0ff' };
+  if (enemy.ai === 'wander' && enemy.alertness < 2) return null;
+
+  if (enemy.alertness >= 2) {
+    if (dist === 1) return { glyph: '!', color: '#ff6060' };
+    return { glyph: '→', color: '#ffd060' };
+  }
+
+  return null;
+}
+
 // === ENEMY AI ===
 function processEnemies() {
   // Sort by distance to player (closest first)
@@ -9247,6 +9283,23 @@ function render() {
     ctx.font = `${Math.floor(ts * 0.7)}px serif`;
     ctx.fillText(e.glyph, sx, sy);
 
+    if (settings.showIntents) {
+      const intent = getEnemyIntent(e);
+      if (intent) {
+        const iconSize = Math.max(10, Math.floor(ts * 0.30));
+        const iconX = (e.x - camX) * ts + ts * 0.79;
+        const iconY = (e.y - camY) * ts + ts * 0.24;
+        const bubbleR = Math.max(6, Math.floor(ts * 0.17));
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, bubbleR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = `bold ${iconSize}px monospace`;
+        ctx.fillStyle = intent.color;
+        ctx.fillText(intent.glyph, iconX, iconY);
+      }
+    }
+
     // Green ally indicator ring
     if (e.isAlly) {
       ctx.strokeStyle = '#40e040';
@@ -10916,6 +10969,7 @@ function showSettings() {
   $('toggle-dpad').classList.toggle('on', settings.dpad);
   $('toggle-autopickup').classList.toggle('on', settings.autopickup);
   $('toggle-autoequip').classList.toggle('on', settings.autoEquip);
+  $('toggle-showIntents').classList.toggle('on', settings.showIntents);
 
   $('toggle-sound').onclick = () => {
     settings.sound = !settings.sound;
@@ -10948,6 +11002,13 @@ function showSettings() {
     settings.autoEquip = !settings.autoEquip;
     $('toggle-autoequip').classList.toggle('on', settings.autoEquip);
     saveSettings();
+  };
+
+  $('toggle-showIntents').onclick = () => {
+    settings.showIntents = !settings.showIntents;
+    $('toggle-showIntents').classList.toggle('on', settings.showIntents);
+    saveSettings();
+    if (state) render();
   };
 
   $('settings-overlay').classList.add('active');
