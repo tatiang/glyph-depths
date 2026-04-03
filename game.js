@@ -22,6 +22,7 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
+let lockedDoorPulseActive = false; // prevents duplicate RAF loops for locked-door pulse
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.7 — identification persistence, instrument loot, sage DEF'; // updated each push
@@ -8565,7 +8566,15 @@ function render() {
         }
       }
     }
-    if (hasLockedDoor) requestAnimationFrame(() => { if (!state.gameOver) render(); });
+    if (hasLockedDoor && !lockedDoorPulseActive) {
+      lockedDoorPulseActive = true;
+      requestAnimationFrame(function pulseDoor() {
+        lockedDoorPulseActive = false;
+        if (!state.gameOver) render();
+      });
+    } else if (!hasLockedDoor) {
+      lockedDoorPulseActive = false;
+    }
   }
 
   // Draw web hazards as a subtle floor overlay (before other entities so they appear underneath)
@@ -9274,11 +9283,10 @@ function showItemMenu(item, index, event) {
       item.itemType === 'weapon' &&
       (item.name.includes('Dagger') || item.name.includes('Knife'))) {
     actions.push({ label: 'Throw', fn: () => {
-      state.player.inventory.splice(index, 1);
       state.throwMode = true;
       state.throwItem = {
         item: { name: item.name, glyph: item.glyph, itemType: 'thrown', ammo: Infinity, damage: item.attack || 1, range: 5, meleeWeapon: true },
-        index: -1
+        index  // kept so we can remove on resolution or restore on cancel
       };
       addMessage(`${item.glyph} Choose a direction to throw! (sacrifices weapon)`, 'good');
       updateUI();
@@ -11844,7 +11852,8 @@ function throwProjectile(dx, dy, isSecondShot) {
       p.loadedSpecialArrow = null;
     }
   } else if (item.meleeWeapon) {
-    // Thrown melee weapon (Rogue/Ninja) — already removed from inventory at throw initiation
+    // Thrown melee weapon (Rogue/Ninja) — remove from inventory now that throw resolved
+    if (throwIndex >= 0 && throwIndex < p.inventory.length) p.inventory.splice(throwIndex, 1);
     if (!hit) addMessage(`Your ${item.name} clatters harmlessly away.`, '');
     else addMessage(`Your ${item.name} is destroyed in the throw!`, '');
   } else {
