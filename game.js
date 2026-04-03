@@ -22,6 +22,7 @@ let state = null; // main game state object
 let canvas, ctxC; // canvas and 2d context
 let tileSize = 25;
 let inputLocked = false;
+let lockedDoorPulseActive = false; // prevents duplicate RAF loops for locked-door pulse
 let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoEquip: false, heroIcon: '🧝', helpFontSize: 1, difficulty: 'normal' };
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.8 — waterfall, mound, icy path, fire path, enchanted wall, chasm'; // updated each push
@@ -1674,8 +1675,20 @@ function generateFloor() {
   if (state.floor < MAX_FLOOR) {
     const farthestRoom = getFarthestRoom(p.x, p.y);
     if (farthestRoom) {
-      const sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
-      const sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+      let sx = farthestRoom.x + Math.floor(farthestRoom.w / 2);
+      let sy = farthestRoom.y + Math.floor(farthestRoom.h / 2);
+      // If center is water/stepping stone, find nearest non-water floor tile in the room
+      if (getTile(sx, sy) === T.WATER || getTile(sx, sy) === T.STEPPING_STONE) {
+        let found = false;
+        outer: for (let dy = 0; dy < farthestRoom.h; dy++) {
+          for (let dx = 0; dx < farthestRoom.w; dx++) {
+            const cx = farthestRoom.x + dx, cy = farthestRoom.y + dy;
+            const t = getTile(cx, cy);
+            if (t === T.FLOOR || t === T.CORRIDOR) { sx = cx; sy = cy; found = true; break outer; }
+          }
+        }
+        if (!found) { sx = farthestRoom.x; sy = farthestRoom.y; } // fallback to corner
+      }
       setTile(sx, sy, T.STAIRS_DOWN);
     }
     // One-way doors must run after stairs are placed (needs valid stair pos)
@@ -2136,10 +2149,12 @@ function carveWaterFeatures() {
   }
 
   // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
+  const farthestForLake = getFarthestRoom(p.x, p.y);
   const eligibleRooms = state.rooms.filter(r => {
     const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
     const isStart = (Math.abs(cx2 - p.x) + Math.abs(cy2 - p.y)) < 3;
-    return !isStart && r.w >= 5 && r.h >= 5;
+    const isFarthest = farthestForLake && r === farthestForLake;
+    return !isStart && !isFarthest && r.w >= 5 && r.h >= 5;
   });
   if (eligibleRooms.length > 0) {
     const lakeRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
@@ -7909,6 +7924,30 @@ function fixBlockedStairs() {
     }
     if (cleared > 0) addMessage('Rubble crumbles, revealing a passable path!', 'good');
   }
+  // Second pass: if stairs are still unreachable (e.g. water bug), convert
+  // water tiles around the stairs to bridges and move player to stairs
+  if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
+    for (let r = 1; r <= 3; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const tx = sx + dx, ty = sy + dy;
+          if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
+          if (state.map[ty * MAP_W + tx] === T.WATER || state.map[ty * MAP_W + tx] === T.STEPPING_STONE) {
+            state.map[ty * MAP_W + tx] = T.BRIDGE;
+          }
+        }
+      }
+      if (bfsReachable(state.player.x, state.player.y, sx, sy)) break;
+    }
+    // If still unreachable, teleport player directly to stairs
+    if (!bfsReachable(state.player.x, state.player.y, sx, sy)) {
+      state.player.x = sx;
+      state.player.y = sy;
+      addMessage('The water recedes — you find yourself at the stairs.', 'gold');
+    } else {
+      addMessage('The water parts, revealing a path.', 'gold');
+    }
+  }
 }
 
 function loadGameFromSlot(slot) {
@@ -8948,7 +8987,15 @@ function render() {
         }
       }
     }
-    if (hasLockedDoor) requestAnimationFrame(() => { if (!state.gameOver) render(); });
+    if (hasLockedDoor && !lockedDoorPulseActive) {
+      lockedDoorPulseActive = true;
+      requestAnimationFrame(function pulseDoor() {
+        lockedDoorPulseActive = false;
+        if (!state.gameOver) render();
+      });
+    } else if (!hasLockedDoor) {
+      lockedDoorPulseActive = false;
+    }
   }
 
   // Draw web hazards as a subtle floor overlay (before other entities so they appear underneath)
@@ -9694,11 +9741,10 @@ function showItemMenu(item, index, event) {
       item.itemType === 'weapon' &&
       (item.name.includes('Dagger') || item.name.includes('Knife'))) {
     actions.push({ label: 'Throw', fn: () => {
-      state.player.inventory.splice(index, 1);
       state.throwMode = true;
       state.throwItem = {
         item: { name: item.name, glyph: item.glyph, itemType: 'thrown', ammo: Infinity, damage: item.attack || 1, range: 5, meleeWeapon: true },
-        index: -1
+        index  // kept so we can remove on resolution or restore on cancel
       };
       addMessage(`${item.glyph} Choose a direction to throw! (sacrifices weapon)`, 'good');
       updateUI();
@@ -12281,7 +12327,8 @@ function throwProjectile(dx, dy, isSecondShot) {
       p.loadedSpecialArrow = null;
     }
   } else if (item.meleeWeapon) {
-    // Thrown melee weapon (Rogue/Ninja) — already removed from inventory at throw initiation
+    // Thrown melee weapon (Rogue/Ninja) — remove from inventory now that throw resolved
+    if (throwIndex >= 0 && throwIndex < p.inventory.length) p.inventory.splice(throwIndex, 1);
     if (!hit) addMessage(`Your ${item.name} clatters harmlessly away.`, '');
     else addMessage(`Your ${item.name} is destroyed in the throw!`, '');
   } else {
