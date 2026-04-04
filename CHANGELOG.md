@@ -1,5 +1,12 @@
 # Changelog
 
+Apr 3, 2026 — 10:40 PM PT — Fixed enchanted walls rendering as black floor squares
+- Added explicit `T.ENCHANTED_WALL` draw handling in the main map and minimap tile renderers so enchanted walls display in purple.
+
+Apr 3, 2026 — 10:28 PM PT — Restored the previous maze and HUD visuals after review
+- Reverted the rejected dark-fantasy UI/art overhaul.
+- Restored the prior maze readability and the more distinctive original on-map presentation.
+
 Apr 3, 2026 — 8:44 PM PT — 5072265 — Consolidated the character roster into 9 distinct classes
 - Finished the merged-class refactor for Rogue, Conjurer, Monk, Beastmaster, Dark Wizard, and Escape Artist.
 - Reworked class actions, cooldowns, save migration, and UI text to remove deleted-class runtime wiring.
