@@ -1,5 +1,17 @@
 # Release Summary
 
+## Visual style harmonization
+- The play screen now matches the Config menu’s dark-fantasy / techno-rune presentation with darker surfaces, pale-gold labels, and cleaner stat framing.
+- Inventory slots, action buttons, and the special-skill button were rebuilt with a more ornate icon-and-frame treatment while preserving the existing layout.
+
+## Dungeon rendering refresh
+- Dungeon walls and floors now render as textured stone and flagstone tiles instead of flat glyph-like marks, while still following the exact underlying ASCII map pattern.
+- The player is now rendered as a simple helmet-style sprite on the map, enemies use simpler readable silhouettes, and gold pickups appear as coin piles.
+
+## UI readability
+- The top HUD was reformatted into compact stat modules with clearer number hierarchy and stronger HP emphasis.
+- Added small-screen compression for the richer HUD so the style overhaul remains usable on phone-width displays.
+
 ## Character class consolidation
 - The class roster is now centered on 9 archetypes with deleted classes removed from active play.
 - Monk and Beastmaster remain locked behind the existing floor-13 `maze_master` badge.
