@@ -632,10 +632,10 @@ const CLASS_DEFS = [
     flavor: 'Holy warrior. Undead fear the faithful. Heals through devotion.',
     hp: 18, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '✝ Holy Aura vs Undead · Curse/Drain Immune',
+    passive: '✝ Holy Aura vs Undead · Weaken + Divine Heal',
     startItems: 'Mace · Healing Potion · Scroll of Identify',
     statBadges: [{ label: '18 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Divine Heal', cls: 'pos' }]
+    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
   },
   {
     id: 'darkwizard', name: 'Dark Wizard', icon: '💀',
@@ -724,6 +724,7 @@ function normalizeLoadedPlayer(player) {
   player.songMastery = player.classId === 'monk' ? true : !!player.songMastery;
   player.meditateCooldown = Math.max(0, player.meditateCooldown || 0);
   player.arcaneDartCooldown = Math.max(0, player.arcaneDartCooldown || 0);
+  player.weakenCooldown = Math.max(0, player.weakenCooldown || 0);
   player.roundhouseKick = player.classId === 'rogue';
   player.charmChance = player.classId === 'monk' ? (player.charmChance || 0.25) : (player.classId === 'beastmaster' ? (player.charmChance || 0) : 0);
   player.hasRegen = player.classId === 'beastmaster' ? true : !!player.hasRegen;
@@ -1224,6 +1225,7 @@ function createPlayer(classId = 'berserker') {
     aimedShotCooldown: 0,
     // Cleric
     divineHealUsed: false,
+    weakenCooldown: 0,
     curseImmune: classId === 'cleric',
     drainImmune: false, // granted by shrine sacrifice
     // Monk
@@ -4149,8 +4151,8 @@ function attackEntity(attacker, defender) {
     damage = Math.max(1, damage - 1);
   }
 
-  // Ghost miss chance
-  if (defender.special === 'phase' && Math.random() < 0.5) {
+  // Ghost miss chance (suppressed while weakened)
+  if (defender.special === 'phase' && !hasStatusEffect(defender, 'weakened') && Math.random() < 0.5) {
     addMessage(`Your attack passes through the ${defender.name}!`, '');
     Audio.miss();
     return;
@@ -4396,7 +4398,9 @@ function getEffectiveDefense(entity) {
     return Math.max(0, def);
   }
   // Aquatic enemies get +1 DEF when on or adjacent to water
-  return entity.defense + (entity.aquaticDefBonus || 0);
+  let def = entity.defense + (entity.aquaticDefBonus || 0);
+  if (hasStatusEffect(entity, 'weakened')) def -= 2;
+  return Math.max(0, def);
 }
 
 function applyWeaponSpecial(weapon, target) {
@@ -7268,6 +7272,7 @@ function endTurn() {
   if (state.player.acidBoltCooldown > 0) state.player.acidBoltCooldown--;
   if (state.player.illusionCooldown > 0) state.player.illusionCooldown--;
   if (state.player.arcaneDartCooldown > 0) state.player.arcaneDartCooldown--;
+  if (state.player.weakenCooldown > 0) state.player.weakenCooldown--;
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
 
   // Expire illusion entities
@@ -9366,12 +9371,17 @@ function updateUI() {
       }
     } else if (cls === 'cleric') {
       spRow.style.display = '';
-      if (p.divineHealUsed) {
-        setBtn('✝ HEAL ✓ (next floor)', false);
-        setBar(0, 'var(--text-dim)');
+      const weakenMax = 8;
+      if (p.divineHealUsed && p.weakenCooldown > 0) {
+        setBtn(`✝ WEAKEN ${p.weakenCooldown}t`, false);
+        setBar(((weakenMax - p.weakenCooldown) / weakenMax) * 100, '#90b050');
       } else {
-        setBtn('✝ DIVINE HEAL', true);
-        setBar(100, 'var(--gold)');
+        setBtn('✝ CLERIC SPELLS', true, '#f0e060');
+        if (p.weakenCooldown > 0) {
+          setBar(((weakenMax - p.weakenCooldown) / weakenMax) * 100, '#90b050');
+        } else {
+          setBar(100, '#f0e060');
+        }
       }
     } else if (cls === 'darkwizard') {
       spRow.style.display = '';
@@ -10118,7 +10128,7 @@ function setupInput() {
     }
     if (state.player.classId === 'berserker') activateEnrage();
     else if (state.player.classId === 'ranger') activateAimedShot();
-    else if (state.player.classId === 'cleric') activateDivineHeal();
+    else if (state.player.classId === 'cleric') activateClericMenu();
     else if (state.player.classId === 'darkwizard') activateAcidBolt();
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
     else if (state.player.classId === 'conjurer') activateConjurerMenu();
@@ -10542,9 +10552,10 @@ function showSettings() {
           abilities.push({ icon: '🏹', name: 'Arrow Supply', desc: `${p.arrows} arrows remaining` });
           break;
         case 'cleric':
-          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead, life drain repelled' });
+          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+2 damage vs undead, life drain repelled' });
           abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
           abilities.push({ icon: '⚔️', name: 'Blunt Style', desc: 'Weapon attacks gain 1 less damage from gear' });
+          abilities.push({ icon: '🌀', name: 'Weaken', desc: `Room debuff: -2 DEF, suppresses dodge/phase (${p.weakenCooldown > 0 ? p.weakenCooldown + 't CD' : 'Ready'})` });
           abilities.push({ icon: '💛', name: 'Divine Heal', desc: `40% HP heal + cure (1/floor)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
         case 'darkwizard':
@@ -11856,6 +11867,7 @@ function getDodgeChance(attacker, defender) {
     if (hasRune('swiftness')) dodge += 0.08; // Glyph of Swiftness
     return dodge;
   }
+  if (hasStatusEffect(defender, 'weakened')) return 0;
   // Evasive enemies can dodge player attacks
   if (['Bat', 'Spider', 'Rat'].includes(defender.name)) return 0.10;
   return 0;
@@ -12316,6 +12328,65 @@ function activateEnrage() {
   updateUI();
 }
 
+function activateClericMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  const weakenReady = p.weakenCooldown <= 0;
+  const healReady = !p.divineHealUsed;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '⛪ CLERIC';
+  $('levelup-label').textContent = 'Choose a rite:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+
+  const weakenBtn = document.createElement('button');
+  weakenBtn.className = 'perk-btn';
+  weakenBtn.innerHTML = `<div class="perk-name">🌀 Weaken</div><div class="perk-desc">Debuff enemies in this room for 4 turns${weakenReady ? '' : ` (${p.weakenCooldown} turns)`}</div>`;
+  if (!weakenReady) weakenBtn.style.opacity = '0.5';
+  const weakenHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (weakenReady) activateWeaken();
+    else addMessage(`Weaken recharging (${p.weakenCooldown} turns).`, '');
+  };
+  weakenBtn.addEventListener('click', weakenHandler);
+  weakenBtn.addEventListener('touchend', (e) => { e.preventDefault(); weakenHandler(); }, { passive: false });
+  container.appendChild(weakenBtn);
+
+  const healBtn = document.createElement('button');
+  healBtn.className = 'perk-btn';
+  healBtn.innerHTML = `<div class="perk-name">💛 Divine Heal</div><div class="perk-desc">Restore 40% HP and cleanse poison/burning${healReady ? '' : ' (used this floor)'}</div>`;
+  if (!healReady) healBtn.style.opacity = '0.5';
+  const healHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (healReady) activateDivineHeal();
+    else addMessage('Divine Heal already used this floor.', '');
+  };
+  healBtn.addEventListener('click', healHandler);
+  healBtn.addEventListener('touchend', (e) => { e.preventDefault(); healHandler(); }, { passive: false });
+  container.appendChild(healBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+
+  overlay.classList.add('active');
+}
+
 function activateConjurerMenu() {
   if (inputLocked || state.gameOver || state.victory) return;
   const p = state.player;
@@ -12456,6 +12527,38 @@ function activateAimedShot() {
   addMessage('🏹 Aimed Shot — choose a direction!', 'good');
   updateUI();
   render();
+}
+
+function activateWeaken() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.weakenCooldown > 0) {
+    addMessage(`Weaken recharging (${p.weakenCooldown} turns).`, '');
+    return;
+  }
+  const room = getRoomAt(p.x, p.y);
+  if (!room) {
+    addMessage('You must stand in a room to cast Weaken.', '');
+    return;
+  }
+  const hostiles = state.entities.filter(e =>
+    e.type === 'enemy' && e.hp > 0 && !e.isAlly &&
+    e.x >= room.x && e.x < room.x + room.w &&
+    e.y >= room.y && e.y < room.y + room.h
+  );
+  if (hostiles.length === 0) {
+    addMessage('No enemies in this room to weaken.', '');
+    return;
+  }
+  Audio.resume();
+  for (const enemy of hostiles) addStatusEffect(enemy, 'weakened', 4);
+  p.weakenCooldown = 8;
+  addMessage(`🌀 You cast Weaken! ${hostiles.length} foe${hostiles.length === 1 ? '' : 's'} falter.`, 'good');
+  animateAoeBlast(p.x, p.y, 1.5, '#90b050');
+  Audio.useItem();
+  haptic(40);
+  updateUI();
+  endTurn();
 }
 
 function activateDivineHeal() {

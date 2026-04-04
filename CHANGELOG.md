@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 3, 2026 — 11:25 PM PT — Added Cleric Weaken spell with room-wide defense debuff
+- Cleric special action now opens a spell menu with both `Weaken` and `Divine Heal`.
+- `Weaken` applies `Weakened` to enemies in the current room for 4 turns, reducing defense and suppressing dodge/phase avoidance.
+- Updated Cleric class UI copy to surface the new spell and cooldown state.
+
 Apr 3, 2026 — 10:58 PM PT — Fixed Cleric Identify scrolls so they correctly reveal carried consumables
 - Class starter scrolls are now created with `makeScroll(...)`, ensuring `effectId` is present and Identify effects execute properly.
 
