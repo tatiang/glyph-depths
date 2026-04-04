@@ -8583,6 +8583,191 @@ function saveSettings() {
 }
 
 // === RENDERING ===
+function tileNoise(x, y, salt = 0) {
+  const n = Math.sin((x * 127.1 + y * 311.7 + salt * 73.3) * 0.0174533) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function drawWallSkin(ctx, x, y, ts, baseColor, mx, my) {
+  ctx.fillStyle = baseColor;
+  ctx.fillRect(x, y, ts, ts);
+
+  const rows = 3;
+  const rowH = ts / rows;
+  for (let row = 0; row < rows; row++) {
+    const y0 = y + row * rowH;
+    const offset = row % 2 ? ts * 0.26 : 0;
+    const blockW = ts * 0.54;
+    for (let bx = -offset; bx < ts; bx += blockW) {
+      const seed = tileNoise(mx * 5 + row, my * 7 + bx, row + 1);
+      ctx.fillStyle = seed > 0.52 ? 'rgba(210,220,205,0.10)' : 'rgba(0,0,0,0.26)';
+      ctx.fillRect(x + bx + 1, y0 + 1, Math.max(1, blockW - 2), Math.max(1, rowH - 2));
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.40)';
+    ctx.fillRect(x, y0 + rowH - 1, ts, 1);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeRect(x + 0.5, y + 0.5, ts - 1, ts - 1);
+}
+
+function drawFloorSkin(ctx, x, y, ts, baseColor, mx, my, corridor = false) {
+  ctx.fillStyle = baseColor;
+  ctx.fillRect(x, y, ts, ts);
+
+  const slab = corridor ? 3 : 2;
+  const step = ts / slab;
+  for (let gy = 0; gy < slab; gy++) {
+    for (let gx = 0; gx < slab; gx++) {
+      const sx = x + gx * step;
+      const sy = y + gy * step;
+      const seed = tileNoise(mx * 3 + gx, my * 3 + gy, corridor ? 21 : 9);
+      ctx.fillStyle = seed > 0.55 ? 'rgba(190,195,175,0.10)' : 'rgba(0,0,0,0.18)';
+      ctx.fillRect(sx + 0.5, sy + 0.5, Math.max(1, step - 1), Math.max(1, step - 1));
+    }
+  }
+
+  ctx.strokeStyle = corridor ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)';
+  ctx.strokeRect(x + 0.5, y + 0.5, ts - 1, ts - 1);
+}
+
+function drawGoldPileSprite(ctx, sx, sy, ts) {
+  const r = Math.max(2, ts * 0.12);
+  const offsets = [
+    [-r * 1.3, r * 0.35], [0, r * 0.5], [r * 1.3, r * 0.35],
+    [-r * 0.65, -r * 0.25], [r * 0.65, -r * 0.25], [0, -r * 0.55]
+  ];
+  for (const [ox, oy] of offsets) {
+    ctx.fillStyle = '#f2cf65';
+    ctx.beginPath();
+    ctx.arc(sx + ox, sy + oy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(118,82,22,0.9)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function drawHelmetPlayer(ctx, sx, sy, ts, isInvisible) {
+  const w = ts * 0.62;
+  const h = ts * 0.52;
+  const x = sx - w / 2;
+  const y = sy - h / 2;
+  if (isInvisible) ctx.globalAlpha = 0.45;
+
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, '#8ba08f');
+  grad.addColorStop(1, '#36483a');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.12, y + h * 0.46);
+  ctx.quadraticCurveTo(x + w * 0.18, y + h * 0.08, x + w * 0.5, y + h * 0.06);
+  ctx.quadraticCurveTo(x + w * 0.82, y + h * 0.08, x + w * 0.88, y + h * 0.46);
+  ctx.lineTo(x + w * 0.8, y + h * 0.86);
+  ctx.lineTo(x + w * 0.2, y + h * 0.86);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#1a221c';
+  ctx.lineWidth = Math.max(1, ts * 0.055);
+  ctx.stroke();
+
+  ctx.fillStyle = '#1f2a22';
+  ctx.fillRect(x + w * 0.31, y + h * 0.43, w * 0.38, h * 0.16);
+  ctx.fillStyle = '#c7d8c9';
+  ctx.fillRect(x + w * 0.47, y + h * 0.2, w * 0.08, h * 0.17);
+
+  ctx.globalAlpha = 1.0;
+}
+
+function drawRatSprite(ctx, sx, sy, ts) {
+  const bodyW = ts * 0.48;
+  const bodyH = ts * 0.26;
+  ctx.fillStyle = '#8a8f95';
+  ctx.beginPath();
+  ctx.ellipse(sx - ts * 0.03, sy + ts * 0.02, bodyW / 2, bodyH / 2, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#9da3aa';
+  ctx.beginPath();
+  ctx.ellipse(sx + ts * 0.2, sy - ts * 0.02, ts * 0.14, ts * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#b47278';
+  ctx.lineWidth = Math.max(1, ts * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(sx - ts * 0.25, sy + ts * 0.06);
+  ctx.quadraticCurveTo(sx - ts * 0.42, sy + ts * 0.16, sx - ts * 0.46, sy + ts * 0.02);
+  ctx.stroke();
+
+  ctx.fillStyle = '#121212';
+  ctx.beginPath();
+  ctx.arc(sx + ts * 0.23, sy - ts * 0.03, Math.max(1, ts * 0.04), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawEnemySprite(ctx, enemy, sx, sy, ts) {
+  const n = (enemy.name || '').toLowerCase();
+  if (n.includes('rat')) {
+    drawRatSprite(ctx, sx, sy, ts);
+    return;
+  }
+
+  if (n.includes('bat')) {
+    ctx.fillStyle = '#7f8793';
+    ctx.beginPath();
+    ctx.moveTo(sx - ts * 0.3, sy + ts * 0.05);
+    ctx.lineTo(sx - ts * 0.1, sy - ts * 0.12);
+    ctx.lineTo(sx, sy + ts * 0.02);
+    ctx.lineTo(sx + ts * 0.1, sy - ts * 0.12);
+    ctx.lineTo(sx + ts * 0.3, sy + ts * 0.05);
+    ctx.lineTo(sx, sy + ts * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+
+  if (n.includes('slime')) {
+    ctx.fillStyle = '#6ca86f';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + ts * 0.06, ts * 0.24, ts * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#253628';
+    ctx.fillRect(sx - ts * 0.1, sy + ts * 0.02, ts * 0.2, ts * 0.03);
+    return;
+  }
+
+  ctx.fillStyle = enemy.isAlly ? '#65d68a' : '#b8b9bf';
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - ts * 0.27);
+  ctx.lineTo(sx + ts * 0.24, sy);
+  ctx.lineTo(sx, sy + ts * 0.27);
+  ctx.lineTo(sx - ts * 0.24, sy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#171717';
+  ctx.lineWidth = Math.max(1, ts * 0.05);
+  ctx.stroke();
+
+  ctx.fillStyle = '#131313';
+  ctx.fillRect(sx - ts * 0.1, sy - ts * 0.02, ts * 0.08, ts * 0.05);
+  ctx.fillRect(sx + ts * 0.02, sy - ts * 0.02, ts * 0.08, ts * 0.05);
+}
+
+function drawMimicChestSprite(ctx, sx, sy, ts) {
+  const w = ts * 0.44;
+  const h = ts * 0.3;
+  const x = sx - w / 2;
+  const y = sy - h / 2;
+  ctx.fillStyle = '#6d4f2f';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#8f673e';
+  ctx.fillRect(x, y - ts * 0.12, w, ts * 0.12);
+  ctx.strokeStyle = '#2c1f12';
+  ctx.lineWidth = Math.max(1, ts * 0.04);
+  ctx.strokeRect(x, y - ts * 0.12, w, h + ts * 0.12);
+  ctx.fillStyle = '#ccb36b';
+  ctx.fillRect(sx - ts * 0.03, y, ts * 0.06, ts * 0.08);
+}
+
 function render() {
   if (!state) return;
 
@@ -8646,128 +8831,140 @@ function render() {
 
       // Draw tile glyph
       ctx.font = `${fontSize}px monospace`;
-      let tileGlyph, tileColor;
+      let tileGlyph = '';
+      let tileColor = '#000';
+      let tileFont = `${fontSize}px monospace`;
       switch (tile) {
         case T.WALL: {
           const mKey = my * MAP_W + mx;
           const isMasonWall = state.masonWalls && state.masonWalls.has(mKey);
-          tileGlyph = '▓';
           if (isMasonWall) {
             const mHp = state.masonWalls.get(mKey) || 3;
-            // Orange-brown for fresh walls, darkens as damaged
             tileColor = vis ? (mHp >= 3 ? '#c87838' : mHp === 2 ? '#a85e28' : '#804020') : '#5a3018';
           } else {
             tileColor = vis ? biome.wallVis : biome.wallDim;
           }
+          drawWallSkin(ctx, vx * ts, vy * ts, ts, tileColor, mx, my);
           break;
         }
-        case T.ENCHANTED_WALL:
-          tileGlyph = '▓';
+        case T.ENCHANTED_WALL: {
           tileColor = vis ? '#c060ff' : '#4a1f62';
+          drawWallSkin(ctx, vx * ts, vy * ts, ts, tileColor, mx, my);
           break;
+        }
         case T.FLOOR:
-          tileGlyph = '·';
-          tileColor = vis ? biome.floorVis : biome.floorDim;
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           break;
         case T.CORRIDOR:
-          tileGlyph = '·';
-          tileColor = vis ? biome.corrVis : biome.corrDim;
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
           break;
         case T.STAIRS_DOWN:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           tileGlyph = '▼';
           tileColor = '#80ff80';
           break;
         case T.STAIRS_UP:
-          tileGlyph = '·';
-          tileColor = vis ? biome.floorVis : biome.floorDim;
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
+          tileGlyph = '▲';
+          tileColor = '#60c0ff';
           break;
         case T.DOOR_CLOSED:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
           tileGlyph = '+';
           tileColor = (state.rogueClosedDoors && state.rogueClosedDoors.has(my * MAP_W + mx)) ? '#40a0a0' : '#8B6914';
           break;
         case T.DOOR_OPEN:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
           tileGlyph = '/';
           tileColor = '#6B4914';
           break;
         case T.DOOR_ONEWAY:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
           tileGlyph = '⊳';
           tileColor = '#c06030';
           break;
         case T.DOOR_SEALED:
-          tileGlyph = '▓';
-          tileColor = '#4a2020';
+          drawWallSkin(ctx, vx * ts, vy * ts, ts, '#4a2020', mx, my);
           break;
         case T.WALL_SECRET: {
-          // Looks like a normal wall; Rogue class can detect with shimmer
           const sKey = my * MAP_W + mx;
           const cracked = state.secretBashes && state.secretBashes[sKey];
-          tileGlyph = cracked ? '▒' : '▓';
           tileColor = cracked ? '#c09040' : (vis ? biome.wallVis : biome.wallDim);
+          drawWallSkin(ctx, vx * ts, vy * ts, ts, tileColor, mx, my);
+          if (cracked) {
+            tileGlyph = '▒';
+            tileColor = '#d9b66e';
+          }
           if (!cracked && vis && canDetectSecretWalls() && Math.random() < 0.30) {
-            tileColor = '#9090a0';
+            ctx.fillStyle = 'rgba(165,165,180,0.24)';
+            ctx.fillRect(vx * ts + 1, vy * ts + 1, ts - 2, ts - 2);
           }
           break;
         }
         case T.DOOR_LOCKED:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
           tileGlyph = '⊞';
           tileColor = vis ? '#c08030' : '#604018';
           break;
         case T.SPECIAL:
-          tileGlyph = '·';
-          tileColor = vis ? '#8060c0' : '#302040';
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
+          tileGlyph = '✦';
+          tileColor = vis ? '#9d7bda' : '#4a356c';
           break;
         case T.TELEPORT: {
-          // Ninja/Rogue/Escape Artist can sense hidden teleports, as can Ring of Detection
           const hasDetectRing = hasRingEffect('detection');
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           if (state.player.teleportSight || hasDetectRing) {
             tileGlyph = '◊';
             tileColor = vis ? '#40e0d0' : '#1a6060';
-          } else {
-            // Invisible teleport — looks like normal floor until triggered
-            tileGlyph = '·';
-            tileColor = vis ? biome.floorVis : biome.floorDim;
           }
           break;
         }
         case T.TELEPORT_VIS:
-          // Revealed teleport — pulsing cyan
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           tileGlyph = '◊';
           tileColor = vis ? '#40e0d0' : '#1a6060';
           break;
         case T.RUBBLE:
-          // Avalanche debris — warm brown, impassable
+          drawWallSkin(ctx, vx * ts, vy * ts, ts, vis ? '#9a6535' : '#3a2515', mx, my);
           tileGlyph = '▒';
-          tileColor = vis ? '#9a6535' : '#3a2515';
+          tileColor = vis ? '#bd8a5c' : '#4f321d';
           break;
         case T.WATER:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'), mx, my, false);
           tileGlyph = '≈';
-          tileColor = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828');
+          tileColor = vis ? '#9fd6f7' : '#4e7991';
           break;
         case T.BRIDGE:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? '#8a6a3a' : '#4a3a1a', mx, my, true);
           tileGlyph = '═';
-          tileColor = vis ? '#8a6a3a' : '#4a3a1a';
+          tileColor = vis ? '#d0b27a' : '#796241';
           break;
         case T.STEPPING_STONE:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'), mx, my, false);
           tileGlyph = '◦';
           tileColor = vis ? '#6a8a8a' : '#3a4a4a';
           break;
         case T.STALAGMITE:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           tileGlyph = '▲';
           tileColor = vis ? '#5a6a70' : '#2a3238';
           break;
         case T.WATERFALL:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'), mx, my, false);
           tileGlyph = '≋';
           tileColor = vis ? '#a0d8ff' : '#304860';
           break;
         case T.MOUND:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           tileGlyph = '^';
           tileColor = vis ? '#8a6030' : '#3a2810';
           break;
         case T.ICY_PATH:
-          tileGlyph = '·';
-          tileColor = vis ? '#a0e8f8' : '#304858';
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? '#8dd8e8' : '#304858', mx, my, false);
           break;
         case T.FIRE_PATH:
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? '#933315' : '#501808', mx, my, false);
           tileGlyph = '▒';
           tileColor = vis ? '#e05010' : '#501808';
           break;
@@ -8781,12 +8978,15 @@ function render() {
           }
           break;
         default:
-          tileGlyph = ' ';
+          drawFloorSkin(ctx, vx * ts, vy * ts, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
           tileColor = '#000';
       }
 
-      ctx.fillStyle = tileColor;
-      ctx.fillText(tileGlyph, px, py);
+      if (tileGlyph) {
+        ctx.font = tileFont;
+        ctx.fillStyle = tileColor;
+        ctx.fillText(tileGlyph, px, py);
+      }
     }
   }
 
@@ -8945,6 +9145,11 @@ function render() {
       ctx.font = `${Math.floor(ts * 0.7)}px serif`;
       ctx.fillText(e.glyph, sx, sy);
       ctx.globalAlpha = 1.0;
+      continue;
+    }
+
+    if (e.type === 'item' && e.item?.itemType === 'gold') {
+      drawGoldPileSprite(ctx, sx, sy, ts);
       continue;
     }
 
@@ -9134,8 +9339,7 @@ function render() {
       if (dist > 1) {
         const sx = (e.x - camX) * ts + ts / 2;
         const sy = (e.y - camY) * ts + ts / 2;
-        ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-        ctx.fillText('📦', sx, sy);
+        drawMimicChestSprite(ctx, sx, sy, ts);
         continue;
       }
     }
@@ -9144,8 +9348,7 @@ function render() {
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
 
-    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
-    ctx.fillText(e.glyph, sx, sy);
+    drawEnemySprite(ctx, e, sx, sy, ts);
 
     if (settings.showIntents) {
       const intent = getEnemyIntent(e);
@@ -9203,26 +9406,38 @@ function render() {
   ctx.fillRect((p.x - camX) * ts, (p.y - camY) * ts, ts, ts);
   // Redraw the tile underneath the player (so the floor/stairs/etc. are still visible around the player)
   const playerTile = getTile(p.x, p.y);
-  let playerTileGlyph, playerTileColor;
+  let playerTileGlyph = '';
+  let playerTileColor = '#fff';
   switch (playerTile) {
-    case T.STAIRS_DOWN: playerTileGlyph = '▼'; playerTileColor = '#80ff80'; break;
-    case T.STAIRS_UP:   playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
-    case T.DOOR_OPEN:   playerTileGlyph = '\\'; playerTileColor = '#c0a060'; break;
-    case T.FLOOR:       playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
-    case T.CORRIDOR:    playerTileGlyph = '·'; playerTileColor = biome.corrVis; break;
-    default:            playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+    case T.STAIRS_DOWN:
+      drawFloorSkin(ctx, (p.x - camX) * ts, (p.y - camY) * ts, ts, biome.floorVis, p.x, p.y, false);
+      playerTileGlyph = '▼';
+      playerTileColor = '#80ff80';
+      break;
+    case T.STAIRS_UP:
+      drawFloorSkin(ctx, (p.x - camX) * ts, (p.y - camY) * ts, ts, biome.floorVis, p.x, p.y, false);
+      playerTileGlyph = '▲';
+      playerTileColor = '#60c0ff';
+      break;
+    case T.DOOR_OPEN:
+      drawFloorSkin(ctx, (p.x - camX) * ts, (p.y - camY) * ts, ts, biome.corrVis, p.x, p.y, true);
+      playerTileGlyph = '/';
+      playerTileColor = '#c0a060';
+      break;
+    case T.CORRIDOR:
+      drawFloorSkin(ctx, (p.x - camX) * ts, (p.y - camY) * ts, ts, biome.corrVis, p.x, p.y, true);
+      break;
+    default:
+      drawFloorSkin(ctx, (p.x - camX) * ts, (p.y - camY) * ts, ts, biome.floorVis, p.x, p.y, false);
+      break;
   }
   ctx.globalAlpha = 1.0;
-  ctx.font = `${Math.floor(ts * 0.7)}px monospace`;
-  ctx.fillStyle = playerTileColor;
-  ctx.fillText(playerTileGlyph, playerSX, playerSY);
-  ctx.font = `${Math.floor(ts * 0.75)}px serif`;
-  ctx.fillStyle = '#ffffff';
-  if (hasStatusEffect(p, 'invisibility')) {
-    ctx.globalAlpha = 0.4;
+  if (playerTileGlyph) {
+    ctx.font = `${Math.floor(ts * 0.7)}px monospace`;
+    ctx.fillStyle = playerTileColor;
+    ctx.fillText(playerTileGlyph, playerSX, playerSY);
   }
-  ctx.fillText(p.glyph, playerSX, playerSY);
-  ctx.globalAlpha = 1.0;
+  drawHelmetPlayer(ctx, playerSX, playerSY, ts, hasStatusEffect(p, 'invisibility'));
 
   // Danger border — red glow when low HP or low food
   const hpPct = p.hp / p.maxHp;
@@ -9288,19 +9503,19 @@ function updateUI() {
   const p = state.player;
 
   // Status bar
-  $('floor-label').textContent = `⬊${state.floor}`;
+  $('floor-label').textContent = `F${state.floor}`;
   $('level-label').textContent = `Lv.${p.level}`;
-  $('gold-label').textContent = `💰 ${p.gold}`;
-  $('hunger-label').textContent = `🍖 ${p.hunger}`;
+  $('gold-label').textContent = `${p.gold}`;
+  $('hunger-label').textContent = `${p.hunger}`;
   // Arrow counter — show if player has a ranged weapon or any arrows
   const arrowEl = $('arrow-label');
-  if (arrowEl) {
-    if (p.equipped.ranged || p.arrows > 0) {
-      arrowEl.style.display = '';
-      arrowEl.textContent = `➶ ${p.arrows}`;
-    } else {
-      arrowEl.style.display = 'none';
-    }
+    if (arrowEl) {
+      if (p.equipped.ranged || p.arrows > 0) {
+        arrowEl.style.display = '';
+        arrowEl.textContent = `${p.arrows}`;
+      } else {
+        arrowEl.style.display = 'none';
+      }
   }
   // Fire button — show when ranged weapon equipped
   const fireBtn = $('btn-fire');
@@ -9378,38 +9593,38 @@ function updateUI() {
     };
     if (state.throwMode || state.fortifyMode) {
       spRow.style.display = '';
-      setBtn('❌ CANCEL TARGETING', true, '#ff4444');
+      setBtn('CANCEL TARGETING', true, '#ff4444');
       setBar(100, '#ff4444');
     } else if (cls === 'berserker') {
       spRow.style.display = '';
       if (p.enrageActive) {
-        setBtn(`🔥 FURY ${p.engageTurnsLeft}t`, true, '#ff6020');
+        setBtn(`ENRAGE ${p.engageTurnsLeft}T`, true, '#ff6020');
         setBar((p.engageTurnsLeft / 5) * 100, '#ff6020');
       } else if (p.enrageFloorUsed) {
-        setBtn('⚡ ENRAGE ✓', false);
+        setBtn('ENRAGE READY NEXT FLOOR', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('⚡ ENRAGE', true);
+        setBtn('ENRAGE', true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'ranger') {
       spRow.style.display = '';
       const aimMax = p.quickDraw ? 5 : 8;
       if (p.aimedShotCooldown > 0) {
-        setBtn(`🏹 AIM ${p.aimedShotCooldown}t`, false);
+        setBtn(`AIMED SHOT ${p.aimedShotCooldown}T`, false);
         setBar(((aimMax - p.aimedShotCooldown) / aimMax) * 100, '#4a9');
       } else {
-        setBtn('🏹 AIMED SHOT', true);
+        setBtn('AIMED SHOT', true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'cleric') {
       spRow.style.display = '';
       const weakenMax = 8;
       if (p.divineHealUsed && p.weakenCooldown > 0) {
-        setBtn(`✝ WEAKEN ${p.weakenCooldown}t`, false);
+        setBtn(`WEAKEN ${p.weakenCooldown}T`, false);
         setBar(((weakenMax - p.weakenCooldown) / weakenMax) * 100, '#90b050');
       } else {
-        setBtn('✝ CLERIC SPELLS', true, '#f0e060');
+        setBtn('CLERIC SPELLS', true, '#f0e060');
         if (p.weakenCooldown > 0) {
           setBar(((weakenMax - p.weakenCooldown) / weakenMax) * 100, '#90b050');
         } else {
@@ -9419,10 +9634,10 @@ function updateUI() {
     } else if (cls === 'darkwizard') {
       spRow.style.display = '';
       if (p.acidBoltCooldown > 0) {
-        setBtn(`☣️ BOLT ${p.acidBoltCooldown}t`, false);
+        setBtn(`ACID BOLT ${p.acidBoltCooldown}T`, false);
         setBar(((7 - p.acidBoltCooldown) / 7) * 100, '#44cc44');
       } else {
-        setBtn('☣️ ACID BOLT', true, '#44cc44');
+        setBtn('ACID BOLT', true, '#44cc44');
         setBar(100, '#44cc44');
       }
     } else if (cls === 'escapeartist') {
@@ -9430,32 +9645,32 @@ function updateUI() {
       const maxEscape = getMasteryBonuses(cls).extraEscape ? 2 : 1;
       const usedEscape = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
       if (usedEscape >= maxEscape) {
-        setBtn('💨 ESCAPE ✓ (next floor)', false);
+        setBtn('ESCAPE ROUTE NEXT FLOOR', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('💨 ESCAPE', true, '#80ffff');
+        setBtn('ESCAPE ROUTE', true, '#80ffff');
         setBar(((maxEscape - usedEscape) / maxEscape) * 100, '#80ffff');
       }
     } else if (cls === 'conjurer') {
       spRow.style.display = '';
       const maxCD = getMasteryBonuses(cls).fastIllusion ? 6 : 8;
       if (p.illusionCooldown <= 0 && p.arcaneDartCooldown <= 0) {
-        setBtn('✨ SPELLS', true, '#cc44ff');
+        setBtn('ARCANE SPELLS', true, '#cc44ff');
         setBar(100, '#cc44ff');
       } else if (p.illusionCooldown <= 0 || p.arcaneDartCooldown <= 0) {
-        setBtn(`✨ SPELLS ${Math.max(p.illusionCooldown, p.arcaneDartCooldown)}t`, true, '#cc44ff');
+        setBtn(`ARCANE SPELLS ${Math.max(p.illusionCooldown, p.arcaneDartCooldown)}T`, true, '#cc44ff');
         setBar(100, '#cc44ff');
       } else {
-        setBtn(`✨ SPELLS ${Math.min(p.illusionCooldown, p.arcaneDartCooldown)}t`, false, '#cc44ff');
+        setBtn(`ARCANE SPELLS ${Math.min(p.illusionCooldown, p.arcaneDartCooldown)}T`, false, '#cc44ff');
         setBar(((maxCD - p.illusionCooldown) / maxCD) * 100, '#cc44ff');
       }
     } else if (cls === 'monk') {
       spRow.style.display = '';
       if (p.meditateCooldown > 0) {
-        setBtn(`🧘 MEDITATE ${p.meditateCooldown}t`, false, '#60c0a0');
+        setBtn(`MEDITATE ${p.meditateCooldown}T`, false, '#60c0a0');
         setBar(((20 - p.meditateCooldown) / 20) * 100, '#60c0a0');
       } else {
-        setBtn('🧘 MEDITATE', true, '#60c0a0');
+        setBtn('MEDITATE', true, '#60c0a0');
         setBar(100, '#60c0a0');
       }
     } else {
@@ -9487,10 +9702,10 @@ function renderInventory() {
 
   // Show equipped items first with gold border
   const equipped = [
-    { label: '⚔️', slot: 'weapon', item: state.player.equipped.weapon },
-    { label: '🏹', slot: 'ranged', item: state.player.equipped.ranged },
-    { label: '🛡️', slot: 'armor', item: state.player.equipped.armor },
-    { label: '💍', slot: 'ring', item: state.player.equipped.ring }
+    { label: '⚔', slot: 'weapon', item: state.player.equipped.weapon },
+    { label: '➶', slot: 'ranged', item: state.player.equipped.ranged },
+    { label: '⛨', slot: 'armor', item: state.player.equipped.armor },
+    { label: '◌', slot: 'ring', item: state.player.equipped.ring }
   ];
 
   function showSlotInfo(item, el) {
@@ -10544,6 +10759,9 @@ function showSettings() {
   function statRow(label, val) {
     return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
   }
+  function highlightValueTokens(text) {
+    return String(text).replace(/([+]\d+(?:\.\d+)?(?:x|%|t)?|\b\d+(?:\.\d+)?x\b|\b\d+%\b)/g, '<span class="cfg-value-token">$1</span>');
+  }
 
   $('char-name').textContent = state
     ? `${state.playerName} ${state.playerEpithet} ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Berserker'}`
@@ -10660,7 +10878,7 @@ function showSettings() {
       classAbilList.innerHTML = abilities.map(a =>
         `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
         + `<span style="font-size:15px;flex-shrink:0;">${a.icon}</span>`
-        + `<span style="font-size:12px;"><strong style="color:var(--gold);">${a.name}</strong> — <span style="color:var(--text-dim);">${a.desc}</span></span>`
+        + `<span style="font-size:12px;"><strong style="color:var(--gold);">${a.name}</strong> — <span style="color:var(--text-dim);">${highlightValueTokens(a.desc)}</span></span>`
         + `</div>`
       ).join('');
     } else {
@@ -10678,7 +10896,7 @@ function showSettings() {
         $('synergy-list').innerHTML = activeSyn.map(s =>
           `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">`
           + `<span style="font-size:15px;flex-shrink:0;">${s.icon}</span>`
-          + `<span style="font-size:12px;"><strong style="color:#c0a0ff;">${s.name}</strong> — <span style="color:var(--text-dim);">${s.desc}</span></span>`
+          + `<span style="font-size:12px;"><strong style="color:#c0a0ff;">${s.name}</strong> — <span style="color:var(--text-dim);">${highlightValueTokens(s.desc)}</span></span>`
           + `</div>`
         ).join('');
       } else {
@@ -10738,7 +10956,7 @@ function showSettings() {
         runeList.innerHTML = runes.map(r =>
           `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">`
           + `<span style="font-size:16px;">${r.symbol}</span>`
-          + `<span style="font-size:12px;"><strong style="color:var(--gold);">${r.name}</strong> — <span style="color:var(--text-dim);">${r.desc}</span></span>`
+          + `<span style="font-size:12px;"><strong style="color:var(--gold);">${r.name}</strong> — <span style="color:var(--text-dim);">${highlightValueTokens(r.desc)}</span></span>`
           + `</div>`
         ).join('');
       } else {

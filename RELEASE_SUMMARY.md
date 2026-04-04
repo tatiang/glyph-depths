@@ -1,5 +1,12 @@
 # Release Summary
 
+## Visual style overhaul and harmonization
+- Unified the in-run HUD, button chrome, and overlay theme around the Config-screen dark fantasy rune-tech visual standard.
+- Updated status presentation to emphasize readability: pale-gold headers, white stat text, green numeric modifiers, and red HP treatment.
+- Preserved gameplay layout while upgrading control and inventory visuals with consistent rune-style glyph buttons.
+- Kept the ASCII-derived dungeon structure intact but replaced flat glyph-only terrain rendering with textured wall/floor skins.
+- Enforced map clarity separation: player now renders as a simple helmet sprite, enemies as simple sprites, and UI-grade icon complexity remains in menus/buttons only.
+
 ## Character class consolidation
 - The class roster is now centered on 9 archetypes with deleted classes removed from active play.
 - Monk and Beastmaster remain locked behind the existing floor-13 `maze_master` badge.

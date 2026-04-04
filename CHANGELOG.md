@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 4, 2026 — 6:21 AM PT — Harmonized the full UI and map rendering into a unified dark rune-tech style
+- Re-themed gameplay HUD controls and overlays to match the Config screen visual hierarchy: pale-gold headers, white core stats, green modifier highlights, and red HP emphasis.
+- Replaced emoji-forward control icons with a consistent rune-glyph button language while preserving existing control layout and labels.
+- Kept dungeon topology unchanged but skinned map tiles with textured wall/floor rendering, added gold-pile loot rendering, and switched on-map actors to simple sprites (helmet player + simplified enemies, including a rat sprite).
+
 Apr 3, 2026 — 11:48 PM PT — Made Rogues and Detection Ring users immune to enchanted wall effects
 - Rogues and characters wearing the Ring of Detection no longer get woozy or direction-distortion from enchanted walls.
 - Added the immunity feedback message: "The enchanted walls glow but seem to have no effect on you."

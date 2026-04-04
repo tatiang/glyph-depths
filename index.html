@@ -1336,21 +1336,260 @@
     #manual-search { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text); font-size: 14px; font-family: inherit; margin-bottom: 10px; box-sizing: border-box; -webkit-appearance: none; }
     #manual-search::placeholder { color: var(--text-dim); }
     .manual-no-match { display: none !important; }
+
+    /* === VISUAL HARMONIZATION OVERRIDES === */
+    :root {
+      --bg: #000000;
+      --bg-dark: #030304;
+      --text: #f0f1f4;
+      --text-dim: #8b8f97;
+      --gold: #d8be7a;
+      --accent: #6f7688;
+      --danger: #d24a4a;
+      --hp-high: #cb2e2e;
+      --hp-mid: #c43636;
+      --hp-low: #b11f1f;
+      --panel: #0c0d10;
+      --panel-bg: #13161c;
+      --panel-border: #4a3f2c;
+      --item-slot: #141820;
+      --btn: #171c25;
+      --btn-active: #232a35;
+      --cfg-green: #58d37e;
+    }
+
+    html, body {
+      background: #000;
+      font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      letter-spacing: 0.02em;
+    }
+
+    #app {
+      background:
+        radial-gradient(circle at 50% -20%, rgba(105, 126, 166, 0.12), transparent 52%),
+        radial-gradient(circle at 50% 120%, rgba(155, 118, 67, 0.1), transparent 46%),
+        #000;
+    }
+
+    .style-rune {
+      color: var(--gold);
+      text-shadow: 0 0 8px rgba(216, 190, 122, 0.25);
+      font-weight: 700;
+    }
+
+    #status-bar {
+      height: 52px;
+      padding: 6px 8px;
+      gap: 6px;
+      background: linear-gradient(180deg, #121722, #0a0d13);
+      border-bottom: 1px solid #615337;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    #status-bar .stat,
+    #hp-wrap {
+      border: 1px solid #5c4f38;
+      border-radius: 7px;
+      background: linear-gradient(180deg, #232933 0%, #171b24 100%);
+      min-height: 38px;
+      padding: 4px 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .stat-icon {
+      display: inline-flex;
+      width: 16px;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--gold);
+    }
+
+    #floor-label, #level-label, #gold-label, #hunger-label, #arrow-label, #hp-text {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    #hp-wrap {
+      flex: 1;
+      max-width: 170px;
+      background: linear-gradient(180deg, #2a1a1a, #1c1111);
+      border-color: #6a473b;
+    }
+
+    #hp-bar-bg {
+      border: 1px solid #4e3030;
+      background: #260f0f;
+      height: 11px;
+    }
+
+    #hp-bar {
+      background: linear-gradient(90deg, #8f1010, #d63838);
+      box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.18);
+    }
+
+    #msg-log {
+      background: linear-gradient(180deg, #111111, #060606);
+      border-top: 1px solid #3a3123;
+      border-bottom: 1px solid #3a3123;
+      font-size: 12px;
+    }
+
+    #msg-log-toggle {
+      color: #b8a782;
+      background: linear-gradient(transparent, #0b0b0b 45%);
+    }
+
+    #inv-bar {
+      background: linear-gradient(180deg, #10131a, #0a0c11);
+      border-bottom: 1px solid #3f3628;
+      height: 60px;
+      padding: 6px 8px;
+      gap: 5px;
+    }
+
+    .inv-slot {
+      background: linear-gradient(180deg, #212734, #151a24);
+      border-color: #574a34;
+      border-radius: 8px;
+      color: #f4f4f4;
+      font-size: 21px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .inv-slot.equipped {
+      border-color: var(--gold);
+      box-shadow: 0 0 7px rgba(216, 190, 122, 0.28), inset 0 0 0 1px rgba(216, 190, 122, 0.18);
+    }
+
+    #controls {
+      background:
+        radial-gradient(circle at 75% 50%, rgba(255, 180, 90, 0.07), transparent 30%),
+        linear-gradient(180deg, #13151b, #0a0b0f);
+      border-top: 1px solid #3c3326;
+      padding: 10px 10px calc(10px + var(--safe-bottom));
+    }
+
+    .dpad-btn,
+    .act-btn {
+      border: 1px solid #5a4e39;
+      background: linear-gradient(180deg, #252b36, #191d27);
+      color: #e6d8b5;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    }
+
+    .dpad-btn:active,
+    .act-btn:active {
+      background: linear-gradient(180deg, #2b3240, #1f2430);
+      color: #f4e6c2;
+    }
+
+    .act-btn {
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      width: 58px;
+      height: 44px;
+    }
+
+    .act-btn .icon {
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    #btn-special {
+      border-color: var(--gold) !important;
+      color: var(--gold) !important;
+      background: linear-gradient(180deg, #27303d, #1b222d);
+      box-shadow: 0 0 10px rgba(216, 190, 122, 0.2), inset 0 0 0 1px rgba(216, 190, 122, 0.2);
+      font-weight: 800;
+      letter-spacing: 0.07em;
+    }
+
+    #cd-bar {
+      height: 4px;
+      background: linear-gradient(90deg, #b9923d, #f0d084);
+    }
+
+    .overlay {
+      background:
+        radial-gradient(circle at 50% 0%, rgba(95, 114, 148, 0.14), transparent 40%),
+        rgba(0, 0, 0, 0.95);
+    }
+
+    .overlay h1 {
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-shadow: 0 0 12px rgba(216, 190, 122, 0.18);
+    }
+
+    .overlay h2,
+    .stats-grid .stat-label {
+      color: var(--text);
+    }
+
+    .stats-heading {
+      color: var(--gold);
+      letter-spacing: 0.16em;
+      font-weight: 800;
+    }
+
+    .stats-grid .stat-row {
+      background: linear-gradient(180deg, rgba(40, 45, 58, 0.52), rgba(24, 28, 36, 0.52));
+      border: 1px solid rgba(120, 105, 77, 0.45);
+      border-radius: 6px;
+      padding: 5px 8px;
+      margin-bottom: 4px;
+    }
+
+    .stats-grid .stat-val {
+      color: #f8f8fa;
+      font-weight: 800;
+    }
+
+    .cfg-value-token {
+      color: var(--cfg-green);
+      font-weight: 700;
+    }
+
+    .big-btn {
+      background: linear-gradient(180deg, #252c38, #181d27);
+      border: 1px solid #6a5a3f;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .config-dot {
+      background: #60553e;
+      opacity: 0.65;
+    }
+
+    .config-dot.active {
+      background: var(--gold);
+      box-shadow: 0 0 6px rgba(216, 190, 122, 0.45);
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <div id="status-bar">
-      <div class="stat"><span id="floor-label">F1</span></div>
+      <div class="stat stat-floor"><span class="stat-icon style-rune">⟱</span><span id="floor-label">F1</span></div>
       <div id="hp-wrap">
-        <span style="font-size:14px">❤️</span>
+        <span class="stat-icon style-rune">♥</span>
         <div id="hp-bar-bg"><div id="hp-bar" style="width:100%"></div></div>
         <span id="hp-text">15/15</span>
       </div>
-      <div class="stat"><span id="level-label">Lv.1</span></div>
-      <div class="stat"><span id="hunger-label">🍖 100</span></div>
-      <div class="stat"><span id="arrow-label" style="color:#4a9;display:none;">➶ 0</span></div>
-      <div class="stat"><span id="gold-label">💰 0</span></div>
+      <div class="stat stat-level"><span class="stat-icon style-rune">✶</span><span id="level-label">Lv.1</span></div>
+      <div class="stat stat-hunger"><span class="stat-icon style-rune">⌬</span><span id="hunger-label">100</span></div>
+      <div class="stat stat-arrows"><span class="stat-icon style-rune">➶</span><span id="arrow-label" style="display:none;">0</span></div>
+      <div class="stat stat-gold"><span class="stat-icon style-rune">◍</span><span id="gold-label">0</span></div>
     </div>
 
     <div id="rune-bar" style="display:none;text-align:center;padding:2px 4px;font-size:14px;letter-spacing:2px;color:#c0a0ff;"></div>
@@ -1375,16 +1614,16 @@
     <div id="controls">
       <div id="action-btns">
         <div class="action-row">
-          <div class="act-btn" id="btn-pickup"><span class="icon">✋</span>Get</div>
-          <div class="act-btn" id="btn-stairs"><span class="icon">🚪</span>Stairs</div>
-          <div class="act-btn" id="btn-wait"><span class="icon">⏳</span>Wait</div>
+          <div class="act-btn" id="btn-pickup"><span class="icon style-rune">✥</span>Get</div>
+          <div class="act-btn" id="btn-stairs"><span class="icon style-rune">⟱</span>Stairs</div>
+          <div class="act-btn" id="btn-wait"><span class="icon style-rune">⌛</span>Wait</div>
         </div>
         <div class="action-row">
-          <div class="act-btn" id="btn-fire" style="display:none;border-color:#4a9;color:#4a9;"><span class="icon">🏹</span>Fire</div>
-          <div class="act-btn" id="btn-closedoor" style="display:none;border-color:#a08030;color:#a08030;"><span class="icon">🚪</span>Close</div>
-          <div class="act-btn" id="btn-minimap"><span class="icon">🗺️</span>Map</div>
-          <div class="act-btn" id="btn-quickuse"><span class="icon">🧪</span>Use</div>
-          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Config</div>
+          <div class="act-btn" id="btn-fire" style="display:none;border-color:#4a9;color:#4a9;"><span class="icon style-rune">➶</span>Fire</div>
+          <div class="act-btn" id="btn-closedoor" style="display:none;border-color:#a08030;color:#a08030;"><span class="icon style-rune">⊞</span>Close</div>
+          <div class="act-btn" id="btn-minimap"><span class="icon style-rune">◫</span>Map</div>
+          <div class="act-btn" id="btn-quickuse"><span class="icon style-rune">⚗</span>Use</div>
+          <div class="act-btn" id="btn-settings"><span class="icon style-rune">⚙</span>Config</div>
         </div>
         <div class="action-row" id="special-row" style="display:none;">
           <div class="act-btn" id="btn-special" style="flex:1;min-width:0;border-color:var(--gold);color:var(--gold);font-size:12px;letter-spacing:0.04em;font-weight:700;position:relative;overflow:hidden;"><span id="btn-special-text"></span><div id="cd-bar"></div></div>
