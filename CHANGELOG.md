@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 3, 2026 — 11:41 PM PT — Made allied companions actively defend and engage nearby threats
+- Allies now prioritize enemies threatening the player before chasing distant targets.
+- Ally pursuit uses deeper pathfinding, so summoned and hired companions navigate corridors into fights more reliably.
+- Allies regroup closer to the player when no immediate threat is present.
+
 Apr 3, 2026 — 11:25 PM PT — Added Cleric Weaken spell with room-wide defense debuff
 - Cleric special action now opens a spell menu with both `Weaken` and `Divine Heal`.
 - `Weaken` applies `Weakened` to enemies in the current room for 4 turns, reducing defense and suppressing dodge/phase avoidance.

@@ -3286,7 +3286,7 @@ function showTavern(tavern) {
         type: 'enemy', x: ax, y: ay, glyph: '💂', name: 'Hired Sword',
         hp: allyHp, maxHp: allyHp,
         attack: allyAtk, defense: 1, xp: 0,
-        ai: 'chase', alertness: 'active', isAlly: true, allyTurns: 999,
+        ai: 'chase', alertness: 2, isAlly: true, allyTurns: 999,
         statusEffects: []
       });
       tavernFeedback('A hired sword joins you!', 'good');
@@ -4040,12 +4040,12 @@ function castLight(cx, cy, row, startSlope, endSlope, radius, oct) {
 }
 
 // === A* PATHFINDING (BOUNDED) ===
-function findPath(sx, sy, gx, gy, phaseThrough, canSwim) {
+function findPath(sx, sy, gx, gy, phaseThrough, canSwim, maxExpansions = 25) {
   const open = [{ x: sx, y: sy, g: 0, h: Math.abs(gx - sx) + Math.abs(gy - sy), parent: null }];
   const closed = new Set();
   let expansions = 0;
 
-  while (open.length > 0 && expansions < 25) {
+  while (open.length > 0 && expansions < maxExpansions) {
     open.sort((a, b) => (a.g + a.h) - (b.g + b.h));
     const cur = open.shift();
     const key = cur.x + ',' + cur.y;
@@ -5317,47 +5317,62 @@ function allyAI(ally) {
   const p = state.player;
   const distToPlayer = Math.abs(ally.x - p.x) + Math.abs(ally.y - p.y);
 
-  // Find nearest enemy within a reasonable range
-  let nearestEnemy = null, nearestDist = 999;
+  // Build a hostile list and prioritize enemies threatening the player.
+  const hostiles = [];
   for (const e of state.entities) {
     if (e.type !== 'enemy' || e.isAlly || e.hp <= 0) continue;
-    const d = Math.abs(e.x - ally.x) + Math.abs(e.y - ally.y);
-    if (d < nearestDist) { nearestDist = d; nearestEnemy = e; }
+    const dAlly = Math.abs(e.x - ally.x) + Math.abs(e.y - ally.y);
+    const dPlayer = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
+    const threateningPlayer = dPlayer <= 3 || (e.alertness >= 2 && dPlayer <= 7);
+    hostiles.push({ enemy: e, dAlly, dPlayer, threateningPlayer });
   }
 
-  // Priority 1: Attack adjacent enemy
-  if (nearestEnemy && nearestDist === 1) {
-    const dmg = Math.max(1, ally.attack - nearestEnemy.defense + Math.floor(Math.random() * 3) - 1);
-    nearestEnemy.hp -= dmg;
-    addMessage(`Your ${ally.name} hits ${nearestEnemy.name} for ${dmg}!`, '');
-    if (nearestEnemy.hp <= 0) {
-      addMessage(`${nearestEnemy.name} is destroyed!`, 'good');
-      removeEntity(nearestEnemy);
-      state.enemiesKilled++;
+  // No enemies: regroup tightly around the player.
+  if (hostiles.length === 0) {
+    if (distToPlayer > 2) {
+      const step = findPath(ally.x, ally.y, p.x, p.y, false, false, 80);
+      if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
     }
     return;
   }
 
-  // Priority 2: Chase nearby enemy (within 5 tiles) if not too far from player
-  if (nearestEnemy && nearestDist <= 5 && distToPlayer <= 6) {
-    const step = findPath(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y, false);
+  hostiles.sort((a, b) => {
+    // Always attack adjacent enemies first.
+    if (a.dAlly === 1 || b.dAlly === 1) return a.dAlly - b.dAlly;
+    // Then prioritize enemies currently threatening the player.
+    if (a.threateningPlayer !== b.threateningPlayer) return a.threateningPlayer ? -1 : 1;
+    // Then prioritize the threat closest to the player, then closest to this ally.
+    if (a.dPlayer !== b.dPlayer) return a.dPlayer - b.dPlayer;
+    return a.dAlly - b.dAlly;
+  });
+
+  const targetInfo = hostiles[0];
+  const target = targetInfo.enemy;
+
+  // Priority 1: Attack adjacent enemy.
+  if (targetInfo.dAlly === 1) {
+    attackEntity(ally, target);
+    return;
+  }
+
+  // Priority 2: Pursue aggressively when danger is nearby.
+  const shouldPursue =
+    targetInfo.threateningPlayer ||
+    targetInfo.dPlayer <= 5 ||
+    (targetInfo.dAlly <= 8 && distToPlayer <= 6);
+
+  if (shouldPursue) {
+    const step = findPath(ally.x, ally.y, target.x, target.y, false, false, 80);
     if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
     return;
   }
 
-  // Priority 3: Move toward player if too far away (>3 tiles)
-  if (distToPlayer > 3) {
-    const step = findPath(ally.x, ally.y, p.x, p.y, false);
+  // Priority 3: Regroup near the player when no immediate threat.
+  if (distToPlayer > 2) {
+    const step = findPath(ally.x, ally.y, p.x, p.y, false, false, 80);
     if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
     return;
   }
-
-  // Priority 4: Chase any enemy if close to player
-  if (nearestEnemy) {
-    const step = findPath(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y, false);
-    if (step) tryMoveEnemy(ally, ally.x + step.x, ally.y + step.y);
-  }
-  // Otherwise: idle near the player
 }
 
 function tryMoveEnemy(enemy, nx, ny) {
