@@ -27,71 +27,6 @@ let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoE
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.8 — waterfall, mound, icy path, fire path, enchanted wall, chasm'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
-const UI_ICON_SVGS = {
-  weapon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 16 8-8"/><path d="m9.5 6.5 8 8"/><path d="m6 18 2.2-2.2"/><path d="m15.8 18.5 2.2-2.2"/><path d="M5 19.5 3.5 21"/><path d="M17 5l2-2"/></svg>',
-  ranged: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18c5-1 8-4 9-9"/><path d="m12 7 5 5"/><path d="M15 4h5v5"/><path d="M4 20c5.5-.5 9-4 10-10"/></svg>',
-  armor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2 18 6v5.3c0 4-2.6 7-6 8.5-3.4-1.5-6-4.5-6-8.5V6z"/><path d="M9 9.2h6"/><path d="M9.5 12.5h5"/></svg>',
-  ring: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14.5" r="4.3"/><path d="m10 8 2-3 2 3"/><path d="M8.8 9.5h6.4"/></svg>',
-  potion: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 4h5.6"/><path d="M10 4h4v2.5l3 4.2-1.5 7a2.2 2.2 0 0 1-2.2 1.8h-2.6a2.2 2.2 0 0 1-2.2-1.8l-1.5-7 3-4.2z"/><path d="M9.4 12c1 .8 1.8 1 2.6 1 .8 0 1.6-.2 2.6-1"/></svg>',
-  food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18c0-4.4 2.7-8 6-8s6 3.6 6 8"/><path d="M9 7.5c1.5 1.1 4.5 1.1 6 0"/><path d="M8 6V4h8v2"/></svg>',
-  gold: '<svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="8.5" rx="5.3" ry="2.3"/><path d="M6.7 11.2c1 .8 3 1.3 5.3 1.3s4.3-.5 5.3-1.3v2c-1 .8-3 1.3-5.3 1.3s-4.3-.5-5.3-1.3z"/><path d="M6.7 14.2c1 .8 3 1.3 5.3 1.3s4.3-.5 5.3-1.3v2c-1 .8-3 1.3-5.3 1.3s-4.3-.5-5.3-1.3z"/></svg>',
-  arrows: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m6 18 12-12"/><path d="M13 6h5v5"/><path d="m5.5 21-2.5-2.5"/><path d="m8.5 21-2.5-2.5"/></svg>',
-  thrown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m7 17 10-10"/><path d="m11 7 6 6"/><path d="m5.5 18.5 2.2-2.2"/><path d="m15 5 3.5-3.5"/></svg>',
-  scroll: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5h7a3 3 0 0 1 0 6H9a3 3 0 1 0 0 6h7"/><path d="M8 5a3 3 0 0 0 0 6"/><path d="M16 11a3 3 0 0 0 0 6"/></svg>',
-  instrument: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.5a2.5 2.5 0 1 1-1.8-2.4"/><path d="M14 6.5 19 5v8.5a2.5 2.5 0 1 1-1.8-2.4"/></svg>',
-  default: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 14.4 9.2 20 10l-4 3.9.9 5.6L12 17l-4.9 2.5.9-5.6L4 10l5.6-.8z"/></svg>',
-};
-
-function getUiIconMarkup(name, cls = 'slot-icon') {
-  const svg = UI_ICON_SVGS[name] || UI_ICON_SVGS.default;
-  return `<span class="${cls}" aria-hidden="true">${svg}</span>`;
-}
-
-function getItemIconKey(item, slotName = '') {
-  if (slotName === 'weapon') return 'weapon';
-  if (slotName === 'ranged') return 'ranged';
-  if (slotName === 'armor') return 'armor';
-  if (slotName === 'ring') return 'ring';
-  if (!item) return 'default';
-  if (item.itemType === 'weapon') return 'weapon';
-  if (item.itemType === 'ranged') return 'ranged';
-  if (item.itemType === 'armor') return 'armor';
-  if (item.itemType === 'ring') return 'ring';
-  if (item.itemType === 'food') return 'food';
-  if (item.itemType === 'gold') return 'gold';
-  if (item.itemType === 'thrown') return 'thrown';
-  if (item.itemType === 'special_arrow' || item.itemType === 'arrows') return 'arrows';
-  if (item.itemType === 'instrument') return 'instrument';
-  if (item.itemType === 'scroll') return 'scroll';
-  if ((item.glyph || '').includes('🧪')) return 'potion';
-  return 'default';
-}
-
-function getItemIconTone(item, slotName = '') {
-  if (slotName === 'weapon') return '#d8e0f0';
-  if (slotName === 'ranged') return '#84f1c5';
-  if (slotName === 'armor') return '#f2e0bf';
-  if (slotName === 'ring') return '#c7f1ff';
-  if (!item) return '#a5a5b5';
-  if (item.itemType === 'gold') return '#ffd66a';
-  if (item.itemType === 'food') return '#e2b170';
-  if (item.itemType === 'thrown' || item.itemType === 'special_arrow' || item.itemType === 'arrows') return '#84f1c5';
-  if (item.itemType === 'scroll') return '#f1deba';
-  if (item.itemType === 'instrument') return '#d8b8ff';
-  if ((item.glyph || '').includes('🧪')) return item.color || '#7be0d2';
-  return '#f5e3b0';
-}
-
-function renderSlotCore(item, options = {}) {
-  const { slotName = '', fallbackGlyph = '' } = options;
-  const iconKey = getItemIconKey(item, slotName);
-  const tone = getItemIconTone(item, slotName);
-  const useGlyph = iconKey === 'default' && (item?.glyph || fallbackGlyph);
-  const content = useGlyph
-    ? `<span class="slot-glyph" aria-hidden="true">${item?.glyph || fallbackGlyph}</span>`
-    : getUiIconMarkup(iconKey);
-  return `<div class="slot-core" style="color:${tone};">${content}</div>`;
-}
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -900,391 +835,6 @@ function setupCanvas() {
   canvas.height = VIEW_ROWS * tileSize;
   canvas.style.width = canvas.width + 'px';
   canvas.style.height = canvas.height + 'px';
-}
-
-function clampValue(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function hexToRgb(hex) {
-  if (typeof hex !== 'string' || hex[0] !== '#') return null;
-  const clean = hex.length === 4
-    ? hex.slice(1).split('').map(ch => ch + ch).join('')
-    : hex.slice(1);
-  if (clean.length !== 6) return null;
-  const num = parseInt(clean, 16);
-  if (Number.isNaN(num)) return null;
-  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
-}
-
-function shadeHex(hex, amount) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return hex;
-  const mix = amount >= 0 ? 255 : 0;
-  const weight = Math.abs(amount);
-  const r = Math.round(rgb.r + (mix - rgb.r) * weight);
-  const g = Math.round(rgb.g + (mix - rgb.g) * weight);
-  const b = Math.round(rgb.b + (mix - rgb.b) * weight);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function alphaHex(hex, alpha) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return `rgba(255,255,255,${alpha})`;
-  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-}
-
-function tileNoise(x, y, seed = 0) {
-  const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
-  return n - Math.floor(n);
-}
-
-function drawCenteredGlyph(ctx, glyph, cx, cy, size, color, family = 'monospace') {
-  ctx.font = `${Math.floor(size)}px ${family}`;
-  ctx.fillStyle = color;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(glyph, cx, cy);
-}
-
-function drawFloorSkin(ctx, left, top, ts, baseColor, mx, my, corridor = false) {
-  const base = shadeHex(baseColor, -0.55);
-  ctx.fillStyle = base;
-  ctx.fillRect(left, top, ts, ts);
-  const lineColor = alphaHex(shadeHex(baseColor, corridor ? -0.18 : -0.08), 0.45);
-  const slabA = 0.18 + tileNoise(mx, my, 1) * 0.12;
-  const slabB = 0.50 + tileNoise(mx, my, 2) * 0.1;
-  ctx.fillStyle = alphaHex(shadeHex(baseColor, corridor ? -0.08 : 0.02), 0.92);
-  ctx.fillRect(left + ts * 0.1, top + ts * slabA, ts * 0.36, ts * 0.24);
-  ctx.fillRect(left + ts * 0.52, top + ts * slabB, ts * 0.28, ts * 0.18);
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = Math.max(1, ts * 0.04);
-  ctx.beginPath();
-  ctx.moveTo(left + ts * 0.08, top + ts * 0.42);
-  ctx.lineTo(left + ts * 0.92, top + ts * 0.36);
-  ctx.moveTo(left + ts * 0.34, top + ts * 0.08);
-  ctx.lineTo(left + ts * 0.28, top + ts * 0.92);
-  ctx.stroke();
-  ctx.fillStyle = alphaHex(shadeHex(baseColor, 0.28), 0.18);
-  ctx.fillRect(left + 1, top + 1, ts - 2, Math.max(1, ts * 0.08));
-}
-
-function drawWallSkin(ctx, left, top, ts, baseColor, mx, my, sealed = false) {
-  const base = sealed ? '#281313' : shadeHex(baseColor, -0.38);
-  ctx.fillStyle = base;
-  ctx.fillRect(left, top, ts, ts);
-  const seam = sealed ? 'rgba(70,28,28,0.6)' : alphaHex(shadeHex(baseColor, -0.72), 0.7);
-  const rows = 3;
-  const brickH = ts / rows;
-  for (let row = 0; row < rows; row++) {
-    const offset = row % 2 === 0 ? 0 : ts * 0.16;
-    for (let col = -1; col < 3; col++) {
-      const x = left + offset + col * ts * 0.38;
-      const y = top + row * brickH;
-      const v = tileNoise(mx + col, my + row, 6);
-      ctx.fillStyle = sealed
-        ? `rgba(${70 + Math.floor(v * 22)}, ${24 + Math.floor(v * 12)}, ${24 + Math.floor(v * 12)}, 0.92)`
-        : alphaHex(shadeHex(baseColor, -0.15 + v * 0.22), 0.95);
-      ctx.fillRect(x, y + 1, ts * 0.38, brickH - 2);
-      ctx.strokeStyle = seam;
-      ctx.lineWidth = Math.max(1, ts * 0.035);
-      ctx.strokeRect(x, y + 1, ts * 0.38, brickH - 2);
-    }
-  }
-  ctx.fillStyle = alphaHex(shadeHex(baseColor, 0.2), 0.16);
-  ctx.fillRect(left + 1, top + 1, ts - 2, Math.max(1, ts * 0.09));
-}
-
-function drawWaterSkin(ctx, left, top, ts, color) {
-  const grad = ctx.createLinearGradient(left, top, left, top + ts);
-  grad.addColorStop(0, shadeHex(color, 0.12));
-  grad.addColorStop(1, shadeHex(color, -0.45));
-  ctx.fillStyle = grad;
-  ctx.fillRect(left, top, ts, ts);
-  ctx.strokeStyle = alphaHex('#b8ecff', 0.24);
-  ctx.lineWidth = Math.max(1, ts * 0.04);
-  for (let i = 0; i < 3; i++) {
-    const y = top + ts * (0.26 + i * 0.22);
-    ctx.beginPath();
-    ctx.moveTo(left + ts * 0.12, y);
-    ctx.quadraticCurveTo(left + ts * 0.35, y - ts * 0.06, left + ts * 0.58, y);
-    ctx.quadraticCurveTo(left + ts * 0.8, y + ts * 0.06, left + ts * 0.92, y - ts * 0.02);
-    ctx.stroke();
-  }
-}
-
-function drawChasmSkin(ctx, left, top, ts, mx, my) {
-  const grad = ctx.createRadialGradient(left + ts / 2, top + ts / 2, ts * 0.08, left + ts / 2, top + ts / 2, ts * 0.75);
-  grad.addColorStop(0, 'rgba(18, 12, 24, 0.55)');
-  grad.addColorStop(1, 'rgba(0, 0, 0, 0.98)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(left, top, ts, ts);
-  ctx.fillStyle = alphaHex('#40384a', 0.22);
-  for (let i = 0; i < 3; i++) {
-    const x = left + ts * (0.18 + tileNoise(mx, my, i) * 0.64);
-    const y = top + ts * (0.18 + tileNoise(mx, my, i + 8) * 0.64);
-    ctx.fillRect(x, y, Math.max(1, ts * 0.05), Math.max(1, ts * 0.05));
-  }
-}
-
-function drawGoldPileSprite(ctx, cx, cy, ts) {
-  ctx.fillStyle = '#7a5214';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + ts * 0.18, ts * 0.19, ts * 0.08, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#f5d46c';
-  const coins = [
-    [-0.16, 0.12, 0.16, 0.09],
-    [0.02, 0.02, 0.18, 0.1],
-    [0.18, 0.12, 0.15, 0.08],
-    [-0.02, 0.18, 0.17, 0.09],
-  ];
-  for (const [ox, oy, rx, ry] of coins) {
-    ctx.beginPath();
-    ctx.ellipse(cx + ts * ox, cy + ts * oy, ts * rx, ts * ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(80, 48, 10, 0.45)';
-  ctx.lineWidth = Math.max(1, ts * 0.03);
-  ctx.stroke();
-}
-
-function drawHelmetSprite(ctx, cx, cy, ts) {
-  ctx.fillStyle = '#68776e';
-  ctx.beginPath();
-  ctx.moveTo(cx - ts * 0.22, cy + ts * 0.06);
-  ctx.quadraticCurveTo(cx - ts * 0.16, cy - ts * 0.24, cx, cy - ts * 0.26);
-  ctx.quadraticCurveTo(cx + ts * 0.16, cy - ts * 0.24, cx + ts * 0.22, cy + ts * 0.06);
-  ctx.lineTo(cx + ts * 0.16, cy + ts * 0.22);
-  ctx.lineTo(cx - ts * 0.16, cy + ts * 0.22);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.beginPath();
-  ctx.ellipse(cx - ts * 0.08, cy - ts * 0.07, ts * 0.09, ts * 0.05, -0.35, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#31413b';
-  ctx.lineWidth = Math.max(1, ts * 0.04);
-  ctx.beginPath();
-  ctx.moveTo(cx - ts * 0.15, cy + ts * 0.06);
-  ctx.lineTo(cx + ts * 0.15, cy + ts * 0.06);
-  ctx.moveTo(cx, cy - ts * 0.2);
-  ctx.lineTo(cx, cy + ts * 0.06);
-  ctx.stroke();
-}
-
-function drawRatSprite(ctx, cx, cy, ts, color = '#9c8a74') {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + ts * 0.08, ts * 0.2, ts * 0.12, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + ts * 0.18, cy + ts * 0.02, ts * 0.1, ts * 0.08, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + ts * 0.21, cy - ts * 0.07, ts * 0.04, ts * 0.04, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - ts * 0.18, cy + ts * 0.14);
-  ctx.quadraticCurveTo(cx - ts * 0.34, cy + ts * 0.12, cx - ts * 0.38, cy + ts * 0.02);
-  ctx.strokeStyle = '#c98986';
-  ctx.lineWidth = Math.max(1, ts * 0.035);
-  ctx.stroke();
-  ctx.fillStyle = '#0f0f10';
-  ctx.fillRect(cx + ts * 0.23, cy + ts * 0.01, Math.max(1, ts * 0.04), Math.max(1, ts * 0.04));
-}
-
-function drawEnemySprite(ctx, enemy, cx, cy, ts) {
-  const name = (enemy.name || '').toLowerCase();
-  if (name.includes('rat')) {
-    drawRatSprite(ctx, cx, cy, ts, enemy.isAlly ? '#8db18a' : '#9c8a74');
-    return;
-  }
-  const friendly = enemy.isAlly;
-  ctx.fillStyle = friendly ? '#8db18a' : '#98826d';
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - ts * 0.22);
-  ctx.lineTo(cx + ts * 0.18, cy - ts * 0.04);
-  ctx.lineTo(cx + ts * 0.18, cy + ts * 0.18);
-  ctx.lineTo(cx - ts * 0.18, cy + ts * 0.18);
-  ctx.lineTo(cx - ts * 0.18, cy - ts * 0.04);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = friendly ? '#304c30' : '#1c1715';
-  ctx.fillRect(cx - ts * 0.09, cy - ts * 0.03, Math.max(1, ts * 0.05), Math.max(1, ts * 0.05));
-  ctx.fillRect(cx + ts * 0.04, cy - ts * 0.03, Math.max(1, ts * 0.05), Math.max(1, ts * 0.05));
-}
-
-function drawTilePresentation(ctx, tile, left, top, ts, options) {
-  const { vis, alpha, biome, mx, my } = options;
-  const cx = left + ts / 2;
-  const cy = top + ts / 2;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-
-  if (tile === T.SPECIAL && vis) {
-    ctx.fillStyle = 'rgba(128, 80, 255, 0.15)';
-    ctx.fillRect(left, top, ts, ts);
-  }
-  if (tile === T.TELEPORT_VIS && vis) {
-    ctx.fillStyle = 'rgba(64, 224, 208, 0.12)';
-    ctx.fillRect(left, top, ts, ts);
-  }
-  if (tile === T.WATER && vis) {
-    ctx.fillStyle = 'rgba(30, 110, 210, 0.22)';
-    ctx.fillRect(left, top, ts, ts);
-  }
-
-  switch (tile) {
-    case T.WALL: {
-      const mKey = my * MAP_W + mx;
-      const isMasonWall = state.masonWalls && state.masonWalls.has(mKey);
-      let color = vis ? biome.wallVis : biome.wallDim;
-      if (isMasonWall) {
-        const mHp = state.masonWalls.get(mKey) || 3;
-        color = vis ? (mHp >= 3 ? '#c87838' : mHp === 2 ? '#a85e28' : '#804020') : '#5a3018';
-      }
-      drawWallSkin(ctx, left, top, ts, color, mx, my, false);
-      break;
-    }
-    case T.FLOOR:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      break;
-    case T.CORRIDOR:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.corrVis : biome.corrDim, mx, my, true);
-      break;
-    case T.STAIRS_DOWN:
-      drawFloorSkin(ctx, left, top, ts, biome.floorVis, mx, my, false);
-      drawCenteredGlyph(ctx, '▼', cx, cy, ts * 0.64, '#80ff80');
-      break;
-    case T.STAIRS_UP:
-      drawFloorSkin(ctx, left, top, ts, biome.floorVis, mx, my, false);
-      drawCenteredGlyph(ctx, '▲', cx, cy, ts * 0.56, '#60c0ff');
-      break;
-    case T.DOOR_CLOSED:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      drawCenteredGlyph(ctx, '+', cx, cy, ts * 0.74, (state.rogueClosedDoors && state.rogueClosedDoors.has(my * MAP_W + mx)) ? '#40a0a0' : '#b98b39');
-      break;
-    case T.DOOR_OPEN:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      drawCenteredGlyph(ctx, '/', cx, cy, ts * 0.74, '#9b7440');
-      break;
-    case T.DOOR_ONEWAY:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      drawCenteredGlyph(ctx, '⊳', cx, cy, ts * 0.7, '#c06030');
-      break;
-    case T.DOOR_SEALED:
-      drawWallSkin(ctx, left, top, ts, '#4a2020', mx, my, true);
-      break;
-    case T.WALL_SECRET: {
-      const sKey = my * MAP_W + mx;
-      const cracked = state.secretBashes && state.secretBashes[sKey];
-      drawWallSkin(ctx, left, top, ts, cracked ? '#8a6030' : (vis ? biome.wallVis : biome.wallDim), mx, my, false);
-      if (cracked) drawCenteredGlyph(ctx, '+', cx, cy, ts * 0.6, '#d0a35b');
-      break;
-    }
-    case T.DOOR_LOCKED:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      drawCenteredGlyph(ctx, '⊞', cx, cy, ts * 0.7, '#c08030');
-      break;
-    case T.SPECIAL:
-      drawFloorSkin(ctx, left, top, ts, vis ? '#8060c0' : '#302040', mx, my, false);
-      break;
-    case T.TELEPORT:
-    case T.TELEPORT_VIS:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      if (tile === T.TELEPORT_VIS || state.player.teleportSight || hasRingEffect('detection')) {
-        ctx.strokeStyle = '#40e0d0';
-        ctx.lineWidth = Math.max(1, ts * 0.05);
-        ctx.beginPath();
-        ctx.arc(cx, cy, ts * 0.2, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      break;
-    case T.RUBBLE:
-      drawFloorSkin(ctx, left, top, ts, '#7a5731', mx, my, false);
-      ctx.fillStyle = alphaHex('#d6b56a', 0.5);
-      ctx.fillRect(left + ts * 0.16, top + ts * 0.56, ts * 0.16, ts * 0.14);
-      ctx.fillRect(left + ts * 0.44, top + ts * 0.4, ts * 0.24, ts * 0.18);
-      ctx.fillRect(left + ts * 0.66, top + ts * 0.58, ts * 0.14, ts * 0.12);
-      break;
-    case T.WATER:
-      drawWaterSkin(ctx, left, top, ts, vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'));
-      break;
-    case T.BRIDGE:
-      drawChasmSkin(ctx, left, top, ts, mx, my);
-      ctx.fillStyle = '#8a6a3a';
-      ctx.fillRect(left + ts * 0.18, top + ts * 0.26, ts * 0.64, ts * 0.48);
-      ctx.strokeStyle = '#4a3018';
-      ctx.lineWidth = Math.max(1, ts * 0.04);
-      for (let i = 0; i < 3; i++) {
-        const x = left + ts * (0.28 + i * 0.16);
-        ctx.beginPath();
-        ctx.moveTo(x, top + ts * 0.28);
-        ctx.lineTo(x, top + ts * 0.72);
-        ctx.stroke();
-      }
-      break;
-    case T.STEPPING_STONE:
-      drawWaterSkin(ctx, left, top, ts, '#24445a');
-      ctx.fillStyle = '#6a8a8a';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ts * 0.22, ts * 0.14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case T.STALAGMITE:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-      ctx.fillStyle = '#5a6a70';
-      ctx.beginPath();
-      ctx.moveTo(cx, top + ts * 0.22);
-      ctx.lineTo(left + ts * 0.32, top + ts * 0.8);
-      ctx.lineTo(left + ts * 0.68, top + ts * 0.8);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case T.WATERFALL:
-      drawWaterSkin(ctx, left, top, ts, '#4978a8');
-      ctx.strokeStyle = alphaHex('#d6f5ff', 0.3);
-      ctx.lineWidth = Math.max(1, ts * 0.05);
-      ctx.beginPath();
-      ctx.moveTo(left + ts * 0.32, top + ts * 0.1);
-      ctx.lineTo(left + ts * 0.32, top + ts * 0.9);
-      ctx.moveTo(left + ts * 0.52, top + ts * 0.06);
-      ctx.lineTo(left + ts * 0.52, top + ts * 0.94);
-      ctx.stroke();
-      break;
-    case T.MOUND:
-      drawFloorSkin(ctx, left, top, ts, '#7f5a2f', mx, my, false);
-      ctx.fillStyle = '#8a6030';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + ts * 0.1, ts * 0.24, ts * 0.15, 0, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case T.ICY_PATH:
-      drawFloorSkin(ctx, left, top, ts, '#6f95ab', mx, my, false);
-      ctx.fillStyle = 'rgba(220,245,255,0.18)';
-      ctx.fillRect(left + ts * 0.1, top + ts * 0.1, ts * 0.8, ts * 0.8);
-      break;
-    case T.FIRE_PATH:
-      drawFloorSkin(ctx, left, top, ts, '#6b2b18', mx, my, false);
-      ctx.strokeStyle = 'rgba(255,160,80,0.34)';
-      ctx.lineWidth = Math.max(1, ts * 0.045);
-      ctx.beginPath();
-      ctx.moveTo(left + ts * 0.24, top + ts * 0.22);
-      ctx.lineTo(left + ts * 0.5, top + ts * 0.5);
-      ctx.lineTo(left + ts * 0.34, top + ts * 0.78);
-      ctx.moveTo(left + ts * 0.62, top + ts * 0.18);
-      ctx.lineTo(left + ts * 0.76, top + ts * 0.72);
-      ctx.stroke();
-      break;
-    case T.CHASM:
-      drawChasmSkin(ctx, left, top, ts, mx, my);
-      break;
-    default:
-      drawFloorSkin(ctx, left, top, ts, vis ? biome.floorVis : biome.floorDim, mx, my, false);
-  }
-
-  ctx.restore();
 }
 
 // === CHARACTER NAME GENERATION ===
@@ -9029,8 +8579,8 @@ function render() {
 
       if (!exp) continue; // Unexplored — leave black
 
-      const left = vx * ts;
-      const top = vy * ts;
+      const px = vx * ts + ts / 2;
+      const py = vy * ts + ts / 2;
 
       // Distance-based brightness
       const dist = Math.sqrt((mx - p.x) ** 2 + (my - p.y) ** 2);
@@ -9041,7 +8591,161 @@ function render() {
         alpha = 0.65; // Explored but not visible — clearly readable, slightly dimmed
       }
 
-      drawTilePresentation(ctx, tile, left, top, ts, { vis, alpha, biome, mx, my });
+      ctx.globalAlpha = alpha;
+
+      // Draw tile background for special tiles
+      if (tile === T.SPECIAL && vis) {
+        ctx.fillStyle = 'rgba(128, 80, 255, 0.15)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
+      if (tile === T.TELEPORT_VIS && vis) {
+        ctx.fillStyle = 'rgba(64, 224, 208, 0.12)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
+      if (tile === T.WATER && vis) {
+        ctx.fillStyle = 'rgba(30, 110, 210, 0.30)';
+        ctx.fillRect(vx * ts, vy * ts, ts, ts);
+      }
+
+      // Draw tile glyph
+      ctx.font = `${fontSize}px monospace`;
+      let tileGlyph, tileColor;
+      switch (tile) {
+        case T.WALL: {
+          const mKey = my * MAP_W + mx;
+          const isMasonWall = state.masonWalls && state.masonWalls.has(mKey);
+          tileGlyph = '▓';
+          if (isMasonWall) {
+            const mHp = state.masonWalls.get(mKey) || 3;
+            // Orange-brown for fresh walls, darkens as damaged
+            tileColor = vis ? (mHp >= 3 ? '#c87838' : mHp === 2 ? '#a85e28' : '#804020') : '#5a3018';
+          } else {
+            tileColor = vis ? biome.wallVis : biome.wallDim;
+          }
+          break;
+        }
+        case T.FLOOR:
+          tileGlyph = '·';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
+          break;
+        case T.CORRIDOR:
+          tileGlyph = '·';
+          tileColor = vis ? biome.corrVis : biome.corrDim;
+          break;
+        case T.STAIRS_DOWN:
+          tileGlyph = '▼';
+          tileColor = '#80ff80';
+          break;
+        case T.STAIRS_UP:
+          tileGlyph = '·';
+          tileColor = vis ? biome.floorVis : biome.floorDim;
+          break;
+        case T.DOOR_CLOSED:
+          tileGlyph = '+';
+          tileColor = (state.rogueClosedDoors && state.rogueClosedDoors.has(my * MAP_W + mx)) ? '#40a0a0' : '#8B6914';
+          break;
+        case T.DOOR_OPEN:
+          tileGlyph = '/';
+          tileColor = '#6B4914';
+          break;
+        case T.DOOR_ONEWAY:
+          tileGlyph = '⊳';
+          tileColor = '#c06030';
+          break;
+        case T.DOOR_SEALED:
+          tileGlyph = '▓';
+          tileColor = '#4a2020';
+          break;
+        case T.WALL_SECRET: {
+          // Looks like a normal wall; Rogue class can detect with shimmer
+          const sKey = my * MAP_W + mx;
+          const cracked = state.secretBashes && state.secretBashes[sKey];
+          tileGlyph = cracked ? '▒' : '▓';
+          tileColor = cracked ? '#c09040' : (vis ? biome.wallVis : biome.wallDim);
+          if (!cracked && vis && canDetectSecretWalls() && Math.random() < 0.30) {
+            tileColor = '#9090a0';
+          }
+          break;
+        }
+        case T.DOOR_LOCKED:
+          tileGlyph = '⊞';
+          tileColor = vis ? '#c08030' : '#604018';
+          break;
+        case T.SPECIAL:
+          tileGlyph = '·';
+          tileColor = vis ? '#8060c0' : '#302040';
+          break;
+        case T.TELEPORT: {
+          // Ninja/Rogue/Escape Artist can sense hidden teleports, as can Ring of Detection
+          const hasDetectRing = hasRingEffect('detection');
+          if (state.player.teleportSight || hasDetectRing) {
+            tileGlyph = '◊';
+            tileColor = vis ? '#40e0d0' : '#1a6060';
+          } else {
+            // Invisible teleport — looks like normal floor until triggered
+            tileGlyph = '·';
+            tileColor = vis ? biome.floorVis : biome.floorDim;
+          }
+          break;
+        }
+        case T.TELEPORT_VIS:
+          // Revealed teleport — pulsing cyan
+          tileGlyph = '◊';
+          tileColor = vis ? '#40e0d0' : '#1a6060';
+          break;
+        case T.RUBBLE:
+          // Avalanche debris — warm brown, impassable
+          tileGlyph = '▒';
+          tileColor = vis ? '#9a6535' : '#3a2515';
+          break;
+        case T.WATER:
+          tileGlyph = '≈';
+          tileColor = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828');
+          break;
+        case T.BRIDGE:
+          tileGlyph = '═';
+          tileColor = vis ? '#8a6a3a' : '#4a3a1a';
+          break;
+        case T.STEPPING_STONE:
+          tileGlyph = '◦';
+          tileColor = vis ? '#6a8a8a' : '#3a4a4a';
+          break;
+        case T.STALAGMITE:
+          tileGlyph = '▲';
+          tileColor = vis ? '#5a6a70' : '#2a3238';
+          break;
+        case T.WATERFALL:
+          tileGlyph = '≋';
+          tileColor = vis ? '#a0d8ff' : '#304860';
+          break;
+        case T.MOUND:
+          tileGlyph = '^';
+          tileColor = vis ? '#8a6030' : '#3a2810';
+          break;
+        case T.ICY_PATH:
+          tileGlyph = '·';
+          tileColor = vis ? '#a0e8f8' : '#304858';
+          break;
+        case T.FIRE_PATH:
+          tileGlyph = '▒';
+          tileColor = vis ? '#e05010' : '#501808';
+          break;
+        case T.CHASM:
+          tileGlyph = ' ';
+          tileColor = '#000';
+          // Draw a dark void background when visible
+          if (vis) {
+            ctx.fillStyle = 'rgba(5,0,15,0.85)';
+            ctx.fillRect(vx * ts, vy * ts, ts, ts);
+          }
+          break;
+        default:
+          tileGlyph = ' ';
+          tileColor = '#000';
+      }
+
+      ctx.fillStyle = tileColor;
+      ctx.fillText(tileGlyph, px, py);
     }
   }
 
@@ -9203,21 +8907,12 @@ function render() {
       continue;
     }
 
-    if (e.item?.itemType === 'gold') {
-      drawGoldPileSprite(ctx, sx, sy, ts);
-    } else if (e.item?.itemType === 'arrows') {
-      ctx.strokeStyle = '#ffe066';
-      ctx.lineWidth = Math.max(1, ts * 0.05);
-      ctx.beginPath();
-      ctx.moveTo(sx - ts * 0.14, sy + ts * 0.16);
-      ctx.lineTo(sx + ts * 0.12, sy - ts * 0.12);
-      ctx.lineTo(sx + ts * 0.12, sy + ts * 0.04);
-      ctx.moveTo(sx + ts * 0.12, sy - ts * 0.12);
-      ctx.lineTo(sx - ts * 0.02, sy - ts * 0.12);
-      ctx.stroke();
+    ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+    if (e.item?.itemType === 'arrows') {
+      ctx.fillStyle = '#ffe066'; // bright amber so arrows stand out on the floor
+      ctx.fillText(e.glyph, sx, sy);
+      ctx.fillStyle = '#ffffff';
     } else {
-      ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-      ctx.fillStyle = '#f6f1de';
       ctx.fillText(e.glyph, sx, sy);
     }
   }
@@ -9398,11 +9093,8 @@ function render() {
       if (dist > 1) {
         const sx = (e.x - camX) * ts + ts / 2;
         const sy = (e.y - camY) * ts + ts / 2;
-        ctx.fillStyle = '#8f7343';
-        ctx.fillRect(sx - ts * 0.18, sy - ts * 0.12, ts * 0.36, ts * 0.26);
-        ctx.strokeStyle = '#d5b56a';
-        ctx.lineWidth = Math.max(1, ts * 0.04);
-        ctx.strokeRect(sx - ts * 0.18, sy - ts * 0.12, ts * 0.36, ts * 0.26);
+        ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+        ctx.fillText('📦', sx, sy);
         continue;
       }
     }
@@ -9411,7 +9103,8 @@ function render() {
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
 
-    drawEnemySprite(ctx, e, sx, sy, ts);
+    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+    ctx.fillText(e.glyph, sx, sy);
 
     if (settings.showIntents) {
       const intent = getEnemyIntent(e);
@@ -9469,17 +9162,25 @@ function render() {
   ctx.fillRect((p.x - camX) * ts, (p.y - camY) * ts, ts, ts);
   // Redraw the tile underneath the player (so the floor/stairs/etc. are still visible around the player)
   const playerTile = getTile(p.x, p.y);
-  drawTilePresentation(ctx, playerTile, (p.x - camX) * ts, (p.y - camY) * ts, ts, {
-    vis: true,
-    alpha: 1,
-    biome,
-    mx: p.x,
-    my: p.y,
-  });
+  let playerTileGlyph, playerTileColor;
+  switch (playerTile) {
+    case T.STAIRS_DOWN: playerTileGlyph = '▼'; playerTileColor = '#80ff80'; break;
+    case T.STAIRS_UP:   playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+    case T.DOOR_OPEN:   playerTileGlyph = '\\'; playerTileColor = '#c0a060'; break;
+    case T.FLOOR:       playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+    case T.CORRIDOR:    playerTileGlyph = '·'; playerTileColor = biome.corrVis; break;
+    default:            playerTileGlyph = '·'; playerTileColor = biome.floorVis; break;
+  }
+  ctx.globalAlpha = 1.0;
+  ctx.font = `${Math.floor(ts * 0.7)}px monospace`;
+  ctx.fillStyle = playerTileColor;
+  ctx.fillText(playerTileGlyph, playerSX, playerSY);
+  ctx.font = `${Math.floor(ts * 0.75)}px serif`;
+  ctx.fillStyle = '#ffffff';
   if (hasStatusEffect(p, 'invisibility')) {
     ctx.globalAlpha = 0.4;
   }
-  drawHelmetSprite(ctx, playerSX, playerSY, ts);
+  ctx.fillText(p.glyph, playerSX, playerSY);
   ctx.globalAlpha = 1.0;
 
   // Danger border — red glow when low HP or low food
@@ -9546,19 +9247,18 @@ function updateUI() {
   const p = state.player;
 
   // Status bar
-  $('floor-label').textContent = `${state.floor}`;
-  $('level-label').textContent = `Lvl. ${p.level}`;
-  $('gold-label').textContent = `${p.gold}`;
-  $('hunger-label').textContent = `${p.hunger}`;
+  $('floor-label').textContent = `⬊${state.floor}`;
+  $('level-label').textContent = `Lv.${p.level}`;
+  $('gold-label').textContent = `💰 ${p.gold}`;
+  $('hunger-label').textContent = `🍖 ${p.hunger}`;
   // Arrow counter — show if player has a ranged weapon or any arrows
   const arrowEl = $('arrow-label');
-  const arrowStat = $('arrow-stat');
   if (arrowEl) {
     if (p.equipped.ranged || p.arrows > 0) {
-      if (arrowStat) arrowStat.style.display = '';
-      arrowEl.textContent = `${p.arrows}`;
+      arrowEl.style.display = '';
+      arrowEl.textContent = `➶ ${p.arrows}`;
     } else {
-      if (arrowStat) arrowStat.style.display = 'none';
+      arrowEl.style.display = 'none';
     }
   }
   // Fire button — show when ranged weapon equipped
@@ -9637,46 +9337,46 @@ function updateUI() {
     };
     if (state.throwMode || state.fortifyMode) {
       spRow.style.display = '';
-      setBtn('CANCEL TARGET', true, '#ff4444');
+      setBtn('❌ CANCEL TARGETING', true, '#ff4444');
       setBar(100, '#ff4444');
     } else if (cls === 'berserker') {
       spRow.style.display = '';
       if (p.enrageActive) {
-        setBtn(`ENRAGE ${p.engageTurnsLeft}T`, true, '#ff6020');
+        setBtn(`🔥 FURY ${p.engageTurnsLeft}t`, true, '#ff6020');
         setBar((p.engageTurnsLeft / 5) * 100, '#ff6020');
       } else if (p.enrageFloorUsed) {
-        setBtn('ENRAGE SPENT', false);
+        setBtn('⚡ ENRAGE ✓', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('ENRAGE', true);
+        setBtn('⚡ ENRAGE', true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'ranger') {
       spRow.style.display = '';
       const aimMax = p.quickDraw ? 5 : 8;
       if (p.aimedShotCooldown > 0) {
-        setBtn(`AIMED SHOT ${p.aimedShotCooldown}T`, false);
+        setBtn(`🏹 AIM ${p.aimedShotCooldown}t`, false);
         setBar(((aimMax - p.aimedShotCooldown) / aimMax) * 100, '#4a9');
       } else {
-        setBtn('AIMED SHOT', true);
+        setBtn('🏹 AIMED SHOT', true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'cleric') {
       spRow.style.display = '';
       if (p.divineHealUsed) {
-        setBtn('HEAL NEXT FLOOR', false);
+        setBtn('✝ HEAL ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('DIVINE HEAL', true);
+        setBtn('✝ DIVINE HEAL', true);
         setBar(100, 'var(--gold)');
       }
     } else if (cls === 'darkwizard') {
       spRow.style.display = '';
       if (p.acidBoltCooldown > 0) {
-        setBtn(`ACID BOLT ${p.acidBoltCooldown}T`, false);
+        setBtn(`☣️ BOLT ${p.acidBoltCooldown}t`, false);
         setBar(((7 - p.acidBoltCooldown) / 7) * 100, '#44cc44');
       } else {
-        setBtn('ACID BOLT', true, '#44cc44');
+        setBtn('☣️ ACID BOLT', true, '#44cc44');
         setBar(100, '#44cc44');
       }
     } else if (cls === 'escapeartist') {
@@ -9684,32 +9384,32 @@ function updateUI() {
       const maxEscape = getMasteryBonuses(cls).extraEscape ? 2 : 1;
       const usedEscape = Math.max(p.escapeRouteUsesFloor || 0, p.stairsTeleportFloorUsed ? 1 : 0);
       if (usedEscape >= maxEscape) {
-        setBtn('ESCAPE NEXT FLOOR', false);
+        setBtn('💨 ESCAPE ✓ (next floor)', false);
         setBar(0, 'var(--text-dim)');
       } else {
-        setBtn('ESCAPE', true, '#80ffff');
+        setBtn('💨 ESCAPE', true, '#80ffff');
         setBar(((maxEscape - usedEscape) / maxEscape) * 100, '#80ffff');
       }
     } else if (cls === 'conjurer') {
       spRow.style.display = '';
       const maxCD = getMasteryBonuses(cls).fastIllusion ? 6 : 8;
       if (p.illusionCooldown <= 0 && p.arcaneDartCooldown <= 0) {
-        setBtn('SPELLS READY', true, '#cc44ff');
+        setBtn('✨ SPELLS', true, '#cc44ff');
         setBar(100, '#cc44ff');
       } else if (p.illusionCooldown <= 0 || p.arcaneDartCooldown <= 0) {
-        setBtn(`SPELLS ${Math.max(p.illusionCooldown, p.arcaneDartCooldown)}T`, true, '#cc44ff');
+        setBtn(`✨ SPELLS ${Math.max(p.illusionCooldown, p.arcaneDartCooldown)}t`, true, '#cc44ff');
         setBar(100, '#cc44ff');
       } else {
-        setBtn(`SPELLS ${Math.min(p.illusionCooldown, p.arcaneDartCooldown)}T`, false, '#cc44ff');
+        setBtn(`✨ SPELLS ${Math.min(p.illusionCooldown, p.arcaneDartCooldown)}t`, false, '#cc44ff');
         setBar(((maxCD - p.illusionCooldown) / maxCD) * 100, '#cc44ff');
       }
     } else if (cls === 'monk') {
       spRow.style.display = '';
       if (p.meditateCooldown > 0) {
-        setBtn(`MEDITATE ${p.meditateCooldown}T`, false, '#60c0a0');
+        setBtn(`🧘 MEDITATE ${p.meditateCooldown}t`, false, '#60c0a0');
         setBar(((20 - p.meditateCooldown) / 20) * 100, '#60c0a0');
       } else {
-        setBtn('MEDITATE', true, '#60c0a0');
+        setBtn('🧘 MEDITATE', true, '#60c0a0');
         setBar(100, '#60c0a0');
       }
     } else {
@@ -9831,9 +9531,10 @@ function renderInventory() {
     // Ranged weapon slot: show arrow count overlay
     if (eq.slot === 'ranged' && eq.item) {
       const arrowStr = `${state.player.arrows}`;
-      slot.innerHTML = renderSlotCore(eq.item, { slotName: eq.slot }) + `<span class="inv-count" style="color:#84f1c5;">${arrowStr}</span>`;
+      slot.style.position = 'relative';
+      slot.innerHTML = `${eq.item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#4a9;font-weight:bold;">${arrowStr}</span>`;
     } else {
-      slot.innerHTML = renderSlotCore(eq.item, { slotName: eq.slot, fallbackGlyph: eq.label });
+      slot.textContent = eq.item ? eq.item.glyph : eq.label;
     }
     if (eq.item) {
       makeTappable(
@@ -9857,18 +9558,18 @@ function renderInventory() {
       const countLabel = item.ammo != null ? item.ammo : '';
       const isLoaded = item.itemType === 'special_arrow' && state.player.loadedSpecialArrow === item;
       const countColor = isLoaded ? '#ff8020' : '#60ffb0';
-      slot.innerHTML = renderSlotCore(item) + `<span class="inv-count" style="color:${countColor};">${countLabel}</span>`;
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:${countColor};font-weight:bold;">${countLabel}</span>`;
       if (isLoaded) slot.style.boxShadow = '0 0 6px rgba(255,128,32,0.5)';
     } else if (item.itemType === 'food' && item.stack && item.stack > 1) {
-      slot.innerHTML = renderSlotCore(item) + `<span class="inv-count">×${item.stack}</span>`;
+      slot.innerHTML = `${item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#f0c040;font-weight:bold;">×${item.stack}</span>`;
     } else if ((item.count || 1) > 1) {
-      slot.innerHTML = renderSlotCore(item);
+      slot.textContent = item.glyph;
       const badge = document.createElement('span');
       badge.className = 'inv-count';
       badge.textContent = item.count;
       slot.appendChild(badge);
     } else {
-      slot.innerHTML = renderSlotCore(item);
+      slot.textContent = item.glyph;
     }
     const idx = i;
     makeTappable(
@@ -9883,7 +9584,7 @@ function renderInventory() {
   for (let i = state.player.inventory.length; i < MAX_INVENTORY; i++) {
     const slot = document.createElement('div');
     slot.className = 'inv-slot empty';
-    slot.innerHTML = renderSlotCore(null);
+    slot.textContent = '';
     bar.appendChild(slot);
   }
 }
@@ -10795,27 +10496,7 @@ function showSettings() {
   const noGame = '—';
 
   function statRow(label, val) {
-    const statIconMap = {
-      Level: 'default',
-      XP: 'scroll',
-      HP: 'potion',
-      Hunger: 'food',
-      Attack: 'weapon',
-      Defense: 'armor',
-      Floor: 'default',
-      Gold: 'gold',
-      Score: 'default',
-      Enemies: 'weapon',
-      Items: 'default',
-      Turns: 'scroll',
-      Weapon: 'weapon',
-      Ranged: 'ranged',
-      Armor: 'armor',
-      Ring: 'ring',
-    };
-    const iconKey = statIconMap[label];
-    const iconMarkup = iconKey ? getUiIconMarkup(iconKey, 'slot-icon') : '';
-    return `<div class="stat-row"><span class="stat-label" style="display:flex;align-items:center;gap:6px;">${iconMarkup}<span>${label}</span></span><span class="stat-val">${val}</span></div>`;
+    return `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
   }
 
   $('char-name').textContent = state
@@ -10993,10 +10674,10 @@ function showSettings() {
   const r = p?.equipped.ring;
   const rng = p?.equipped.ranged;
   $('equip-stats').innerHTML = [
-    statRow('Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
-    statRow('Ranged', rng ? `${rng.name} (${rng.damage} dmg, ${rng.range} rng)` : 'None'),
-    statRow('Armor', a ? `${a.name} (+${a.defense})` : 'None'),
-    statRow('Ring', r ? r.name : 'None'),
+    statRow('⚔️ Weapon', w ? `${w.name} (+${w.attack})` : 'None'),
+    statRow('🏹 Ranged', rng ? `${rng.name} (${rng.damage} dmg, ${rng.range} rng)` : 'None'),
+    statRow('🛡️ Armor', a ? `${a.name} (+${a.defense})` : 'None'),
+    statRow('💍 Ring', r ? r.name : 'None'),
   ].join('');
 
   // Glyph Runes panel

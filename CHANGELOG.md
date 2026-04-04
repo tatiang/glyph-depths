@@ -1,9 +1,8 @@
 # Changelog
 
-Apr 3, 2026 — 10:16 PM PT — Unified the HUD and dungeon art into the config-menu visual style
-- Rebuilt the live HUD, action buttons, and inventory slots with a darker rune-tech frame, pale-gold labels, and cleaner icon treatment.
-- Skinned dungeon walls and floors into textured stone and flagstone tiles while keeping the underlying ASCII map structure intact.
-- Replaced on-map player/enemy presentation with simple readable sprites, including a helmet-style hero and a clearer rat/gold pickup look.
+Apr 3, 2026 — 10:28 PM PT — Restored the previous maze and HUD visuals after review
+- Reverted the rejected dark-fantasy UI/art overhaul.
+- Restored the prior maze readability and the more distinctive original on-map presentation.
 
 Apr 3, 2026 — 8:44 PM PT — 5072265 — Consolidated the character roster into 9 distinct classes
 - Finished the merged-class refactor for Rogue, Conjurer, Monk, Beastmaster, Dark Wizard, and Escape Artist.
