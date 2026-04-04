@@ -1,5 +1,8 @@
 # Changelog
 
+Apr 3, 2026 — 10:58 PM PT — Fixed Cleric Identify scrolls so they correctly reveal carried consumables
+- Class starter scrolls are now created with `makeScroll(...)`, ensuring `effectId` is present and Identify effects execute properly.
+
 Apr 3, 2026 — 10:40 PM PT — Fixed enchanted walls rendering as black floor squares
 - Added explicit `T.ENCHANTED_WALL` draw handling in the main map and minimap tile renderers so enchanted walls display in purple.
 

@@ -1313,7 +1313,7 @@ function applyClassStartingItems(classId) {
     const identifyScroll = scrollNames.find(n => n.id === 'identify');
     if (identifyScroll) {
       scrollIdentified[identifyScroll.id] = true;
-      p.inventory.push({ ...identifyScroll, glyph: '📜', itemType: 'scroll', identified: true });
+      p.inventory.push(makeScroll(identifyScroll));
     }
   } else if (classId === 'darkwizard') {
     p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
@@ -1327,8 +1327,7 @@ function applyClassStartingItems(classId) {
       if (!usedIds.has(s.id)) {
         usedIds.add(s.id);
         scrollIdentified[s.id] = true;
-        // The wizard identified them, but we must make sure all scrolls start identified? Wait, no.
-        p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
+        p.inventory.push(makeScroll(s));
       }
     }
   } else if (classId === 'escapeartist') {
@@ -1343,7 +1342,7 @@ function applyClassStartingItems(classId) {
     for (const sn of scrollNames) scrollIdentified[sn.id] = true;
     const mapScroll = scrollNames.find(n => n.id === 'mapping');
     if (mapScroll) {
-      p.inventory.push({ ...mapScroll, glyph: '📜', itemType: 'scroll', identified: true });
+      p.inventory.push(makeScroll(mapScroll));
     }
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { p.inventory.push(makePotion(healPotion)); }
