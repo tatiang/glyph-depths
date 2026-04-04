@@ -1,5 +1,8 @@
 # Changelog
 
+Apr 3, 2026 — 10:40 PM PT — Fixed enchanted walls rendering as black floor squares
+- Added explicit `T.ENCHANTED_WALL` draw handling in the main map and minimap tile renderers so enchanted walls display in purple.
+
 Apr 3, 2026 — 10:28 PM PT — Restored the previous maze and HUD visuals after review
 - Reverted the rejected dark-fantasy UI/art overhaul.
 - Restored the prior maze readability and the more distinctive original on-map presentation.

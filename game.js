@@ -8624,6 +8624,10 @@ function render() {
           }
           break;
         }
+        case T.ENCHANTED_WALL:
+          tileGlyph = '▓';
+          tileColor = vis ? '#c060ff' : '#4a1f62';
+          break;
         case T.FLOOR:
           tileGlyph = '·';
           tileColor = vis ? biome.floorVis : biome.floorDim;
@@ -11151,6 +11155,7 @@ function startMinimapPulse() {
           case T.DOOR_ONEWAY: ctx.fillStyle = '#c06030'; break;
           case T.DOOR_SEALED: ctx.fillStyle = '#6a2020'; break;
           case T.WALL_SECRET: ctx.fillStyle = vis ? biome.wallVis : biome.wallDim; break;
+          case T.ENCHANTED_WALL: ctx.fillStyle = vis ? '#9a52d0' : '#4a1f62'; break;
           case T.DOOR_LOCKED: ctx.fillStyle = '#ffc040'; break;
           case T.SPECIAL: ctx.fillStyle = '#8060c0'; break;
           case T.WATER: ctx.fillStyle = vis ? (biome.waterVis || '#1a3050') : (biome.waterDim || '#0c1828'); break;
@@ -11234,6 +11239,9 @@ function renderMinimap() {
           break;
         case T.DOOR_SEALED:
           ctx.fillStyle = '#6a2020';
+          break;
+        case T.ENCHANTED_WALL:
+          ctx.fillStyle = vis ? '#9a52d0' : '#4a1f62';
           break;
         case T.WALL_SECRET: {
           // Render as normal wall on minimap, unless detect ring is equipped
