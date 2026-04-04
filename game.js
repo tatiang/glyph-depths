@@ -43,6 +43,7 @@ const BADGE_DEFS = [
   { id: 'boss_rush', name: 'Boss Rush', icon: '☠️', desc: 'Defeat all 3 mini-bosses in one run', cat: 'combat' },
   // Exploration & Survival
   { id: 'deep_diver', name: 'Deep Diver', icon: '🚪', desc: 'Reach floor 8', cat: 'explore' },
+  { id: 'maze_master', name: 'Maze Master', icon: '🌀', desc: 'Reach floor 13', cat: 'explore' },
   { id: 'citadel_bound', name: 'Citadel Bound', icon: '🏰', desc: 'Reach floor 15', cat: 'explore' },
   { id: 'ascendant', name: 'Ascendant', icon: '🌟', desc: 'Win the game', cat: 'explore' },
   { id: 'cartographer', name: 'Cartographer', icon: '🗺️', desc: 'Reveal 90%+ of a floor', cat: 'explore' },
@@ -53,22 +54,15 @@ const BADGE_DEFS = [
   { id: 'hoarder', name: 'Hoarder', icon: '💰', desc: 'Finish a run with 200+ gold', cat: 'explore' },
   { id: 'alchemist', name: 'Alchemist', icon: '⚗️', desc: 'Identify all 6 potion types in one run', cat: 'explore' },
   // Class Mastery
-  { id: 'win_adventurer', name: "Adventurer's Journey", icon: '🤺', desc: 'Win as Adventurer', cat: 'class' },
   { id: 'win_berserker', name: "Berserker's Fury", icon: '💪', desc: 'Win as Berserker', cat: 'class' },
   { id: 'win_rogue', name: "Shadow's Edge", icon: '🥷', desc: 'Win as Rogue', cat: 'class' },
-  { id: 'win_wizard', name: 'Arcane Mastery', icon: '🧙', desc: 'Win as Wizard', cat: 'class' },
   { id: 'win_ranger', name: "Ranger's Mark", icon: '🏹', desc: 'Win as Ranger', cat: 'class' },
   { id: 'win_cleric', name: 'Divine Crusade', icon: '⛪', desc: 'Win as Cleric', cat: 'class' },
-  { id: 'win_bard', name: "Bard's Ballad", icon: '🎵', desc: 'Win as Bard', cat: 'class' },
-  { id: 'win_artificer', name: "Artificer's Opus", icon: '⚒️', desc: 'Win as Artificer', cat: 'class' },
-  { id: 'win_ninja', name: "Ninja's Shadow", icon: '🌟', desc: 'Win as Ninja', cat: 'class' },
   { id: 'win_darkwizard', name: "Necromancer's Throne", icon: '💀', desc: 'Win as Dark Wizard', cat: 'class' },
-  { id: 'win_mason', name: "Mason's Bastion", icon: '🧱', desc: 'Win as Brick Mason', cat: 'class' },
-  { id: 'win_daredevil', name: "Daredevil's Gamble", icon: '🤸', desc: 'Win as Daredevil', cat: 'class' },
   { id: 'win_escapeartist', name: "Escape Artist's Exit", icon: '💨', desc: 'Win as Escape Artist', cat: 'class' },
   { id: 'win_conjurer', name: "Conjurer's Phantom", icon: '🎭', desc: 'Win as Conjurer', cat: 'class' },
-  { id: 'win_barterer', name: "Barterer's Fortune", icon: '🪙', desc: 'Win as Barterer', cat: 'class' },
-  { id: 'win_sage', name: "Sage's Codex", icon: '📖', desc: 'Win as Sage', cat: 'class' },
+  { id: 'win_monk', name: "Monk's Enlightenment", icon: '📿', desc: 'Win as Monk', cat: 'class' },
+  { id: 'win_beastmaster', name: "Beastmaster's Call", icon: '🐺', desc: 'Win as Beastmaster', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -87,6 +81,8 @@ function loadBadges() {
   try {
     badgeState = JSON.parse(localStorage.getItem('glyphDepths_badges') || '{}');
     badgeCounts = JSON.parse(localStorage.getItem('glyphDepths_badgeCounts') || '{}');
+    const validBadgeIds = new Set(BADGE_DEFS.map(b => b.id));
+    badgeState = Object.fromEntries(Object.entries(badgeState).filter(([id]) => validBadgeIds.has(id)));
   } catch { badgeState = {}; badgeCounts = {}; }
 }
 
@@ -340,22 +336,15 @@ let masteryState = {};
 const MASTERY_PREFIX = 'glyphDepths_mastery';
 
 const MASTERY_DEFS = [
-  { id: 'adv_mastery',  trigger: 'win_adventurer', name: 'Adventurer Mastery',  desc: 'All Adventurers start with +1 DEF',       classReq: 'adventurer', bonus: { defense: 1 } },
   { id: 'ber_mastery',  trigger: 'win_berserker',  name: 'Berserker Mastery',   desc: 'All Berserkers start with +3 max HP',     classReq: 'berserker',  bonus: { maxHp: 3 } },
   { id: 'rog_mastery',  trigger: 'win_rogue',      name: 'Rogue Mastery',       desc: 'All Rogues start with +5% crit chance',   classReq: 'rogue',      bonus: { critChance: 0.05 } },
-  { id: 'wiz_mastery',  trigger: 'win_wizard',     name: 'Wizard Mastery',      desc: 'All Wizards start with +2 ATK',           classReq: 'wizard',     bonus: { attack: 2 } },
   { id: 'ran_mastery',  trigger: 'win_ranger',     name: 'Ranger Mastery',      desc: 'Rangers start with Hunting Bow',          classReq: 'ranger',     bonus: { upgradeBow: true } },
   { id: 'cle_mastery',  trigger: 'win_cleric',     name: 'Cleric Mastery',      desc: 'All Clerics start with +3 max HP',        classReq: 'cleric',     bonus: { maxHp: 3 } },
-  { id: 'brd_mastery',  trigger: 'win_bard',       name: 'Bard Mastery',        desc: 'All Bards start with +5% charm chance',   classReq: 'bard',       bonus: { charmBonus: 0.05 } },
-  { id: 'art_mastery',  trigger: 'win_artificer',  name: 'Artificer Mastery',   desc: 'All Artificers start with +2 max HP',     classReq: 'artificer',  bonus: { maxHp: 2 } },
-  { id: 'nj_mastery',   trigger: 'win_ninja',      name: 'Ninja Mastery',       desc: 'All Ninjas start with +1 ATK',            classReq: 'ninja',      bonus: { attack: 1 } },
   { id: 'dw_mastery',   trigger: 'win_darkwizard', name: 'Dark Wizard Mastery', desc: 'All Dark Wizards start at 12% necromancy', classReq: 'darkwizard', bonus: { necroBonus: 0.04 } },
-  { id: 'bm_mastery',   trigger: 'win_mason',      name: 'Mason Mastery',       desc: 'All Brick Masons start with +1 DEF',      classReq: 'mason',      bonus: { defense: 1 } },
-  { id: 'dd_mastery',   trigger: 'win_daredevil',  name: 'Daredevil Mastery',   desc: 'All Daredevils start Flip at 3-turn CD',  classReq: 'daredevil',  bonus: { fastFlip: true } },
   { id: 'ea_mastery',   trigger: 'win_escapeartist', name: 'Escape Artist Mastery', desc: 'All Escape Artists get 2 Escape Route uses/floor', classReq: 'escapeartist', bonus: { extraEscape: true } },
   { id: 'conj_mastery', trigger: 'win_conjurer',   name: 'Conjurer Mastery',    desc: 'All Conjurers start with Illusion cooldown 6 instead of 8', classReq: 'conjurer', bonus: { fastIllusion: true } },
-  { id: 'bart_mastery', trigger: 'win_barterer',   name: 'Barterer Mastery',    desc: 'All Barterers start with +5 gold',         classReq: 'barterer',   bonus: { startGold: 5 } },
-  { id: 'sage_mastery', trigger: 'win_sage', name: 'Sage Mastery', desc: 'All Sages start with +3 max HP', classReq: 'sage', bonus: { maxHp: 3 } },
+  { id: 'monk_mastery', trigger: 'win_monk',       name: 'Monk Mastery',        desc: 'All Monks gain +1 DEF',                   classReq: 'monk',       bonus: { defense: 1 } },
+  { id: 'bm_mastery',   trigger: 'win_beastmaster',name: 'Beastmaster Mastery', desc: 'All Beastmasters start with +3 max HP',   classReq: 'beastmaster',bonus: { maxHp: 3 } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -364,6 +353,8 @@ const MASTERY_DEFS = [
 function loadMastery() {
   try {
     masteryState = JSON.parse(localStorage.getItem(MASTERY_PREFIX) || '{}');
+    const validMasteryIds = new Set(MASTERY_DEFS.map(m => m.id));
+    masteryState = Object.fromEntries(Object.entries(masteryState).filter(([id]) => id.startsWith('_') || validMasteryIds.has(id)));
   } catch { masteryState = {}; }
 }
 
@@ -540,6 +531,7 @@ function checkBadgesOnKill(enemy) {
 function checkBadgesOnFloorChange() {
   const floor = state.floor;
   if (floor >= 8) unlockBadge('deep_diver');
+  if (floor >= 13) unlockBadge('maze_master');
   if (floor >= 15) unlockBadge('citadel_bound');
 
   // Untouchable — check previous floor (no damage taken)
@@ -598,28 +590,16 @@ function checkBadgesOnDeath() {
 // === CLASS DEFINITIONS ===
 const CLASS_DEFS = [
   {
-    id: 'adventurer',
-    name: 'Adventurer',
-    icon: '🧝',
-    flavor: 'A steady hand and keen instincts. Heals slowly over time.',
-    hp: 15, attack: 2, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '♻ Rapid Regeneration · 🧭 Pathfinder',
-    startItems: 'Leather Vest · Healing Potion',
-    statBadges: [{ label: '15 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Regen', cls: 'pos' }, { label: 'Pathfinder', cls: 'pos' }]
-  },
-  {
     id: 'berserker',
     name: 'Berserker',
     icon: '🪖',
     flavor: 'Hits hard but burns through food. Rage sharpens at the brink.',
     hp: 22, attack: 4, defense: 0,
-    hungerRate: 2, dodgeBonus: 0, critChance: 0.10,
-    passive: '⚡ Rage: +3 ATK below 40% HP',
+    hungerRate: 1.5, dodgeBonus: 0, critChance: 0.10,
+    passive: '⚡ Rage: +3 ATK below 40% HP · 🍖 1.5× hunger',
     startItems: 'Short Sword · 2× Strength Potions',
     statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+4 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '2× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
+    passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
   },
   {
     id: 'rogue',
@@ -628,22 +608,10 @@ const CLASS_DEFS = [
     flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
     hp: 10, attack: 3, defense: 1,
     hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
-    passive: '👁 15% Dodge · 20% Crit',
+    passive: '👁 15% Dodge · 20% Crit · 🦶 Roundhouse Kick (Lv 5)',
     startItems: '6 Throwing Daggers · Invis Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '👁 Stealth', cls: 'pos' }]
-  },
-  {
-    id: 'wizard',
-    name: 'Wizard',
-    icon: '🧙',
-    flavor: 'Frail but fearsome. Magic doubles in your learned hands.',
-    hp: 11, attack: 1, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '✨ Arcane Affinity: scrolls ×2',
-    startItems: 'Arcane Staff · 3 identified scrolls',
-    statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: '✨ AoE Blast', cls: 'pos' }]
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }]
   },
   {
     id: 'ranger',
@@ -653,7 +621,7 @@ const CLASS_DEFS = [
     hp: 13, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.05, critChance: 0.15,
     passive: '👁 +2 FOV · Forager',
-    startItems: 'Hunting Bow · 4 Throwing Daggers · Ration',
+    startItems: 'Short Bow · 50 Arrows · 4 Throwing Daggers · Ration',
     statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
     passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }]
   },
@@ -670,110 +638,166 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Divine Heal', cls: 'pos' }]
   },
   {
-    id: 'bard',
-    name: 'Bard',
-    icon: '🎵',
-    flavor: 'Charming melodies soothe foes and rally allies.',
-    hp: 12, attack: 1, defense: 1,
-    hungerRate: 1, dodgeBonus: 0.05, critChance: 0.10,
-    passive: '🎶 Charm: 25% pacify on hit · Song of Rest',
-    startItems: 'Rusty Dagger · Healing Potion',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '25% Charm', cls: 'pos' }, { label: '5% Dodge', cls: 'pos' }, { label: '🎵 Song/floor', cls: 'pos' }]
-  },
-  {
-    id: 'artificer',
-    name: 'Artificer',
-    icon: '⚒️',
-    flavor: 'Master of metal and machinery. Upgrades gear on the fly.',
-    hp: 14, attack: 2, defense: 1,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🔧 Tinker: upgrade weapon/armor once per floor (15g) · Exclusive pre-forged item at merchants',
-    startItems: 'Short Sword · Leather Vest',
-    statBadges: [{ label: '14 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Forge 1/floor', cls: 'pos' }, { label: '⚒️ Forged Loot', cls: 'pos' }]
-  },
-  {
-    id: 'ninja', name: 'Ninja', icon: '🌟',
-    flavor: 'Silent, precise. Strikes two foes in a single turn.',
-    hp: 11, attack: 3, defense: 0,
-    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
-    passive: '🗡️ Backstab: hits opposite tile · 🌟 Star Throw',
-    startItems: 'Rusty Dagger · Throwing Stars · Healing Potion',
-    statBadges: [{ label: '11 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Backstab', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '🌟 Stars ×4', cls: 'pos' }]
-  },
-  {
-    id: 'darkwizard', name: 'Dark Wizard', icon: '🧟',
-    flavor: 'Death is not the end. The fallen serve the Dark Wizard.',
+    id: 'darkwizard', name: 'Dark Wizard', icon: '💀',
+    flavor: 'Frail but fearsome. Magic doubles in your hands, and the dead serve you.',
     hp: 10, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '💀 Necromance: chance to raise slain foes',
-    startItems: 'Arcane Staff · Healing Potion · 2 Scrolls',
+    passive: '✨ Arcane Affinity: scrolls ×2 · 💀 Necromance',
+    startItems: 'Arcane Staff · 3 identified scrolls · Healing Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Necromance', cls: 'pos' }, { label: '💀 Acid Bolt', cls: 'pos' }]
-  },
-  {
-    id: 'mason', name: 'Brick Mason', icon: '🧱',
-    flavor: 'Walls are not obstacles — they are options.',
-    hp: 16, attack: 2, defense: 3,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🚪 Can close doors · 🧱 Fortify ×2/floor: build or demolish walls',
-    startItems: 'Mace · Chain Mail',
-    statBadges: [{ label: '16 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+3 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Close Doors', cls: 'pos' }, { label: '🧱 Fortify ×2', cls: 'pos' }]
-  },
-  {
-    id: 'daredevil', name: 'Daredevil', icon: '🤸',
-    flavor: 'Acrobatic and reckless. Ricochets through enemy ranks.',
-    hp: 12, attack: 3, defense: 0,
-    hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
-    passive: '💥 Ricochet: chain damage to nearby foes',
-    startItems: 'Short Sword · Leather Vest · Healing Potion',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: '+3 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '🤸 Flip', cls: 'pos' }]
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
   },
   {
     id: 'escapeartist', name: 'Escape Artist', icon: '💨',
-    flavor: 'Leave nothing behind but ice and regrets.',
+    flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
     hp: 12, attack: 2, defense: 1,
-    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.10,
-    passive: '❄️ Ice Traps on retreat · 💨 Escape Route',
+    hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
+    passive: '❄️ Ice Traps on retreat · 💥 Ricochet · 💨 Escape Route',
     startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Ice Traps', cls: 'pos' }, { label: '15% Dodge', cls: 'pos' }, { label: '💨 Escape/floor', cls: 'pos' }]
+    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }]
   },
   {
     id: 'conjurer', name: 'Conjurer', icon: '🎭',
-    flavor: 'Weaves phantoms from thin air. Enemies chase shadows while you survive.',
+    flavor: 'Weaves phantoms from thin air, armed with all the answers.',
     hp: 12, attack: 2, defense: 0,
     hungerRate: 1, dodgeBonus: 0.10, critChance: 0.10,
-    passive: '🎭 Summon Illusion [8t CD] · Conjure Ration for −5 HP',
-    startItems: 'Rusty Dagger · Healing Potion',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '10% Dodge', cls: 'pos' }, { label: '🎭 Illusion (8t CD)', cls: 'pos' }, { label: 'Ration −5 HP', cls: 'pos' }]
-  },
-  {
-    id: 'barterer', name: 'Barterer', icon: '🪙',
-    flavor: 'Everything has a price — and you always pay less than everyone else.',
-    hp: 13, attack: 2, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🪙 25% discount everywhere · Extra gold drops · Merchants always visible on map',
-    startItems: '20 Gold · Healing Potion',
-    statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '25% Discount', cls: 'pos' }, { label: 'Extra Gold', cls: 'pos' }, { label: '🪙 Merchant Radar', cls: 'pos' }]
-  },
-  {
-    id: 'sage', name: 'Sage', icon: '📖',
-    flavor: 'Knowledge is the sharpest weapon. All items start identified.',
-    hp: 10, attack: 1, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.05,
-    passive: '📖 All items identified · +5 XP from lore · Scroll mastery',
+    passive: '📖 All items identified · ✨ Arcane Dart · 🎭 Illusion',
     startItems: 'Scroll of Mapping · Healing Potion',
-    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: 'neg' }],
-    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: 'Lore XP', cls: 'pos' }, { label: 'Scroll+', cls: 'pos' }]
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }]
+  },
+  {
+    id: 'monk', name: 'Monk', icon: '📿',
+    flavor: 'Requires no steel. Fists, focus, and inner stillness replace all gear.',
+    hp: 12, attack: 0, defense: 0,
+    hungerRate: 1, dodgeBonus: 0.10, critChance: 0.15,
+    passive: '🥋 ATK/DEF scale with level · 🧘 Meditate · 🌊 Walk on Water',
+    startItems: 'Healing Potion · Enchanted Lute',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
+    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
+  },
+  {
+    id: 'beastmaster', name: 'Beastmaster', icon: '🐺',
+    flavor: 'Never hunts alone. A loyal hound fights continuously by your side.',
+    hp: 12, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🐺 Permanent Hound Companion · ♻ Rapid Regeneration · 🐾 Beast Charm',
+    startItems: 'Leather Vest · Healing Potion',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
   }
 ];
+
+const LEGACY_CLASS_REMAP = {
+  adventurer: 'beastmaster',
+  wizard: 'darkwizard',
+  sage: 'conjurer',
+  ninja: 'rogue',
+  daredevil: 'escapeartist',
+  bard: 'monk'
+};
+
+const VALID_CLASS_IDS = new Set(CLASS_DEFS.map(cls => cls.id));
+
+function normalizeClassId(classId) {
+  const mapped = LEGACY_CLASS_REMAP[classId] || classId;
+  return VALID_CLASS_IDS.has(mapped) ? mapped : 'berserker';
+}
+
+function getClassDef(classId) {
+  const normalizedId = normalizeClassId(classId);
+  return CLASS_DEFS.find(c => c.id === normalizedId) || CLASS_DEFS[0];
+}
+
+function isMonkRestrictedItem(item) {
+  return item && ['weapon', 'armor', 'ranged'].includes(item.itemType);
+}
+
+function normalizeLoadedPlayer(player) {
+  if (!player) return;
+  player.classId = normalizeClassId(player.classId);
+  if (!Array.isArray(player.inventory)) player.inventory = [];
+  if (!Array.isArray(player.statusEffects)) player.statusEffects = [];
+  if (!player.equipped) player.equipped = { weapon: null, armor: null, ring: null, ranged: null };
+  player.infiniteArrows = false;
+  player.songMastery = player.classId === 'monk' ? true : !!player.songMastery;
+  player.meditateCooldown = Math.max(0, player.meditateCooldown || 0);
+  player.arcaneDartCooldown = Math.max(0, player.arcaneDartCooldown || 0);
+  player.roundhouseKick = player.classId === 'rogue';
+  player.charmChance = player.classId === 'monk' ? (player.charmChance || 0.25) : (player.classId === 'beastmaster' ? (player.charmChance || 0) : 0);
+  player.hasRegen = player.classId === 'beastmaster' ? true : !!player.hasRegen;
+  player.arcaneAffinity = player.classId === 'darkwizard';
+  player.sageClass = player.classId === 'conjurer';
+  player.scrollMastery = player.classId === 'conjurer';
+  player.teleportSight = ['rogue', 'escapeartist'].includes(player.classId);
+  player.manaShield = false;
+  player.fireWard = false;
+  player.fireWardCooldown = 0;
+  player.masterSmith = false;
+  player.tinkerFloorUsed = false;
+  player.bartererDiscount = false;
+  player.bartererFreeRefresh = false;
+  player.bartererAppraiseUsed = false;
+  player.silentKill = false;
+  player.rampart = false;
+  player.recklessCharge = false;
+  player.sharpDealer = false;
+  player.encore = false;
+  player.backstab = false;
+  if (!player.classState) {
+    player.classState = { haggledThisFloor: false, appraisedThisFloor: false, floorKills: 0, iceTraps: [], fortifiedThisFloor: false, illusionEntity: null };
+  }
+  if (player.classId === 'ranger' && (!Number.isFinite(player.arrows) || player.arrows <= 0)) {
+    player.arrows = 50;
+  }
+  if (player.classId === 'monk') {
+    player.equipped.weapon = null;
+    player.equipped.armor = null;
+    player.equipped.ranged = null;
+  }
+}
+
+function ensureMonkInstrument(player) {
+  if (!player || player.classId !== 'monk') return;
+  if (!Array.isArray(player.inventory)) player.inventory = [];
+  const hasInstrument = player.inventory.some(it => it.itemType === 'instrument');
+  if (!hasInstrument) {
+    player.inventory.push({ name: 'Enchanted Lute', glyph: '🎸', itemType: 'instrument', desc: 'Play songs to create magical effects.', indestructible: true, value: 30 });
+  }
+}
+
+function ensureBeastmasterHound() {
+  if (!state || !state.player || state.player.classId !== 'beastmaster') return;
+  const hasHound = state.entities.some(e => e.type === 'enemy' && e.isAlly && e.beastmasterHound);
+  if (hasHound) return;
+  const hound = createEnemy({
+    name: 'Hound',
+    glyph: '🐺',
+    hp: Math.floor(15 + state.floor * 2),
+    attack: Math.floor(3 + state.floor * 0.5),
+    defense: Math.floor(1 + state.floor * 0.2),
+    ai: 'ally',
+    xp: 0,
+    special: null,
+    detect: 8
+  }, state.player.x, state.player.y);
+  hound.isAlly = true;
+  hound.ai = 'ally';
+  hound.allyTurns = 99999;
+  hound.beastmasterHound = true;
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+  for (const [dx, dy] of dirs) {
+    const nx = state.player.x + dx;
+    const ny = state.player.y + dy;
+    if (isWalkable(nx, ny) && !entityAt(nx, ny)) {
+      hound.x = nx;
+      hound.y = ny;
+      break;
+    }
+  }
+  state.entities.push(hound);
+}
 
 
 // Potion/scroll name randomization for the run
@@ -940,21 +964,34 @@ function showClassSelect() {
     grid.className = 'class-page-grid';
 
     for (const cls of pageCls) {
+      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster') && !hasBadge('maze_master');
+      
       const card = document.createElement('div');
-      card.className = 'class-card';
-      card.innerHTML = `
-        <div class="class-icon">${cls.icon}</div>
-        <div class="class-name">${cls.name}</div>
-        <div class="class-flavor">${cls.flavor}</div>
-        <div class="class-badge-row">
-          ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
-        </div>
-        <div class="class-badge-row" style="margin-top:3px;">
-          ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
-        </div>
-        <div class="class-start-items">${cls.startItems}</div>
-      `;
+      card.className = 'class-card' + (isLocked ? ' locked-class' : '');
+      
+      if (isLocked) {
+        card.innerHTML = `
+          <div class="class-icon" style="filter: grayscale(1); opacity: 0.5;">🔒</div>
+          <div class="class-name" style="color: #666;">Locked Class</div>
+          <div class="class-flavor" style="color: #555;">Reach maze floor 13 to unlock.</div>
+        `;
+      } else {
+        card.innerHTML = `
+          <div class="class-icon">${cls.icon}</div>
+          <div class="class-name">${cls.name}</div>
+          <div class="class-flavor">${cls.flavor}</div>
+          <div class="class-badge-row">
+            ${cls.statBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+          </div>
+          <div class="class-badge-row" style="margin-top:3px;">
+            ${cls.passBadges.map(b => `<span class="class-stat ${b.cls}">${b.label}</span>`).join('')}
+          </div>
+          <div class="class-start-items">${cls.startItems}</div>
+        `;
+      }
+      
       const selectFn = () => {
+        if (isLocked) return;
         selectedClass = cls.id;
         allCards.forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
@@ -1063,7 +1100,8 @@ function showClassSelect() {
 }
 
 // === NEW RUN ===
-function newRun(classId = 'adventurer') {
+function newRun(classId = 'berserker') {
+  classId = normalizeClassId(classId);
   setupCanvas();
   randomizePotionScrollNames();
   state = {
@@ -1096,7 +1134,7 @@ function newRun(classId = 'adventurer') {
     fortifyCandidates: null,
     masonWalls: new Map(),
     floorData: Array.from({length: MAX_FLOOR + 1}, () => ({ kills: 0, damageDealt: 0, damageTaken: 0 })),
-    peakHp: CLASS_DEFS.find(c => c.id === classId)?.hp || 15,
+    peakHp: getClassDef(classId).hp || 15,
     doorBashes: {},
     runStats: {
       miniBossesKilled: 0,
@@ -1116,7 +1154,7 @@ function newRun(classId = 'adventurer') {
   state.playerEpithet = charName.epithet;
   applyClassStartingItems(classId);
   applyMasteryBonuses(classId);
-  const className = CLASS_DEFS.find(c => c.id === classId)?.name || 'Adventurer';
+  const className = getClassDef(classId).name || 'Berserker';
   // Welcome messages with player name and class
   addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into the Shards of the Unknown.`, 'gold');
   const activeMasteries = getActiveMasteries(classId);
@@ -1134,8 +1172,9 @@ function newRun(classId = 'adventurer') {
   });
 }
 
-function createPlayer(classId = 'adventurer') {
-  const cls = CLASS_DEFS.find(c => c.id === classId) || CLASS_DEFS[0];
+function createPlayer(classId = 'berserker') {
+  classId = normalizeClassId(classId);
+  const cls = getClassDef(classId);
   return {
     x: 0, y: 0,
     classId,
@@ -1149,31 +1188,28 @@ function createPlayer(classId = 'adventurer') {
     inventory: [],
     equipped: { weapon: null, armor: null, ring: null, ranged: null },
     arrows: 0,
-    infiniteArrows: classId === 'ranger',
+    infiniteArrows: false,
     loadedSpecialArrow: null, // reference to special arrow item in inventory
     runes: [], // collected glyph runes for this run
     statusEffects: [],
-    hasRegen: classId === 'adventurer',
-    pathfinder: classId === 'adventurer', // always see stairs on minimap
+    hasRegen: classId === 'beastmaster',
+    pathfinder: false, // always see stairs on minimap (removed Adventurer)
     hasVampire: false,
     ironSkin: false,
     hasFury: false,
     glassCannon: false,
     // Class-specific perk flags
-    shadowStep: false,    // Rogue: invisibility on kill
-    manaShield: false,    // Wizard: 25% negate incoming damage
-    undyingFury: false,   // Berserker: survive lethal once per floor
+    shadowStep: false,
+    undyingFury: false,
     undyingFuryUsed: false,
-    quickDraw: false,     // Ranger: -3 aimed shot cooldown
-    sanctifiedGround: false, // Cleric: heal when standing still
-    survivorInstinct: false, // Adventurer: auto-eat food at 0 hunger
-    silentKill: false,    // Ninja: kills refresh/grant invisibility
-    necroticSurge: false, // Dark Wizard: acid bolt poisons adjacent foes
-    recklessCharge: false, // Daredevil: flip damages healthy enemies
-    smokeScreen: false,   // Escape Artist: teleport leaves smoke hazard
-    sharpDealer: false,   // Barterer: every 3rd purchase is free
-    merchantPurchaseCount: 0, // Barterer: tracks Sharp Dealer progress
-    arcaneAffinity: classId === 'wizard',
+    quickDraw: false,
+    sanctifiedGround: false,
+    survivorInstinct: false,
+    necroticSurge: false,
+    recklessCharge: false,
+    smokeScreen: false,
+    merchantPurchaseCount: 0,
+    arcaneAffinity: classId === 'darkwizard',
     dodgeBonus: cls.dodgeBonus,
     critChance: cls.critChance,
     hungerRate: cls.hungerRate,
@@ -1183,7 +1219,6 @@ function createPlayer(classId = 'adventurer') {
     enrageActive: false,
     engageTurnsLeft: 0,
     enrageFloorUsed: false,
-    spellCooldown: 0,
     // Ranger
     fovBonus: classId === 'ranger' ? 2 : 0,
     aimedShotCooldown: 0,
@@ -1191,54 +1226,35 @@ function createPlayer(classId = 'adventurer') {
     divineHealUsed: false,
     curseImmune: classId === 'cleric',
     drainImmune: false, // granted by shrine sacrifice
-    // Bard
-    charmChance: classId === 'bard' ? 0.25 : 0,
+    // Monk
+    charmChance: classId === 'monk' ? 0.25 : 0,
     encore: false,
-    songOfRestCooldown: 0,
-    songOfRestFloorUsed: false,
-    enemiesKilledThisFloor: 0,
-    // Artificer
-    tinkerFloorUsed: false,
+    songMastery: classId === 'monk',
+    meditateCooldown: 0,
     masterSmith: false,
-    // Ninja
-    backstab: classId === 'ninja',
-    starThrowCooldown: 0,
+    roundhouseKick: classId === 'rogue',
     // Dark Wizard
     necromancer: classId === 'darkwizard',
     necroBonus: 0,
     acidBoltCooldown: 0,
-    // Brick Mason
-    fortifyCharges: 2,
-    // Daredevil
-    ricochetMelee: classId === 'daredevil',
-    flipCooldown: 0,
-    flipMode: false,
-    // Escape Artist
+    // Escape Artist & Daredevil legacy
+    ricochetMelee: classId === 'escapeartist',
     stairsTeleportFloorUsed: false,
     iceTrapPassive: classId === 'escapeartist',
     // Conjurer
     illusionCooldown: 0,
+    arcaneDartCooldown: 0,
     mirrorImage: false,
-    // Barterer
-    bartererDiscount: classId === 'barterer',
-    bartererFreeRefresh: classId === 'barterer',
-    bartererAppraiseUsed: false,
-    // Wizard fire ward perk
-    fireWard: false,
-    fireWardCooldown: 0,
     // Ranger double shot perk
     doubleShot: false,
-    // Teleport sight — Ninja/Rogue/Escape Artist see hidden teleport tiles
-    teleportSight: ['ninja', 'rogue', 'escapeartist'].includes(classId),
-    // Wall trap: pending bolt trap on room entry { axis: 'x'|'y' } or null
+    // Teleport sight
+    teleportSight: ['rogue', 'escapeartist'].includes(classId),
     wallTrap: null,
-    // Web slow: parity toggle — true = skip next move while web_slowed
     webSlowSkip: false,
-    // Mound slow: true = skip next move after entering a mound (2-turn entry cost)
     moundSlowPending: false,
-    // Sage
-    sageClass: classId === 'sage',
-    scrollMastery: classId === 'sage',
+    // Conjurer (Sage legacy)
+    sageClass: classId === 'conjurer',
+    scrollMastery: classId === 'conjurer',
     ancientTongue: false,
     // Soul Amulet
     soulFragments: 0,
@@ -1269,12 +1285,7 @@ function applyMasteryBonuses(classId) {
 
 function applyClassStartingItems(classId) {
   const p = state.player;
-  if (classId === 'adventurer') {
-    const armor = ARMORS.find(a => a.name === 'Leather Vest');
-    if (armor) p.equipped.armor = { ...armor };
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
-  } else if (classId === 'berserker') {
+  if (classId === 'berserker') {
     const sword = WEAPONS.find(w => w.name === 'Short Sword');
     if (sword) p.equipped.weapon = { ...sword };
     const strPotion = potionNames.find(n => n.id === 'strength');
@@ -1287,26 +1298,13 @@ function applyClassStartingItems(classId) {
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 6 });
     const invisPotion = potionNames.find(n => n.id === 'invisibility');
     if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
-  } else if (classId === 'wizard') {
-    p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
-    const usedIds = new Set();
-    let tries = 0;
-    while (p.inventory.length < 3 && tries < 30) {
-      tries++;
-      const s = scrollNames[Math.floor(Math.random() * scrollNames.length)];
-      if (!usedIds.has(s.id)) {
-        usedIds.add(s.id);
-        scrollIdentified[s.id] = true;
-        p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
-      }
-    }
   } else if (classId === 'ranger') {
     const bowName = getMasteryBonuses(classId).upgradeBow ? 'Hunting Bow' : 'Short Bow';
     p.equipped.ranged = { ...RANGED_WEAPONS.find(r => r.name === bowName) };
     p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
     p.inventory.push({ name: 'Throwing Daggers', glyph: '🗡️', itemType: 'thrown', damage: 3, ammo: 4 });
     p.inventory.push({ ...FOOD, stack: 1 });
-    // Rangers have infinite basic arrows — no arrow count needed
+    p.arrows = 50;
   } else if (classId === 'cleric') {
     p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
     const healPotion = potionNames.find(n => n.id === 'healing');
@@ -1316,24 +1314,6 @@ function applyClassStartingItems(classId) {
       scrollIdentified[identifyScroll.id] = true;
       p.inventory.push({ ...identifyScroll, glyph: '📜', itemType: 'scroll', identified: true });
     }
-  } else if (classId === 'bard') {
-    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
-    // Bard starts with Enchanted Lute + a random Song
-    p.inventory.push({ name: 'Enchanted Lute', glyph: '🎸', itemType: 'instrument', desc: 'Play songs to create magical effects.', indestructible: true });
-    const startSong = SONG_DEFS[Math.floor(Math.random() * SONG_DEFS.length)];
-    p.inventory.push(makeSong(startSong));
-  } else if (classId === 'artificer') {
-    const sword = WEAPONS.find(w => w.name === 'Short Sword');
-    if (sword) p.equipped.weapon = { ...sword };
-    const armor = ARMORS.find(a => a.name === 'Leather Vest');
-    if (armor) p.equipped.armor = { ...armor };
-  } else if (classId === 'ninja') {
-    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
-    p.inventory.push({ name: 'Throwing Stars', glyph: '🌟', itemType: 'thrown', damage: 3, ammo: 5 });
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   } else if (classId === 'darkwizard') {
     p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
     const healPotion = potionNames.find(n => n.id === 'healing');
@@ -1346,20 +1326,10 @@ function applyClassStartingItems(classId) {
       if (!usedIds.has(s.id)) {
         usedIds.add(s.id);
         scrollIdentified[s.id] = true;
+        // The wizard identified them, but we must make sure all scrolls start identified? Wait, no.
         p.inventory.push({ ...s, glyph: '📜', itemType: 'scroll', identified: true });
       }
     }
-  } else if (classId === 'mason') {
-    p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
-    const chainMail = ARMORS.find(a => a.name === 'Chain Mail');
-    if (chainMail) p.equipped.armor = { ...chainMail };
-  } else if (classId === 'daredevil') {
-    const sword = WEAPONS.find(w => w.name === 'Short Sword');
-    if (sword) p.equipped.weapon = { ...sword };
-    const armor = ARMORS.find(a => a.name === 'Leather Vest');
-    if (armor) p.equipped.armor = { ...armor };
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   } else if (classId === 'escapeartist') {
     const armor = ARMORS.find(a => a.name === 'Leather Vest');
     if (armor) p.equipped.armor = { ...armor };
@@ -1367,15 +1337,7 @@ function applyClassStartingItems(classId) {
     const invisPotion = potionNames.find(n => n.id === 'invisibility');
     if (invisPotion) { potionIdentified[invisPotion.id] = true; p.inventory.push(makePotion(invisPotion)); }
   } else if (classId === 'conjurer') {
-    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
-  } else if (classId === 'barterer') {
-    p.gold = 20;
-    const healPotion = potionNames.find(n => n.id === 'healing');
-    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
-  } else if (classId === 'sage') {
-    // Sage starts with all items identified
+    // Conjurer starts with all items identified
     for (const pn of potionNames) potionIdentified[pn.id] = true;
     for (const sn of scrollNames) scrollIdentified[sn.id] = true;
     const mapScroll = scrollNames.find(n => n.id === 'mapping');
@@ -1384,6 +1346,15 @@ function applyClassStartingItems(classId) {
     }
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'monk') {
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+    p.inventory.push({ name: 'Enchanted Lute', glyph: '🎸', itemType: 'instrument', desc: 'Play songs to create magical effects.', indestructible: true, value: 30 });
+  } else if (classId === 'beastmaster') {
+    const armor = ARMORS.find(a => a.name === 'Leather Vest');
+    if (armor) p.equipped.armor = { ...armor };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
   }
 }
 
@@ -1744,25 +1715,9 @@ function generateFloor() {
   if (state.player.classId === 'ranger') {
     state.player.aimedShotCooldown = 0;
   }
-
-  // Bard: reset song of rest each floor
-  if (state.player.classId === 'bard') {
-    state.player.songOfRestFloorUsed = false;
-  }
-  // Reset per-floor kill counter
-  state.player.enemiesKilledThisFloor = 0;
-
-  // Artificer: reset tinker each floor
-  if (state.player.classId === 'artificer') {
-    state.player.tinkerFloorUsed = false;
-  }
-  // Brick Mason: reset fortify charges each floor
-  state.player.fortifyCharges = state.player.fortifyMaxCharges || 2;
   state.masonWalls = new Map();
   // Escape Artist: reset escape route each floor
   state.player.stairsTeleportFloorUsed = false;
-  // Barterer: reset free refresh and appraise each floor
-  if (state.player.classId === 'barterer') { state.player.bartererFreeRefresh = true; state.player.bartererAppraiseUsed = false; }
 
   // Spawn special tiles (risk/reward)
   if (state.floor >= 2) {
@@ -1804,6 +1759,8 @@ function generateFloor() {
 
   // Spawn a glyph rune on each floor (from pool of runes player hasn't collected yet)
   spawnGlyphRune();
+
+  ensureBeastmasterHound();
 
   computeFOV();
   render();
@@ -2756,29 +2713,24 @@ function renderSageServices(sage) {
   const scalePrice = (base) => Math.floor(base * floorMult);
 
   // Class-specific base costs
-  const isScholar = p.classId === 'wizard' || p.classId === 'darkwizard';
+  const isScholar = p.classId === 'darkwizard' || p.classId === 'conjurer';
   const isCleric  = p.classId === 'cleric';
   const UNCURSE_BASE  = isCleric  ? 20 : 30;
   const IDENTIFY_BASE = isScholar ? 8  : 15;
   const HEAL_BASE     = isCleric  ? 12 : 20;
   const BLESS_BASE    = 25;
 
-  // Barterer discount (same 25% as merchant)
-  const discount = p.bartererDiscount;
-  const finalPrice = (base) => Math.max(1, discount ? Math.floor(scalePrice(base) * 0.75) : scalePrice(base));
+  const finalPrice = (base) => scalePrice(base);
 
   const UNCURSE_COST  = getLocalPrice(sage, 'uncurse', finalPrice(UNCURSE_BASE));
   const IDENTIFY_COST = getLocalPrice(sage, 'identify', finalPrice(IDENTIFY_BASE));
   const HEAL_COST     = getLocalPrice(sage, 'heal', finalPrice(HEAL_BASE));
   const BLESS_COST    = getLocalPrice(sage, 'bless', finalPrice(BLESS_BASE));
 
-  // Show discount banner for Barterer or scholars/clerics
-  if (discount || isScholar || isCleric) {
+  if (isScholar || isCleric) {
     const banner = document.createElement('div');
     banner.style.cssText = 'font-size:11px;color:var(--accent);text-align:center;margin-bottom:6px;';
-    if (discount && (isScholar || isCleric)) banner.textContent = '🪙 Barterer + class discount applied';
-    else if (discount) banner.textContent = '🪙 Barterer discount applied';
-    else if (isScholar) banner.textContent = '📜 Scholar pricing';
+    if (isScholar) banner.textContent = '📜 Scholar pricing';
     else if (isCleric) banner.textContent = '✨ Cleric pricing';
     container.appendChild(banner);
   }
@@ -3298,13 +3250,12 @@ function showTavern(tavern) {
   const hasAlly = state.entities.some(e => e.type === 'enemy' && e.isAlly);
   const HIRE_BASE = 40;
   const localHireCost = getLocalPrice(tavern, 'hire', HIRE_BASE);
-  const bartDiscount = p.bartererDiscount;
-  const finalHireCost = bartDiscount ? Math.max(1, Math.floor(localHireCost * 0.75)) : localHireCost;
+  const finalHireCost = localHireCost;
   const hireBtn = document.createElement('button');
   hireBtn.className = 'perk-btn';
   const allyHp = Math.floor(10 + state.floor * 2);
   const allyAtk = Math.floor(2 + state.floor);
-  hireBtn.innerHTML = `<div class="perk-name">⚔️ Hire Sword (${finalHireCost}💰)</div><div class="perk-desc">${allyHp} HP, ${allyAtk} ATK companion${bartDiscount ? ' 🪙' : ''}</div>`;
+  hireBtn.innerHTML = `<div class="perk-name">⚔️ Hire Sword (${finalHireCost}💰)</div><div class="perk-desc">${allyHp} HP, ${allyAtk} ATK companion</div>`;
   if (hasAlly) {
     hireBtn.style.opacity = '0.4';
     hireBtn.style.pointerEvents = 'none';
@@ -3401,29 +3352,6 @@ function generateShopItems(floor) {
   items.push({ item: { name: '5 Arrows', glyph: '➶', itemType: 'arrows', count: 5, value: 0 }, price: 8 });
   // Food
   items.push({ item: { ...FOOD }, price: 8 });
-  // Artificer exclusive: a pre-forged item one tier above current stock
-  if (state.player && state.player.classId === 'artificer') {
-    const bonusTier = Math.min(tier + 1, 3);
-    let exclusiveItem = null;
-    if (Math.random() < 0.5) {
-      const wPool = WEAPONS.filter(w => w.tier === bonusTier);
-      if (wPool.length > 0) {
-        exclusiveItem = { ...wPool[Math.floor(Math.random() * wPool.length)] };
-        exclusiveItem.attack = (exclusiveItem.attack || 0) + 1;
-        exclusiveItem.name = exclusiveItem.name + ' +1';
-      }
-    } else {
-      const aPool = ARMORS.filter(a => a.tier === bonusTier);
-      if (aPool.length > 0) {
-        exclusiveItem = { ...aPool[Math.floor(Math.random() * aPool.length)] };
-        exclusiveItem.defense = (exclusiveItem.defense || 0) + 1;
-        exclusiveItem.name = exclusiveItem.name + ' +1';
-      }
-    }
-    if (exclusiveItem) {
-      items.push({ item: exclusiveItem, price: exclusiveItem.value + 20, artificerOnly: true });
-    }
-  }
   // 20% chance merchant stocks an Oil Flask
   if (Math.random() < 0.20) {
     items.push({ item: { name: 'Oil Flask', glyph: '🛢️', itemType: 'oil', desc: 'Fuel for the Enchanted Lantern. +3 FOV.', value: 10 }, price: 10 });
@@ -3918,10 +3846,9 @@ function generateMonsterDrop(floor, enemyXp) {
   const roll = Math.random();
   const tier = Math.ceil(floor / 3);
   if (roll < 0.3) {
-    // Gold (Greed rune: +50%, Barterer: +50%)
+    // Gold (Greed rune: +50%)
     let amount = 3 + Math.floor(Math.random() * (2 + floor * 2));
     if (state && hasRune('greed')) amount = Math.floor(amount * 1.5);
-    if (state && state.player.bartererDiscount) amount = Math.floor(amount * 1.5);
     return { name: `${amount} Gold`, glyph: '💰', itemType: 'gold', goldAmount: amount, value: 0 };
   } else if (roll < 0.5) {
     // Food
@@ -4213,13 +4140,6 @@ function attackEntity(attacker, defender) {
     }
   }
 
-  // Mana Shield (Wizard perk): 25% chance to negate damage
-  if (defender === state.player && state.player.manaShield && Math.random() < 0.25) {
-    addMessage('✨ Mana Shield absorbs the attack!', 'good');
-    Audio.miss();
-    return;
-  }
-
   // Iron Skin perk: reduce incoming damage to player by 1
   if (defender === state.player && state.player.ironSkin) {
     damage = Math.max(1, damage - 1);
@@ -4295,9 +4215,20 @@ function attackEntity(attacker, defender) {
     applyWeaponSpecial(state.player.equipped.weapon, defender);
   }
 
-  // Bard Charm: 25% chance to pacify enemy on hit (skip 2 turns)
-  if (isPlayer && !targetIsPlayer && defender.hp > 0 && state.player.charmChance > 0) {
-    if (Math.random() < state.player.charmChance) {
+  // Monk charm / Beastmaster animal charm
+  if (isPlayer && !targetIsPlayer && defender.hp > 0) {
+    if (state.player.classId === 'beastmaster' && ['Bat', 'Slime', 'Spider'].includes(defender.name) && Math.random() < 0.70) {
+      const existingBeast = state.entities.find(e => e.type === 'enemy' && e.hp > 0 && e.charmedByBeastmaster && e !== defender);
+      if (existingBeast) {
+        removeEntity(existingBeast);
+        addMessage(`🐾 ${existingBeast.name} slips back into the shadows.`, '');
+      }
+      defender.isAlly = true;
+      defender.ai = 'ally';
+      defender.allyTurns = 99999;
+      defender.charmedByBeastmaster = true;
+      addMessage(`🐾 ${defender.name} is won over by your beastcraft!`, 'gold');
+    } else if (state.player.charmChance > 0 && Math.random() < state.player.charmChance) {
       // Encore perk: 30% chance to convert charmed enemy to temporary ally
       if (state.player.encore && Math.random() < 0.30) {
         defender.isAlly = true;
@@ -4386,27 +4317,49 @@ function attackEntity(attacker, defender) {
         addStatusEffect(state.player, 'invisibility', 2);
         addMessage('💨 Shadow Step! You vanish into darkness.', 'good');
       }
-      // Silent Kill (Ninja perk): grants invisibility on kill; refreshes timer if already invisible
-      if (isPlayer && state.player.silentKill) {
-        const existingInvis = state.player.statusEffects.find(e => e.type === 'invisibility');
-        if (existingInvis) {
-          existingInvis.turns = 2;
-          addMessage('💨 Silent Kill! Stealth extended.', 'good');
-        } else {
-          addStatusEffect(state.player, 'invisibility', 2);
-          addMessage('💨 Silent Kill! You melt into shadow.', 'good');
-        }
-      }
     }
   }
+}
+
+function getPlayerWeaponAttackContribution(player = state.player) {
+  if (!player || player.classId === 'monk') return 0;
+  let bonus = player.equipped.weapon?.attack || 0;
+  if (bonus <= 0) return 0;
+  if (player.classId === 'cleric') bonus -= 1;
+  if (player.classId === 'darkwizard' || player.classId === 'conjurer') bonus -= 1;
+  return Math.max(0, bonus);
+}
+
+function getPlayerRangedDamageBonus(player = state.player) {
+  if (!player || player.classId === 'monk') return 0;
+  let bonus = 0;
+  if (player.classId === 'darkwizard' || player.classId === 'conjurer') bonus -= 2;
+  return bonus;
+}
+
+function getDisplayedPlayerAttack(player = state.player) {
+  if (!player) return 0;
+  const monkScaling = player.classId === 'monk' ? Math.floor(player.level * 1.5) : 0;
+  return player.attack + monkScaling + getPlayerWeaponAttackContribution(player);
+}
+
+function getDisplayedPlayerDefense(player = state.player) {
+  if (!player) return 0;
+  const monkScaling = player.classId === 'monk' ? Math.floor(player.level * 1.0) : 0;
+  const armorBonus = player.classId === 'monk' ? 0 : (player.equipped.armor?.defense || 0);
+  const ringBonus = player.equipped.ring?.special === 'protection' ? 3 : 0;
+  return player.defense + monkScaling + armorBonus + ringBonus;
 }
 
 function getEffectiveAttack(entity) {
   if (entity === state.player) {
     let atk = state.player.attack;
-    if (state.player.equipped.weapon) atk += state.player.equipped.weapon.attack;
-    // Chaos hammer penalty to defense but we handle attack bonus here
-    if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
+    if (state.player.classId === 'monk') {
+      atk += Math.floor(state.player.level * 1.5);
+    } else {
+      atk += getPlayerWeaponAttackContribution(state.player);
+      if (state.player.equipped.armor?.special === 'heavy') atk -= 1;
+    }
     // Strength potion
     if (hasStatusEffect(state.player, 'strength')) atk += 2;
     // Sage blessing
@@ -4427,7 +4380,11 @@ function getEffectiveAttack(entity) {
 function getEffectiveDefense(entity) {
   if (entity === state.player) {
     let def = state.player.defense;
-    if (state.player.equipped.armor) def += state.player.equipped.armor.defense;
+    if (state.player.classId === 'monk') {
+      def += Math.floor(state.player.level * 1.0);
+    } else {
+      if (state.player.equipped.armor) def += state.player.equipped.armor.defense;
+    }
     if (state.player.equipped.ring?.special === 'protection') def += 3;
     if (state.player.equipped.weapon?.special === 'chaos') def -= 1;
     // Song of Courage
@@ -4471,7 +4428,6 @@ function applyWeaponSpecial(weapon, target) {
 function killEnemy(enemy) {
   state.player.xp += enemy.xp;
   state.enemiesKilled++;
-  state.player.enemiesKilledThisFloor++;
   state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
@@ -4560,14 +4516,6 @@ function killEnemy(enemy) {
     }
   }
 
-  // Bard: track kills for Song of Rest
-  if (state.player.playerClass === 'Bard') {
-    state.player.classState.floorKills++;
-  }
-
-  // Dark Wizard: necromancy chance
-  darkWizardNecromancy(enemy);
-
   // Soul Amulet: collect fragment
   soulAmuletCollect();
 
@@ -4614,7 +4562,7 @@ function playerDeath(killerName, killerGlyph) {
 
   const tk = state.toughestKill;
   const kg = killerGlyph || '';
-  const deathClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
+  const deathClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Berserker';
   $('death-cause').textContent = `${state.playerName} ${state.playerEpithet} ${deathClassName} was slain by ${kg ? kg + ' ' : ''}${killerName} on Floor ${state.floor}`;
   $('death-stats').innerHTML = `
     Level <span>${state.player.level}</span> ${deathClassName} | Score: <span>${state.score}</span><br>
@@ -4636,8 +4584,8 @@ function playerDeath(killerName, killerGlyph) {
     sr('XP', `${p.xp}/${p.xpToNext}`),
     sr('HP', `${p.hp}/${p.maxHp}`),
     sr('Peak HP', state.peakHp),
-    sr('Attack', p.attack + (p.equipped.weapon?.attack || 0)),
-    sr('Defense', p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)),
+    sr('Attack', getDisplayedPlayerAttack(p)),
+    sr('Defense', getDisplayedPlayerDefense(p)),
     sr('Dmg Dealt', totalDealt),
     sr('Dmg Taken', totalTaken),
     sr('Turns', p.turnsSurvived),
@@ -4707,7 +4655,7 @@ function showVictory() {
   }
 
   const tk = state.toughestKill;
-  const victoryClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer';
+  const victoryClassName = CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Berserker';
   $('victory-overlay').querySelector('h2').textContent = `${state.playerName} ${state.playerEpithet} ${victoryClassName} is victorious!`;
   $('victory-stats').innerHTML = `
     Level <span>${state.player.level}</span> | Score: <span>${state.score}</span><br>
@@ -4737,8 +4685,8 @@ function showLevelUp() {
 
   inputLocked = true;
   const p = state.player;
-  const atkTotal = p.attack + (p.equipped.weapon?.attack || 0);
-  const defTotal = p.defense + (p.equipped.armor?.defense || 0);
+  const atkTotal = getDisplayedPlayerAttack(p);
+  const defTotal = getDisplayedPlayerDefense(p);
   $('levelup-label').innerHTML = `Level ${p.level}! <span style="font-size:11px;color:var(--text-dim);display:block;margin-top:4px;">⚔️ ${atkTotal} ATK · 🛡️ ${defTotal} DEF · ❤️ ${p.hp}/${p.maxHp} HP</span>`;
 
   const allPerks = [
@@ -4752,24 +4700,14 @@ function showLevelUp() {
     { name: 'Iron Skin',   desc: 'Reduce all incoming damage by 1',       apply: () => { state.player.ironSkin = true; }, rare: true, unique: true, flag: 'ironSkin' },
     { name: 'Battle Fury', desc: '+3 attack when below 30% HP',           apply: () => { state.player.hasFury = true; }, rare: true, unique: true, flag: 'hasFury' },
     // Class-exclusive perks
-    { name: "Survivor's Instinct", desc: 'Auto-eat food from inventory when starving', apply: () => { state.player.survivorInstinct = true; }, rare: false, unique: true, flag: 'survivorInstinct', classOnly: 'adventurer' },
     { name: 'Undying Fury', desc: 'Survive a lethal hit with 1 HP (once per floor)', apply: () => { state.player.undyingFury = true; }, rare: true, unique: true, flag: 'undyingFury', classOnly: 'berserker' },
     { name: 'Shadow Step', desc: 'Become invisible for 2 turns after a kill', apply: () => { state.player.shadowStep = true; }, rare: true, unique: true, flag: 'shadowStep', classOnly: 'rogue' },
-    { name: 'Mana Shield', desc: '25% chance to negate incoming damage', apply: () => { state.player.manaShield = true; }, rare: true, unique: true, flag: 'manaShield', classOnly: 'wizard' },
     { name: 'Quick Draw', desc: 'Aimed Shot cooldown reduced by 3 turns', apply: () => { state.player.quickDraw = true; }, rare: false, unique: true, flag: 'quickDraw', classOnly: 'ranger' },
     { name: 'Sanctified Ground', desc: 'Heal 1 HP when you wait (Space)', apply: () => { state.player.sanctifiedGround = true; }, rare: false, unique: true, flag: 'sanctifiedGround', classOnly: 'cleric' },
-    { name: 'Encore', desc: 'Charmed enemies have 30% chance to fight for you', apply: () => { state.player.encore = true; }, rare: true, unique: true, flag: 'encore', classOnly: 'bard' },
-    { name: 'Master Smith', desc: 'Forge upgrades give +2 instead of +1', apply: () => { state.player.masterSmith = true; }, rare: false, unique: true, flag: 'masterSmith', classOnly: 'artificer' },
-    { name: 'Rampart', desc: '+1 fortify charge per floor (max 3)', apply: () => { state.player.fortifyMaxCharges = Math.min(3, (state.player.fortifyMaxCharges || 2) + 1); state.player.fortifyCharges = Math.min(state.player.fortifyMaxCharges, state.player.fortifyCharges + 1); }, rare: false, unique: true, flag: 'rampart', classOnly: 'mason' },
     { name: 'Mirror Image', desc: 'Can place 2 illusions at once', apply: () => { state.player.mirrorImage = true; }, rare: false, unique: true, flag: 'mirrorImage', classOnly: 'conjurer' },
-    { name: 'Fire Ward', desc: 'Cast fire spheres around you (8-turn CD)', apply: () => { state.player.fireWard = true; state.player.fireWardCooldown = 0; }, rare: false, unique: true, flag: 'fireWard', classOnly: 'wizard' },
     { name: 'Double Shot', desc: 'Fire 2 arrows in one turn', apply: () => { state.player.doubleShot = true; }, rare: false, unique: true, flag: 'doubleShot', classOnly: 'ranger' },
-    { name: 'Silent Kill', desc: 'Kills grant invisibility; kills while invisible refresh it', apply: () => { state.player.silentKill = true; }, rare: false, unique: true, flag: 'silentKill', classOnly: 'ninja' },
     { name: 'Necrotic Surge', desc: 'Acid bolt splashes poison to adjacent foes', apply: () => { state.player.necroticSurge = true; }, rare: false, unique: true, flag: 'necroticSurge', classOnly: 'darkwizard' },
-    { name: 'Reckless Charge', desc: 'Flip deals full ATK to enemies above 75% HP', apply: () => { state.player.recklessCharge = true; }, rare: false, unique: true, flag: 'recklessCharge', classOnly: 'daredevil' },
     { name: 'Smoke Screen', desc: 'Teleport leaves a 3-turn smoke cloud behind', apply: () => { state.player.smokeScreen = true; }, rare: false, unique: true, flag: 'smokeScreen', classOnly: 'escapeartist' },
-    { name: 'Sharp Dealer', desc: 'Every 3rd merchant purchase grants a free item', apply: () => { state.player.sharpDealer = true; }, rare: false, unique: true, flag: 'sharpDealer', classOnly: 'barterer' },
-    { name: 'Ancient Tongue', desc: 'Scrolls have double duration effects', apply: () => { state.player.ancientTongue = true; }, rare: false, unique: true, flag: 'ancientTongue', classOnly: 'sage' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -4997,8 +4935,8 @@ function processEnemies() {
       if (enemy.alertness < 2 && enemy.special === 'stealth') {
         addMessage(`A ${enemy.name} materializes from the shadows!`, 'damage');
       }
-      // Ninja/Rogue sense approaching enemies
-      else if (enemy.alertness < 2 && (state.player.classId === 'rogue' || state.player.classId === 'ninja')) {
+      // Rogue senses approaching enemies sooner
+      else if (enemy.alertness < 2 && state.player.classId === 'rogue') {
         addMessage(`You sense a ${enemy.name} approaching!`, 'damage');
       }
       enemy.alertness = 2;
@@ -5472,7 +5410,7 @@ function playerMove(dx, dy) {
   if (inputLocked || state.gameOver || state.victory) return;
 
   // Woozy effect: check adjacent tiles for enchanted walls
-  if (!state.throwMode && !state.fortifyMode && (!state.player || !state.player.flipMode)) {
+  if (!state.throwMode && !state.fortifyMode) {
      let nearEnchanted = false;
      for (let ey = -1; ey <= 1; ey++) {
         for (let ex = -1; ex <= 1; ex++) {
@@ -5491,42 +5429,6 @@ function playerMove(dx, dy) {
            dy = 0;
         }
      }
-  }
-
-  // Flip mode — Daredevil jump over enemy
-  if (state.player && state.player.flipMode) {
-    state.player.flipMode = false;
-    const p = state.player;
-    const nx = p.x + dx, ny = p.y + dy;
-    const nx2 = p.x + 2 * dx, ny2 = p.y + 2 * dy;
-    const foe = enemyAt(nx, ny);
-    if (foe && foe.hp > 0 && !foe.isAlly && isWalkable(nx2, ny2) && !enemyAt(nx2, ny2)) {
-      p.x = nx2;
-      p.y = ny2;
-      p.flipCooldown = getMasteryBonuses(p.classId).fastFlip ? 3 : 4;
-      // Reckless Charge: deal bonus damage when flipping over a healthy enemy
-      if (p.recklessCharge && foe.hp > (foe.maxHp || foe.hp) * 0.75) {
-        const chargeDmg = getEffectiveAttack(p);
-        foe.hp -= chargeDmg;
-        addMessage(`🤸 Reckless Charge! ${foe.name} takes ${chargeDmg} damage!`, 'good');
-        haptic(40);
-        if (foe.hp <= 0) killEnemy(foe);
-      }
-      addMessage(`🤸 You flip over the ${foe.name}!`, 'good');
-      Audio.step();
-      haptic(30);
-      animateEntityFlash(p.x, p.y, '#ffee00');
-      computeFOV();
-      autoPickup();
-      updateUI();
-      render();
-      endTurn();
-    } else {
-      addMessage("Can't flip — no enemy to jump or landing blocked.", '');
-      updateUI();
-      render();
-    }
-    return;
   }
 
   // Throw mode — launch projectile in chosen direction
@@ -5619,15 +5521,20 @@ function playerMove(dx, dy) {
         if (bonus && bonus !== enemy && bonus.hp > 0) { attackEntity(p, bonus); break; }
       }
     }
-    // Ninja dual strike: also attack any other adjacent enemy in the same turn
-    if (p.backstab) {
-      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+    if (p.roundhouseKick && p.level >= 5) {
+      const roundhouseTargets = [];
+      const roundhouseDirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+      for (let i = 0; i < roundhouseDirs.length; i++) {
+        const [ddx, ddy] = roundhouseDirs[i];
         const second = enemyAt(p.x + ddx, p.y + ddy);
         if (second && second !== enemy && second.hp > 0 && !second.isAlly) {
-          attackEntity(p, second);
-          addMessage('🌟 Dual Strike!', 'good');
-          break;
+          roundhouseTargets.push({ enemy: second, idx: i });
         }
+      }
+      if (roundhouseTargets.length > 0) {
+        roundhouseTargets.sort((a, b) => a.enemy.hp - b.enemy.hp || a.idx - b.idx);
+        attackEntity(p, roundhouseTargets[0].enemy);
+        addMessage('🦶 Roundhouse Kick!', 'good');
       }
     }
     // Daredevil ricochet: chain to adjacent enemies at 50% then 25%
@@ -5783,14 +5690,7 @@ function playerMove(dx, dy) {
   let walkable = isWalkable(nx, ny);
   const t = getTile(nx, ny);
 
-  // Uneven ground: Ninja and Daredevil can walk on rubble
-  if (t === T.RUBBLE && (state.player.classId === 'ninja' || state.player.classId === 'daredevil')) {
-    walkable = true;
-    addMessage('You nimbly balance on the uneven ground.', '');
-  }
-
-  // Walk on Water potion
-  if (t === T.WATER && hasStatusEffect(state.player, 'walk_on_water')) {
+  if (t === T.WATER && (state.player.classId === 'monk' || hasStatusEffect(state.player, 'walk_on_water'))) {
     walkable = true;
   }
 
@@ -5977,10 +5877,10 @@ function playerMove(dx, dy) {
       npc.spoken = true;
       addMessage(npc.lore, 'gold');
       if (npc.loreIdx !== undefined) unlockCodexEntry('lore_' + npc.loreIdx);
-      // Sage class: gain XP from hearing lore
+      // Conjurer inherits Sage insight from lore
       if (state.player.sageClass) {
         state.player.xp += 5;
-        addMessage('+5 XP (sage insight)', 'good');
+        addMessage('+5 XP (conjurer insight)', 'good');
         while (state.player.xp >= state.player.xpToNext) {
           state.player.xp -= state.player.xpToNext;
           state.player.level++;
@@ -6064,8 +5964,8 @@ function playerMove(dx, dy) {
 
 function closeDoor() {
   if (inputLocked || state.gameOver || state.victory) return;
-  if (!['rogue', 'mason'].includes(state.player.classId)) {
-    addMessage('Only Rogues and Brick Masons can close doors.', '');
+  if (state.player.classId !== 'rogue') {
+    addMessage('Only Rogues can close doors.', '');
     return;
   }
   // Find adjacent open door
@@ -6244,6 +6144,7 @@ function tryAutoEquip(item) {
     : item.itemType === 'ranged' ? 'ranged'
     : null;
   if (!slot) return;
+  if (p.classId === 'monk' && isMonkRestrictedItem(item)) return;
 
   // Never auto-equip cursed items
   if (item.cursed) return;
@@ -6378,6 +6279,10 @@ function useItem(item, index) {
 
   switch (item.itemType) {
     case 'weapon':
+      if (p.classId === 'monk') {
+        addMessage('Monks refuse to wield weapons.', 'damage');
+        return;
+      }
       // Unequip current weapon, equip new one
       if (p.equipped.weapon) p.inventory.push(p.equipped.weapon);
       p.equipped.weapon = item;
@@ -6396,6 +6301,10 @@ function useItem(item, index) {
       break;
 
     case 'armor':
+      if (p.classId === 'monk') {
+        addMessage('Monks do not wear armor.', 'damage');
+        return;
+      }
       if (p.equipped.armor) p.inventory.push(p.equipped.armor);
       p.equipped.armor = item;
       p.inventory.splice(index, 1);
@@ -6462,6 +6371,10 @@ function useItem(item, index) {
       return;
 
     case 'ranged':
+      if (p.classId === 'monk') {
+        addMessage('Monks do not use ranged weapons.', 'damage');
+        return;
+      }
       // Equip ranged weapon
       if (p.equipped.ranged) p.inventory.push(p.equipped.ranged);
       p.equipped.ranged = item;
@@ -6550,8 +6463,7 @@ function useItem(item, index) {
         render();
         return;
       }
-      // Non-Bards have 50% failure chance
-      if (p.classId !== 'bard' && Math.random() < 0.5) {
+      if (!p.songMastery && Math.random() < 0.5) {
         addMessage('You fumble the melody. The song is wasted.', 'damage');
         p.inventory.splice(p.inventory.indexOf(item), 1);
         updateUI();
@@ -6801,253 +6713,6 @@ function applyScrollEffect(scroll) {
   }
 }
 
-// === CLASS ABILITIES ===
-function useClassAbility() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  const p = state.player;
-  switch (p.playerClass) {
-    case 'Conjurer': conjurerPlaceIllusion(); break;
-    case 'Escape Artist': escapeArtistPlaceTrap(); break;
-    case 'Dark Wizard': addMessage('Your dark power activates passively on kills.', ''); break;
-    case 'Brick Mason': brickMasonFortify(); break;
-    case 'Barterer': bartererAppraise(); break;
-    case 'Bard': bardSongOfRest(); break;
-    default: addMessage('No class ability.', ''); break;
-  }
-}
-
-// --- CONJURER: Place illusion with taunt radius ---
-function conjurerPlaceIllusion() {
-  const p = state.player;
-  const cs = p.classState;
-  // Remove old illusion if any
-  if (cs.illusionEntity) {
-    const old = state.entities.find(e => e === cs.illusionEntity);
-    if (old) removeEntity(old);
-    cs.illusionEntity = null;
-  }
-  // Place illusion on an adjacent walkable tile
-  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-  let placed = false;
-  for (const [dx, dy] of dirs) {
-    const nx = p.x + dx, ny = p.y + dy;
-    if (isWalkable(nx, ny) && !enemyAt(nx, ny)) {
-      const illusion = {
-        type: 'illusion',
-        x: nx, y: ny,
-        glyph: p.glyph,
-        name: 'Illusion',
-        hp: 1, maxHp: 1,
-        tauntRadius: 3,
-        blocksMovement: true
-      };
-      state.entities.push(illusion);
-      cs.illusionEntity = illusion;
-      addMessage('You conjure an illusion!', 'good');
-      placed = true;
-      break;
-    }
-  }
-  if (!placed) { addMessage('No room for an illusion!', 'damage'); return; }
-  endTurn();
-}
-
-function getIllusionTauntTarget(enemy) {
-  if (!state.player.playerClass === 'Conjurer') return null;
-  const illusion = state.player.classState.illusionEntity;
-  if (!illusion || !state.entities.includes(illusion)) { state.player.classState.illusionEntity = null; return null; }
-  const dist = Math.abs(enemy.x - illusion.x) + Math.abs(enemy.y - illusion.y);
-  if (dist <= illusion.tauntRadius) return illusion;
-  return null;
-}
-
-// --- BARTERER: Appraise unknown item for free ---
-function bartererAppraise() {
-  const p = state.player;
-  const cs = p.classState;
-  if (cs.appraisedThisFloor) { addMessage('You already appraised this floor.', 'damage'); return; }
-  // Find first unidentified potion or scroll in inventory
-  const target = p.inventory.find(it => (it.itemType === 'potion' || it.itemType === 'scroll') && !it.identified);
-  if (!target) { addMessage('No unknown items to appraise.', ''); return; }
-  cs.appraisedThisFloor = true;
-  if (target.itemType === 'potion') {
-    potionIdentified[target.effectId] = true;
-  } else {
-    scrollIdentified[target.effectId] = true;
-  }
-  target.name = target.trueName;
-  target.identified = true;
-  // Identify matching items in inventory
-  for (const inv of p.inventory) {
-    if (inv.itemType === target.itemType && inv.effectId === target.effectId) {
-      inv.name = inv.trueName;
-      inv.identified = true;
-    }
-  }
-  addMessage(`You appraise it: ${target.trueName}!`, 'good');
-  updateUI();
-  render();
-}
-
-// --- BARTERER: Haggle (reroll merchant stock) ---
-function bartererHaggle(merchant) {
-  const cs = state.player.classState;
-  if (cs.haggledThisFloor) { addMessage('You already haggled this floor.', 'damage'); return; }
-  cs.haggledThisFloor = true;
-  merchant.shopItems = generateShopItems(state.floor);
-  addMessage('You haggle aggressively — the merchant restocks!', 'good');
-  // Re-render merchant UI
-  showMerchant(merchant);
-}
-
-// --- DARK WIZARD: Necromancy on kill (25% chance) ---
-function darkWizardNecromancy(enemy) {
-  if (state.player.playerClass !== 'Dark Wizard') return;
-  if (enemy.name === 'Mini Slime' || enemy.isAlly) return;
-  if (Math.random() >= 0.25) return;
-  // Raise as undead ally at enemy's position
-  const undead = createEnemy({
-    name: 'Undead ' + enemy.name, glyph: '💀', hp: Math.ceil(enemy.maxHp * 0.6),
-    attack: Math.max(1, enemy.attack - 1), defense: enemy.defense,
-    ai: 'chase', xp: 0, special: null, detect: 10
-  }, enemy.x, enemy.y);
-  undead.isAlly = true;
-  undead.allyTurns = 99999; // Persist until death
-  undead.alertness = 2;
-  state.entities.push(undead);
-  addMessage(`${enemy.name} rises as your undead servant!`, 'good');
-}
-
-// --- BRICK MASON: Fortify (place walls/doors) ---
-function brickMasonFortify() {
-  const p = state.player;
-  const cs = p.classState;
-  // Show a choice menu: Place Wall or Place Locked Door
-  inputLocked = true;
-  const container = $('perk-choices');
-  container.innerHTML = '';
-  $('levelup-overlay').querySelector('h1').textContent = '🧱 FORTIFY';
-  $('levelup-label').textContent = 'Choose what to build:';
-
-  const options = [
-    { text: 'Place Wall (5 HP)', action: () => brickMasonPlaceWall() },
-    { text: 'Place Locked Door', action: () => brickMasonPlaceDoor() },
-    { text: 'Repair Sealed Door', action: () => brickMasonRepairDoor() },
-    { text: 'Cancel', action: () => { $('levelup-overlay').classList.remove('active'); $('levelup-overlay').querySelector('h1').textContent = '⬆️ LEVEL UP'; inputLocked = false; } }
-  ];
-
-  for (const opt of options) {
-    const btn = document.createElement('button');
-    btn.className = 'perk-btn';
-    btn.innerHTML = `<div class="perk-name">${opt.text}</div>`;
-    btn.addEventListener('click', () => {
-      $('levelup-overlay').classList.remove('active');
-      $('levelup-overlay').querySelector('h1').textContent = '⬆️ LEVEL UP';
-      inputLocked = false;
-      opt.action();
-    });
-    container.appendChild(btn);
-  }
-  $('levelup-overlay').classList.add('active');
-}
-
-function brickMasonPlaceWall() {
-  const p = state.player;
-  // Place wall on first adjacent walkable tile (including corridors)
-  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-  for (const [dx, dy] of dirs) {
-    const nx = p.x + dx, ny = p.y + dy;
-    const t = getTile(nx, ny);
-    if ((t === T.FLOOR || t === T.CORRIDOR) && !enemyAt(nx, ny)) {
-      // Place a destructible wall (tracked as hazard with wallHP)
-      state.entities.push({
-        type: 'wall_block',
-        x: nx, y: ny,
-        glyph: '🧱',
-        name: 'Mason Wall',
-        wallHP: 5
-      });
-      setTile(nx, ny, T.WALL);
-      addMessage('You build a sturdy wall!', 'good');
-      endTurn();
-      return;
-    }
-  }
-  addMessage('No room to build a wall!', 'damage');
-}
-
-function brickMasonPlaceDoor() {
-  const p = state.player;
-  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-  for (const [dx, dy] of dirs) {
-    const nx = p.x + dx, ny = p.y + dy;
-    const t = getTile(nx, ny);
-    if ((t === T.FLOOR || t === T.CORRIDOR) && !enemyAt(nx, ny)) {
-      setTile(nx, ny, T.DOOR_CLOSED);
-      addMessage('You construct a locked door!', 'good');
-      endTurn();
-      return;
-    }
-  }
-  addMessage('No room to place a door!', 'damage');
-}
-
-function brickMasonRepairDoor() {
-  const p = state.player;
-  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-  for (const [dx, dy] of dirs) {
-    const nx = p.x + dx, ny = p.y + dy;
-    if (getTile(nx, ny) === T.DOOR_SEALED) {
-      setTile(nx, ny, T.DOOR_CLOSED);
-      addMessage('You repair the sealed door!', 'good');
-      endTurn();
-      return;
-    }
-  }
-  addMessage('No sealed doors nearby to repair.', '');
-}
-
-// --- ESCAPE ARTIST: Place visible ice trap ---
-function escapeArtistPlaceTrap() {
-  const p = state.player;
-  const cs = p.classState;
-  if (cs.iceTraps.length >= 3) { addMessage('Maximum 3 ice traps active!', 'damage'); return; }
-  // Place on player's current tile
-  const trap = { type: 'ice_trap', x: p.x, y: p.y, glyph: '❄️', name: 'Ice Trap' };
-  state.entities.push(trap);
-  cs.iceTraps.push(trap);
-  addMessage('You set an ice trap!', 'good');
-  endTurn();
-}
-
-function checkIceTraps(enemy) {
-  if (state.player.playerClass !== 'Escape Artist') return;
-  const cs = state.player.classState;
-  for (let i = cs.iceTraps.length - 1; i >= 0; i--) {
-    const trap = cs.iceTraps[i];
-    if (enemy.x === trap.x && enemy.y === trap.y) {
-      addStatusEffect(enemy, 'frozen', 2);
-      addMessage(`${enemy.name} triggers an ice trap!`, 'good');
-      removeEntity(trap);
-      cs.iceTraps.splice(i, 1);
-      return;
-    }
-  }
-}
-
-// --- BARD: Song of Rest ---
-function bardSongOfRest() {
-  const p = state.player;
-  const cs = p.classState;
-  const baseHeal = 3;
-  const bonusHeal = Math.min(cs.floorKills, state.floor); // +1 per kill, capped at floor #
-  const totalHeal = baseHeal + bonusHeal;
-  p.hp = Math.min(p.maxHp, p.hp + totalHeal);
-  addMessage(`Song of Rest heals ${totalHeal} HP! (${cs.floorKills} kill bonus)`, 'good');
-  Audio.useItem();
-  endTurn();
-}
-
 // === SPECIALTY ITEM MECHANICS ===
 
 // Alchemist's Mortar: brew 3 herbs into a random potion
@@ -7240,7 +6905,7 @@ function renderDropSection(container, refreshCallback) {
 function renderShopItems(merchant) {
   $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
   const discountEl = $('merchant-discount');
-  if (discountEl) discountEl.style.display = state.player.bartererDiscount ? '' : 'none';
+  if (discountEl) discountEl.style.display = 'none';
   const container = $('shop-items');
   container.innerHTML = '';
 
@@ -7260,9 +6925,8 @@ function renderShopItems(merchant) {
       : (it.tier === 3)
       ? ` <span style="color:#aa44ff;font-size:11px;">[Rare]</span>`
       : '';
-    const localPrice = getLocalPrice(merchant, it.name, shopItem.price);
-    const effectivePrice = state.player.bartererDiscount ? Math.max(1, Math.floor(localPrice * 0.75)) : localPrice;
-    const exclusiveTag = shopItem.artificerOnly ? ` <span style="color:#f0a030;font-size:11px;">[⚒️ Forged]</span>` : '';
+    const effectivePrice = getLocalPrice(merchant, it.name, shopItem.price);
+    const exclusiveTag = '';
     const collapsedHTML = `<span>${it.glyph} ${it.name}${statTag}${tierTag}${exclusiveTag}</span><span class="price">${effectivePrice}💰</span>`;
     div.innerHTML = collapsedHTML;
 
@@ -7309,24 +6973,6 @@ function renderShopItems(merchant) {
         }
         Audio.gold();
         recordLocalPurchase(merchant, shopItem.item.name);
-        // Sharp Dealer: every 3rd purchase grants a free item
-        if (state.player.sharpDealer) {
-          state.player.merchantPurchaseCount = (state.player.merchantPurchaseCount || 0) + 1;
-          if (state.player.merchantPurchaseCount >= 3) {
-            state.player.merchantPurchaseCount = 0;
-            const freeItem = generateMonsterDrop(state.floor, 20);
-            if (freeItem && freeItem.itemType !== 'gold') {
-              if (state.player.inventory.length < MAX_INVENTORY) {
-                state.player.inventory.push(freeItem);
-                addMessage(`🎁 Sharp Dealer! Free ${freeItem.name}!`, 'gold');
-                if (settings.autoEquip) tryAutoEquip(freeItem);
-              } else {
-                state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: freeItem.glyph || '?', item: freeItem });
-                addMessage(`🎁 Sharp Dealer! ${freeItem.name} dropped at your feet!`, 'gold');
-              }
-            }
-          }
-        }
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
         div.style.opacity = '0.3';
         div.style.pointerEvents = 'none';
@@ -7405,24 +7051,6 @@ function renderShopItems(merchant) {
     div.addEventListener('click', expandItem);
     div.addEventListener('touchend', (e) => { e.preventDefault(); expandItem(); }, { passive: false });
     container.appendChild(div);
-  }
-
-  // Barterer free refresh button
-  if (state.player.bartererFreeRefresh) {
-    const freeRefDiv = document.createElement('div');
-    freeRefDiv.className = 'shop-item';
-    freeRefDiv.innerHTML = `<span>🔄 Free Reroll</span><span class="price" style="color:var(--good)">FREE (1/floor)</span>`;
-    const freeRefHandler = () => {
-      merchant.shopItems = generateShopItems(state.floor);
-      state.player.bartererFreeRefresh = false;
-      addMessage('You talk the merchant into showing new wares!', 'good');
-      Audio.gold();
-      renderShopItems(merchant);
-      updateUI();
-    };
-    freeRefDiv.addEventListener('click', freeRefHandler);
-    freeRefDiv.addEventListener('touchend', (e) => { e.preventDefault(); freeRefHandler(); }, { passive: false });
-    container.appendChild(freeRefDiv);
   }
 
   // Refresh stock button
@@ -7572,13 +7200,11 @@ function endTurn() {
       addMessage('The battle fury fades.', '');
     }
   }
-  if (state.player.spellCooldown > 0) state.player.spellCooldown--;
   if (state.player.aimedShotCooldown > 0) state.player.aimedShotCooldown--;
-  if (state.player.starThrowCooldown > 0) state.player.starThrowCooldown--;
   if (state.player.acidBoltCooldown > 0) state.player.acidBoltCooldown--;
-  if (state.player.flipCooldown > 0) state.player.flipCooldown--;
   if (state.player.illusionCooldown > 0) state.player.illusionCooldown--;
-  if (state.player.fireWardCooldown > 0) state.player.fireWardCooldown--;
+  if (state.player.arcaneDartCooldown > 0) state.player.arcaneDartCooldown--;
+  if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
 
   // Expire illusion entities
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -7984,6 +7610,23 @@ function serializeState() {
   return s;
 }
 
+function normalizeLoadedStateObject(s) {
+  if (!s || !s.player) return;
+  normalizeLoadedPlayer(s.player);
+  ensureMonkInstrument(s.player);
+  if (!Array.isArray(s.entities)) s.entities = [];
+  s.entities = s.entities.filter(e => {
+    if (!e || !e.type) return false;
+    if (e.beastmasterHound || e.charmedByBeastmaster) {
+      e.type = 'enemy';
+      e.isAlly = true;
+      e.ai = 'ally';
+      e.allyTurns = 99999;
+    }
+    return true;
+  });
+}
+
 function loadFromRaw(raw) {
   try {
     const saveData = JSON.parse(raw);
@@ -7999,6 +7642,7 @@ function loadFromRaw(raw) {
       else if (s[key] && s[key]._map) s[key] = new Map(s[key].data);
       else if (s[key] && s[key]._set) s[key] = new Set(s[key].data);
     }
+    normalizeLoadedStateObject(s);
     state = s;
     inputLocked = false;
     state.throwMode = false;
@@ -8013,6 +7657,7 @@ function loadFromRaw(raw) {
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
     Audio.startAmbient(getBiomeKey(state.floor));
+    ensureBeastmasterHound();
     computeFOV();
     render();
     updateUI();
@@ -8086,6 +7731,7 @@ function loadGameFromSlot(slot) {
         s[key] = new Set(s[key].data);
       }
     }
+    normalizeLoadedStateObject(s);
     state = s;
 
     // Save migration: if save was made before Caverns biome (MAX_FLOOR was 20)
@@ -8117,6 +7763,7 @@ function loadGameFromSlot(slot) {
 
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
+    ensureBeastmasterHound();
     // Recompute FOV and render
     setupCanvas();
     computeFOV();
@@ -8140,7 +7787,7 @@ function getSaveSlotInfo(slot) {
     const data = JSON.parse(raw);
     if (!data || !data.state) return null;
     const p = data.state.player;
-    const cls = CLASS_DEFS.find(c => c.id === p.classId);
+    const cls = getClassDef(p.classId);
     return {
       slot: slot,
       className: cls ? cls.name : 'Unknown',
@@ -8733,7 +8380,7 @@ function cloudSaveGame(slotName) {
     playerInfo: {
       name: state.playerName || 'Unknown',
       epithet: state.playerEpithet || '',
-      className: CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer',
+      className: CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Berserker',
       classIcon: CLASS_DEFS.find(c => c.id === state.player.classId)?.icon || '?',
       floor: state.floor,
       level: state.player.level,
@@ -9494,7 +9141,7 @@ function updateUI() {
   if (arrowEl) {
     if (p.equipped.ranged || p.arrows > 0) {
       arrowEl.style.display = '';
-      arrowEl.textContent = p.infiniteArrows ? '➶ ∞' : `➶ ${p.arrows}`;
+      arrowEl.textContent = `➶ ${p.arrows}`;
     } else {
       arrowEl.style.display = 'none';
     }
@@ -9507,7 +9154,7 @@ function updateUI() {
   // Rogue close door button
   const closeDoorBtn = $('btn-closedoor');
   if (closeDoorBtn) {
-    closeDoorBtn.style.display = (p.classId === 'rogue' || p.classId === 'mason') ? '' : 'none';
+    closeDoorBtn.style.display = p.classId === 'rogue' ? '' : 'none';
   }
   $('hp-text').textContent = `${p.hp}/${p.maxHp}`;
 
@@ -9589,35 +9236,6 @@ function updateUI() {
         setBtn('⚡ ENRAGE', true);
         setBar(100, 'var(--gold)');
       }
-    } else if (cls === 'wizard') {
-      spRow.style.display = '';
-      if (p.fireWard) {
-        // Fire Ward unlocked: button opens spell menu (Arcane Blast + Fire Ward)
-        const blastReady = p.spellCooldown <= 0;
-        const wardReady = p.fireWardCooldown <= 0;
-        if (blastReady && wardReady) {
-          setBtn('✨ SPELLS ✓', true);
-          setBar(100, 'var(--gold)');
-        } else if (blastReady) {
-          setBtn(`✨ SPELLS (ward ${p.fireWardCooldown}t)`, true);
-          setBar(100, '#a060ff');
-        } else if (wardReady) {
-          setBtn(`✨ SPELLS (blast ${p.spellCooldown}t)`, true);
-          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
-        } else {
-          const minCD = Math.min(p.spellCooldown, p.fireWardCooldown);
-          setBtn(`✨ SPELLS ${minCD}t`, false);
-          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
-        }
-      } else {
-        if (p.spellCooldown > 0) {
-          setBtn(`✨ BLAST ${p.spellCooldown}t`, false);
-          setBar(((12 - p.spellCooldown) / 12) * 100, '#7c5cbf');
-        } else {
-          setBtn('✨ ARCANE BLAST', true);
-          setBar(100, 'var(--gold)');
-        }
-      }
     } else if (cls === 'ranger') {
       spRow.style.display = '';
       const aimMax = p.quickDraw ? 5 : 8;
@@ -9637,36 +9255,6 @@ function updateUI() {
         setBtn('✝ DIVINE HEAL', true);
         setBar(100, 'var(--gold)');
       }
-    } else if (cls === 'bard') {
-      spRow.style.display = '';
-      const bardBonus = Math.min(state.floor, p.enemiesKilledThisFloor);
-      const bardHeal = 3 + bardBonus;
-      if (p.songOfRestFloorUsed) {
-        setBtn('🎵 SONG ✓ (next floor)', false);
-        setBar(0, 'var(--text-dim)');
-      } else {
-        setBtn(`🎵 SONG (${bardHeal} HP)`, true);
-        setBar(100, 'var(--gold)');
-      }
-    } else if (cls === 'artificer') {
-      spRow.style.display = '';
-      if (p.tinkerFloorUsed) {
-        setBtn('🔧 FORGE ✓ (next floor)', false);
-        setBar(0, 'var(--text-dim)');
-      } else {
-        const canAfford = p.gold >= 15;
-        setBtn(`🔧 FORGE (15💰)`, canAfford);
-        setBar(canAfford ? 100 : 0, canAfford ? 'var(--gold)' : 'var(--text-dim)');
-      }
-    } else if (cls === 'ninja') {
-      spRow.style.display = '';
-      if (p.starThrowCooldown > 0) {
-        setBtn(`🌟 STARS ${p.starThrowCooldown}t`, false);
-        setBar(((6 - p.starThrowCooldown) / 6) * 100, '#ffdd44');
-      } else {
-        setBtn('🌟 STAR THROW', true);
-        setBar(100, 'var(--gold)');
-      }
     } else if (cls === 'darkwizard') {
       spRow.style.display = '';
       if (p.acidBoltCooldown > 0) {
@@ -9675,25 +9263,6 @@ function updateUI() {
       } else {
         setBtn('☣️ ACID BOLT', true, '#44cc44');
         setBar(100, '#44cc44');
-      }
-    } else if (cls === 'mason') {
-      spRow.style.display = '';
-      if (p.fortifyCharges <= 0) {
-        setBtn('🧱 FORTIFY ✓ (next floor)', false);
-        setBar(0, 'var(--text-dim)');
-      } else {
-        setBtn(`🧱 FORTIFY ×${p.fortifyCharges}`, true);
-        setBar((p.fortifyCharges / (p.fortifyMaxCharges || 2)) * 100, 'var(--gold)');
-      }
-    } else if (cls === 'daredevil') {
-      spRow.style.display = '';
-      const flipMax = getMasteryBonuses(cls).fastFlip ? 3 : 4;
-      if (p.flipCooldown > 0) {
-        setBtn(`🤸 FLIP ${p.flipCooldown}t`, false);
-        setBar(((flipMax - p.flipCooldown) / flipMax) * 100, '#ff8844');
-      } else {
-        setBtn('🤸 FLIP', true, '#ff8844');
-        setBar(100, '#ff8844');
       }
     } else if (cls === 'escapeartist') {
       spRow.style.display = '';
@@ -9707,18 +9276,25 @@ function updateUI() {
     } else if (cls === 'conjurer') {
       spRow.style.display = '';
       const maxCD = getMasteryBonuses(cls).fastIllusion ? 6 : 8;
-      if (p.illusionCooldown > 0) {
-        setBtn(`🎭 ILLUSION ${p.illusionCooldown}t`, false);
-        setBar(((maxCD - p.illusionCooldown) / maxCD) * 100, '#cc44ff');
-      } else {
-        setBtn('🎭 ILLUSION', true, '#cc44ff');
+      if (p.illusionCooldown <= 0 && p.arcaneDartCooldown <= 0) {
+        setBtn('✨ SPELLS', true, '#cc44ff');
         setBar(100, '#cc44ff');
+      } else if (p.illusionCooldown <= 0 || p.arcaneDartCooldown <= 0) {
+        setBtn(`✨ SPELLS ${Math.max(p.illusionCooldown, p.arcaneDartCooldown)}t`, true, '#cc44ff');
+        setBar(100, '#cc44ff');
+      } else {
+        setBtn(`✨ SPELLS ${Math.min(p.illusionCooldown, p.arcaneDartCooldown)}t`, false, '#cc44ff');
+        setBar(((maxCD - p.illusionCooldown) / maxCD) * 100, '#cc44ff');
       }
-    } else if (cls === 'barterer') {
+    } else if (cls === 'monk') {
       spRow.style.display = '';
-      const canAfford = p.hp > 5;
-      setBtn(`🪙 RATION (−5 HP)`, canAfford);
-      setBar(canAfford ? 100 : 0, canAfford ? '#f0c040' : 'var(--text-dim)');
+      if (p.meditateCooldown > 0) {
+        setBtn(`🧘 MEDITATE ${p.meditateCooldown}t`, false, '#60c0a0');
+        setBar(((20 - p.meditateCooldown) / 20) * 100, '#60c0a0');
+      } else {
+        setBtn('🧘 MEDITATE', true, '#60c0a0');
+        setBar(100, '#60c0a0');
+      }
     } else {
       spRow.style.display = '';
       setBtn('No special ability', false);
@@ -9824,7 +9400,7 @@ function renderInventory() {
     else if (eq.slot === 'ranged' && eq.item) slot.style.borderColor = '#4a9';
     // Ranged weapon slot: show arrow count overlay
     if (eq.slot === 'ranged' && eq.item) {
-      const arrowStr = state.player.infiniteArrows ? '∞' : state.player.arrows;
+      const arrowStr = `${state.player.arrows}`;
       slot.style.position = 'relative';
       slot.innerHTML = `${eq.item.glyph}<span style="position:absolute;bottom:1px;right:3px;font-size:8px;color:#4a9;font-weight:bold;">${arrowStr}</span>`;
     } else {
@@ -9930,7 +9506,7 @@ function showItemMenu(item, index, event) {
     return;
   }
   // Rogue/Ninja: throw equipped dagger or knife as a projectile (consumes weapon)
-  if ((state.player.classId === 'rogue' || state.player.classId === 'ninja') &&
+  if (state.player.classId === 'rogue' &&
       item.itemType === 'weapon' &&
       (item.name.includes('Dagger') || item.name.includes('Knife'))) {
     actions.push({ label: 'Throw', fn: () => {
@@ -9955,19 +9531,6 @@ function showItemMenu(item, index, event) {
     actions.push({ label: 'Eat', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'potion') {
     actions.push({ label: 'Drink', fn: () => { useItem(item, index); closeItemMenu(); }});
-    if (state.player.classId === 'sage') {
-      actions.push({ label: 'Throw', fn: () => {
-        state.throwMode = true;
-        state.throwItem = {
-          item: { name: item.name, glyph: item.glyph, itemType: 'thrown_potion', effectId: item.effectId, range: 5, ammo: Infinity },
-          index
-        };
-        addMessage(`${item.glyph} Choose a direction to throw!`, 'good');
-        updateUI();
-        render();
-        closeItemMenu();
-      }});
-    }
   } else if (item.itemType === 'scroll') {
     actions.push({ label: 'Read', fn: () => { useItem(item, index); closeItemMenu(); }});
   } else if (item.itemType === 'thrown') {
@@ -9983,34 +9546,6 @@ function showItemMenu(item, index, event) {
     }
   } else if (item.itemType === 'song') {
     actions.push({ label: 'Play', fn: () => { useItem(item, index); closeItemMenu(); }});
-  }
-  // Barterer Appraise: free identify for unidentified potions/scrolls (1/floor)
-  if (state.player.bartererDiscount && !state.player.bartererAppraiseUsed &&
-      (item.itemType === 'potion' || item.itemType === 'scroll') && !item.identified) {
-    actions.push({ label: 'Appraise (free)', fn: () => {
-      if (item.itemType === 'potion') {
-        potionIdentified[item.effectId] = true;
-      } else {
-        scrollIdentified[item.effectId] = true;
-      }
-      item.identified = true;
-      item.name = item.trueName;
-      item.desc = item.itemType === 'potion'
-        ? potionNames.find(p => p.id === item.effectId).desc
-        : scrollNames.find(s => s.id === item.effectId).desc;
-      state.player.bartererAppraiseUsed = true;
-      addMessage(`You appraise the item: ${item.name}!`, 'good');
-      // Update all matching items in inventory
-      for (const inv of state.player.inventory) {
-        if (inv.effectId === item.effectId && !inv.identified) {
-          inv.identified = true;
-          inv.name = item.name;
-          inv.desc = item.desc;
-        }
-      }
-      updateUI();
-      closeItemMenu();
-    }});
   }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
@@ -10443,18 +9978,12 @@ function setupInput() {
       return;
     }
     if (state.player.classId === 'berserker') activateEnrage();
-    else if (state.player.classId === 'wizard') { if (state.player.fireWard) activateWizardMenu(); else castAoeSpell(); }
     else if (state.player.classId === 'ranger') activateAimedShot();
     else if (state.player.classId === 'cleric') activateDivineHeal();
-    else if (state.player.classId === 'bard') activateSongOfRest();
-    else if (state.player.classId === 'artificer') activateForge();
-    else if (state.player.classId === 'ninja') activateStarThrow();
     else if (state.player.classId === 'darkwizard') activateAcidBolt();
-    else if (state.player.classId === 'mason') activateFortify();
-    else if (state.player.classId === 'daredevil') activateFlip();
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
-    else if (state.player.classId === 'conjurer') activateIllusion();
-    else if (state.player.classId === 'barterer') conjureRation();
+    else if (state.player.classId === 'conjurer') activateConjurerMenu();
+    else if (state.player.classId === 'monk') activateMeditate();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -10829,7 +10358,7 @@ function showSettings() {
   }
 
   $('char-name').textContent = state
-    ? `${state.playerName} ${state.playerEpithet} ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Adventurer'}`
+    ? `${state.playerName} ${state.playerEpithet} ${CLASS_DEFS.find(c => c.id === state.player.classId)?.name || 'Berserker'}`
     : '—';
   $('game-version').textContent = `${GAME_VERSION} · Last updated ${LAST_UPDATED}`;
 
@@ -10838,8 +10367,8 @@ function showSettings() {
     statRow('XP', p ? `${p.xp}/${p.xpToNext}` : noGame),
     statRow('HP', p ? `${p.hp}/${p.maxHp}` : noGame),
     statRow('Hunger', p ? p.hunger : noGame),
-    statRow('Attack', p ? `${p.attack + (p.equipped.weapon?.attack || 0)}` : noGame),
-    statRow('Defense', p ? `${p.defense + (p.equipped.armor?.defense || 0) + (p.equipped.ring?.special === 'protection' ? 3 : 0)}` : noGame),
+    statRow('Attack', p ? `${getDisplayedPlayerAttack(p)}` : noGame),
+    statRow('Defense', p ? `${getDisplayedPlayerDefense(p)}` : noGame),
   ].join('');
 
   // Class abilities & bonuses panel
@@ -10850,101 +10379,69 @@ function showSettings() {
       const cls = CLASS_DEFS.find(c => c.id === p.classId);
       const abilities = [];
       switch (p.classId) {
-        case 'adventurer':
-          abilities.push({ icon: '♻️', name: 'Regeneration', desc: `Heals 1 HP every 15 turns` });
-          abilities.push({ icon: '🎲', name: 'Balanced Stats', desc: '10% crit chance' });
-          break;
         case 'berserker':
           abilities.push({ icon: '💢', name: 'Rage', desc: '+3 ATK when below 40% HP' });
           abilities.push({ icon: '⚡', name: 'Enrage', desc: `+5 ATK for 5 turns (1/floor)${p.enrageFloorUsed ? ' — USED' : ' — Ready'}` });
-          abilities.push({ icon: '🍖', name: 'Ravenous', desc: '2× hunger drain rate' });
+          abilities.push({ icon: '🍖', name: 'Ravenous', desc: '1.5× hunger drain rate' });
           break;
         case 'rogue':
           abilities.push({ icon: '👁', name: 'Evasion', desc: `${Math.round((p.dodgeBonus || 0) * 100)}% dodge chance` });
           abilities.push({ icon: '🗡️', name: 'Critical Strikes', desc: `${Math.round((p.critChance || 0) * 100)}% crit chance` });
+          abilities.push({ icon: '🦶', name: 'Roundhouse Kick', desc: p.level >= 5 ? 'Melee hits also strike one extra adjacent foe' : 'Unlocks at level 5' });
           abilities.push({ icon: '💨', name: 'Stealth', desc: 'Lower enemy detection range' });
-          break;
-        case 'wizard':
-          abilities.push({ icon: '✨', name: 'Arcane Affinity', desc: 'Scroll effects are doubled' });
-          abilities.push({ icon: '💥', name: 'Arcane Blast', desc: `AoE spell (${p.spellCooldown > 0 ? p.spellCooldown + 't CD' : 'Ready'})` });
           break;
         case 'ranger':
           abilities.push({ icon: '👁', name: 'Eagle Eye', desc: `+${p.fovBonus || 2} FOV radius` });
-          abilities.push({ icon: '🌿', name: 'Forager', desc: '50% chance for bonus food/arrows per floor' });
+          abilities.push({ icon: '🌿', name: 'Forager', desc: '50% chance for bonus ration each floor' });
           abilities.push({ icon: '🎯', name: 'Aimed Shot', desc: `2× bow damage (${p.aimedShotCooldown > 0 ? p.aimedShotCooldown + 't CD' : 'Ready'})` });
-          abilities.push({ icon: '♾️', name: 'Infinite Arrows', desc: 'Basic arrows never run out' });
+          abilities.push({ icon: '🏹', name: 'Arrow Supply', desc: `${p.arrows} arrows remaining` });
           break;
         case 'cleric':
-          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead, drain immune' });
+          abilities.push({ icon: '✝️', name: 'Holy Aura', desc: '+3 ATK vs undead, life drain repelled' });
           abilities.push({ icon: '🛡️', name: 'Curse Immune', desc: 'Cannot be cursed' });
+          abilities.push({ icon: '⚔️', name: 'Blunt Style', desc: 'Weapon attacks gain 1 less damage from gear' });
           abilities.push({ icon: '💛', name: 'Divine Heal', desc: `40% HP heal + cure (1/floor)${p.divineHealUsed ? ' — USED' : ' — Ready'}` });
           break;
-        case 'bard':
-          abilities.push({ icon: '🎶', name: 'Charm', desc: `${Math.round(p.charmChance * 100)}% chance to pacify on hit` });
-          const songBonus = Math.min(state.floor, p.enemiesKilledThisFloor);
-          const songHeal = 3 + songBonus;
-          abilities.push({ icon: '🎵', name: 'Song of Rest', desc: `Heal self + allies ${songHeal} HP (1/floor)${p.songOfRestFloorUsed ? ' — USED' : ' — Ready'}` });
-          abilities.push({ icon: '🎤', name: '5% Dodge', desc: 'Natural agility' });
-          break;
-        case 'artificer':
-          abilities.push({ icon: '🔧', name: 'Forge', desc: `Upgrade weapon/armor +${p.masterSmith ? 2 : 1} (15g, 1/floor)${p.tinkerFloorUsed ? ' — USED' : ' — Ready'}` });
-          abilities.push({ icon: '⚒️', name: 'Forged Loot', desc: 'Exclusive +1 gear at merchants' });
-          break;
-        case 'ninja':
-          abilities.push({ icon: '🗡️', name: 'Backstab', desc: 'Hit enemy behind target when attacking' });
-          abilities.push({ icon: '🌟', name: 'Star Throw', desc: `Throw 4 stars in all directions (${p.starThrowCooldown > 0 ? p.starThrowCooldown + 't CD' : 'Ready'})` });
-          abilities.push({ icon: '👁', name: 'Danger Sense', desc: 'Detect enemy type when alerted' });
-          abilities.push({ icon: '💨', name: '15% Dodge', desc: 'Natural agility' });
-          break;
         case 'darkwizard':
+          abilities.push({ icon: '✨', name: 'Arcane Affinity', desc: 'Scroll effects are doubled' });
           abilities.push({ icon: '💀', name: 'Necromancy', desc: `${Math.min(30, 8 + 2 * (p.level || 1))}% chance slain foes rise as allies` });
           abilities.push({ icon: '☣️', name: 'Acid Bolt', desc: `Ranged poison attack (${p.acidBoltCooldown > 0 ? p.acidBoltCooldown + 't CD' : 'Ready'})` });
-          break;
-        case 'mason':
-          abilities.push({ icon: '🧱', name: 'Fortify', desc: `Build/demolish walls (${p.fortifyCharges}/${p.fortifyMaxCharges || 2} charges)` });
-          abilities.push({ icon: '🚪', name: 'Close Doors', desc: 'Can close open doors' });
-          break;
-        case 'daredevil':
-          abilities.push({ icon: '🤸', name: 'Flip', desc: `Leap over enemy (${p.flipCooldown > 0 ? p.flipCooldown + 't CD' : 'Ready'})` });
-          abilities.push({ icon: '⚡', name: 'Ricochet', desc: '50%/25% chain hit to adjacent enemies' });
-          abilities.push({ icon: '💨', name: '10% Dodge', desc: 'Natural agility' });
+          abilities.push({ icon: '🏹', name: 'Arcane Frailty', desc: 'Weapons hit lightly; ranged weapons lose 2 damage' });
           break;
         case 'escapeartist':
           abilities.push({ icon: '❄️', name: 'Ice Traps', desc: 'Drop ice traps when retreating from enemies' });
+          abilities.push({ icon: '💥', name: 'Ricochet', desc: 'Melee hits chain 50%/25% damage to nearby foes' });
           abilities.push({ icon: '💨', name: 'Escape Route', desc: `Teleport to stairs (1/floor)${p.stairsTeleportFloorUsed ? ' — USED' : ' — Ready'}` });
-          abilities.push({ icon: '👁', name: '15% Dodge', desc: 'Natural agility' });
+          abilities.push({ icon: '👁', name: '20% Dodge', desc: 'Natural agility' });
           break;
         case 'conjurer':
-          abilities.push({ icon: '👤', name: 'Illusory Double', desc: `Place a decoy (${p.illusionCooldown > 0 ? p.illusionCooldown + 't CD' : 'Ready'})` });
-          abilities.push({ icon: '🍖', name: 'Conjure Ration', desc: 'Create food for −5 HP' });
-          abilities.push({ icon: '💨', name: '5% Dodge', desc: 'Natural agility' });
+          abilities.push({ icon: '📖', name: 'Omniscience', desc: 'All potions and scrolls start identified' });
+          abilities.push({ icon: '✨', name: 'Arcane Dart', desc: `Low-damage ranged spell (${p.arcaneDartCooldown > 0 ? p.arcaneDartCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🎭', name: 'Illusory Double', desc: `Place a decoy (${p.illusionCooldown > 0 ? p.illusionCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🏹', name: 'Arcane Frailty', desc: 'Weapons hit lightly; ranged weapons lose 2 damage' });
           break;
-        case 'barterer':
-          abilities.push({ icon: '💸', name: '25% Discount', desc: 'All merchant prices reduced' });
-          abilities.push({ icon: '💰', name: 'Gold Sense', desc: '+50% gold from pickups' });
-          abilities.push({ icon: '🗺️', name: 'Merchant Compass', desc: 'Merchants always visible on minimap' });
-          abilities.push({ icon: '🔍', name: 'Appraise', desc: `Identify potion/scroll (${p.appraiseCooldown > 0 ? p.appraiseCooldown + 't CD' : 'Ready'})` });
+        case 'monk':
+          abilities.push({ icon: '🥋', name: 'Disciplined Body', desc: `ATK ${getDisplayedPlayerAttack(p)} and DEF ${getDisplayedPlayerDefense(p)} scale with level` });
+          abilities.push({ icon: '🧘', name: 'Meditate', desc: `Cleanse + heal in an empty room (${p.meditateCooldown > 0 ? p.meditateCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🌊', name: 'Water Walker', desc: 'Cross deep water without a potion' });
+          abilities.push({ icon: '🎶', name: 'Song Mastery', desc: 'Can play song items reliably with an instrument' });
+          break;
+        case 'beastmaster':
+          abilities.push({ icon: '🐺', name: 'Hound Companion', desc: 'A permanent hound spawns beside you each floor' });
+          abilities.push({ icon: '♻️', name: 'Rapid Regeneration', desc: 'Heals 1 HP every 15 turns' });
+          abilities.push({ icon: '🐾', name: 'Beast Charm', desc: '70% chance to win over Bats, Slimes, and Spiders on hit' });
           break;
       }
       // Add unlocked class-specific perks
       const classPerkFlags = [
-        { flag: 'survivorInstinct', icon: '🍖', name: "Survivor's Instinct", desc: 'Auto-eat food when starving' },
         { flag: 'undyingFury', icon: '💢', name: 'Undying Fury', desc: `Survive lethal hit 1/floor${p.undyingFuryUsed ? ' — USED' : ' — Ready'}` },
         { flag: 'shadowStep', icon: '💨', name: 'Shadow Step', desc: 'Invisible for 2 turns after a kill' },
-        { flag: 'manaShield', icon: '✨', name: 'Mana Shield', desc: '25% chance to negate damage' },
         { flag: 'quickDraw', icon: '🎯', name: 'Quick Draw', desc: 'Aimed Shot cooldown 5 instead of 8' },
         { flag: 'sanctifiedGround', icon: '✝️', name: 'Sanctified Ground', desc: 'Heal 1 HP when waiting' },
-        { flag: 'encore', icon: '🎶', name: 'Encore', desc: '30% chance charmed foes fight for you' },
-        { flag: 'masterSmith', icon: '⚒️', name: 'Master Smith', desc: 'Forge gives +2 instead of +1' },
-        { flag: 'rampart', icon: '🧱', name: 'Rampart', desc: '+1 fortify charge per floor' },
         { flag: 'mirrorImage', icon: '🎭', name: 'Mirror Image', desc: 'Place 2 illusions at once' },
-        { flag: 'fireWard', icon: '🔥', name: 'Fire Ward', desc: 'Cast fire spheres around you' },
         { flag: 'doubleShot', icon: '🏹', name: 'Double Shot', desc: 'Fire 2 arrows in one turn' },
-        { flag: 'silentKill', icon: '💨', name: 'Silent Kill', desc: 'Kills grant/refresh stealth (2 turns)' },
         { flag: 'necroticSurge', icon: '☣️', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
-        { flag: 'recklessCharge', icon: '🤸', name: 'Reckless Charge', desc: 'Flip strikes healthy enemies (>75% HP)' },
         { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
-        { flag: 'sharpDealer', icon: '🎁', name: 'Sharp Dealer', desc: 'Every 3rd purchase grants a free item' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -11699,21 +11196,13 @@ function renderMinimap() {
     ctx.fillRect(e.x * scale + 1, e.y * scale + 1, scale - 2, scale - 2);
   }
 
-  // Draw merchants as gold dots (Barterer always sees them even through fog)
+  // Draw merchants as gold dots
   for (const e of state.entities) {
     if (e.type !== 'merchant') continue;
     const idx = e.y * MAP_W + e.x;
-    const alwaysShow = state.player.bartererDiscount;
-    if (!state.visible[idx] && !alwaysShow) continue;
-    ctx.fillStyle = alwaysShow && !state.visible[idx] ? 'rgba(240,192,64,0.45)' : '#f0c040';
+    if (!state.visible[idx]) continue;
+    ctx.fillStyle = '#f0c040';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
-    if (alwaysShow && !state.visible[idx]) {
-      ctx.fillStyle = '#f0c040';
-      ctx.font = 'bold 6px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('$', e.x * scale + scale / 2, e.y * scale + scale / 2);
-    }
   }
 
   // Draw Conjurer illusions as purple dots on minimap
@@ -12266,17 +11755,14 @@ function fireRangedWeapon() {
     return;
   }
 
-  // Check ammo (Rangers have infinite basic arrows)
-  if (!p.infiniteArrows && p.arrows <= 0 && !p.loadedSpecialArrow) {
+  if (p.arrows <= 0 && !p.loadedSpecialArrow) {
     addMessage('No arrows! Find or buy more.', 'damage');
     return;
   }
 
-  // Calculate damage with Ranger level scaling
-  let baseDmg = bow.damage;
-  if (p.infiniteArrows) {
-    baseDmg += Math.floor(p.level / 3); // Rangers scale with level
-  }
+  let baseDmg = bow.damage + getPlayerRangedDamageBonus(p);
+  if (p.classId === 'ranger') baseDmg += Math.floor(p.level / 3);
+  baseDmg = Math.max(1, baseDmg);
 
   // Enter aim mode using throwMode system
   state.throwMode = true;
@@ -12294,7 +11780,7 @@ function fireRangedWeapon() {
     index: -1
   };
 
-  const ammoStr = p.infiniteArrows ? '∞' : `${p.arrows}`;
+  const ammoStr = `${p.arrows}`;
   const specialStr = p.loadedSpecialArrow ? ` [${p.loadedSpecialArrow.name}]` : '';
   addMessage(`🏹 ${bow.name}${specialStr} — choose direction! (${ammoStr} arrows)`, 'good');
   updateUI();
@@ -12372,7 +11858,8 @@ function throwProjectile(dx, dy, isSecondShot) {
   const isAimedShot = item.itemType === 'aimed_shot';
   const isRangedShot = item.itemType === 'ranged_shot';
   const isAcidBolt = item.itemType === 'acid_bolt';
-  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt ? (item.range || 8) : 8);
+  const isArcaneDart = item.itemType === 'arcane_dart';
+  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart ? (item.range || 8) : 8);
   const p = state.player;
 
   let x = p.x + dx;
@@ -12403,6 +11890,10 @@ function throwProjectile(dx, dy, isSecondShot) {
       } else if (isRangedShot) {
         const shotLabel = isSecondShot ? '2nd arrow' : 'Arrow';
         addMessage(`🏹 ${shotLabel} hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isAcidBolt) {
+        addMessage(`☣️ Acid Bolt hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isArcaneDart) {
+        addMessage(`✨ Arcane Dart hits ${target.name} for ${dmg}!`, 'good');
       } else {
         addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
       }
@@ -12472,9 +11963,9 @@ function throwProjectile(dx, dy, isSecondShot) {
 
   // Animation — delay endTurn until projectile animation finishes so enemies
   // don't move while the projectile is still visually in flight
-  const projGlyph = isAcidBolt ? '☣️' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
+  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
   // Check if double shot will fire after this — if so, don't attach endTurn callback to this animation
-  const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && (p.infiniteArrows || p.arrows > 0);
+  const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && p.arrows > 0;
   const deferEndTurn = true; // always defer endTurn until animation completes
   animateProjectile(p.x, p.y, landX, landY, projGlyph, willDoubleShot ? null : () => { updateUI(); render(); endTurn(); });
 
@@ -12501,9 +11992,19 @@ function throwProjectile(dx, dy, isSecondShot) {
     state.player.acidBoltCooldown = 7;
   }
 
+  if (isArcaneDart) {
+    if (!hit) addMessage('The dart flickers into the dark.', '');
+    state.player.arcaneDartCooldown = 5;
+  }
+
   if (isAimedShot) {
     if (!hit) addMessage('Your arrow flies into the darkness.', '');
     p.aimedShotCooldown = p.quickDraw ? 5 : 8;
+    if (p.equipped.ranged && !p.loadedSpecialArrow) {
+      p.arrows--;
+      if (p.arrows <= 0) addMessage('That was your last arrow!', 'damage');
+      else addMessage(`${p.arrows} arrow${p.arrows === 1 ? '' : 's'} remaining.`, '');
+    }
     // Aimed shot consumes special arrow if loaded
     if (p.loadedSpecialArrow && hit) {
       p.loadedSpecialArrow.ammo--;
@@ -12517,14 +12018,11 @@ function throwProjectile(dx, dy, isSecondShot) {
   } else if (isRangedShot) {
     if (!hit) addMessage('Your arrow flies into the darkness.', '');
 
-    // Consume ammo: Rangers use no basic arrows; non-Rangers use 1
-    if (!p.infiniteArrows) {
-      p.arrows--;
-      if (p.arrows <= 0) {
-        addMessage('That was your last arrow!', 'damage');
-      } else {
-        addMessage(`${p.arrows} arrow${p.arrows === 1 ? '' : 's'} remaining.`, '');
-      }
+    p.arrows--;
+    if (p.arrows <= 0) {
+      addMessage('That was your last arrow!', 'damage');
+    } else {
+      addMessage(`${p.arrows} arrow${p.arrows === 1 ? '' : 's'} remaining.`, '');
     }
 
     // Consume special arrow if loaded
@@ -12566,15 +12064,8 @@ function throwProjectile(dx, dy, isSecondShot) {
   // Ranger Double Shot: fire a second arrow in the same direction
   if (isRangedShot && !isSecondShot && p.doubleShot) {
     addMessage('🏹 Double Shot!', 'good');
-    // Consume second arrow for non-Rangers
-    if (!p.infiniteArrows) {
-      if (p.arrows <= 0) {
-        addMessage('No arrows for second shot!', 'damage');
-      } else {
-        const secondThrow = { item: { ...item, loadedArrow: null }, index: -1 };
-        throwProjectile(dx, dy, secondThrow);
-        return;
-      }
+    if (p.arrows <= 0) {
+      addMessage('No arrows for second shot!', 'damage');
     } else {
       const secondThrow = { item: { ...item, loadedArrow: null }, index: -1 };
       throwProjectile(dx, dy, secondThrow);
@@ -12653,83 +12144,53 @@ function activateEnrage() {
   updateUI();
 }
 
-function castAoeSpell() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  if (state.player.spellCooldown > 0) {
-    addMessage(`Arcane blast recharging (${state.player.spellCooldown} turns).`, '');
-    return;
-  }
-  Audio.resume();
-  haptic(40);
-  const radius = 3;
-  const targets = state.entities.filter(e => {
-    if (e.type !== 'enemy' || e.hp <= 0) return false;
-    const dx = e.x - state.player.x, dy = e.y - state.player.y;
-    return Math.sqrt(dx * dx + dy * dy) <= radius;
-  });
-  // AoE blast animation
-  animateAoeBlast(state.player.x, state.player.y, radius, '#a060ff');
-  if (targets.length === 0) {
-    addMessage('✨ Arcane blast — no enemies in range!', '');
-  } else {
-    addMessage(`✨ Arcane blast — ${targets.length} target${targets.length > 1 ? 's' : ''}!`, 'good');
-    for (const t of targets) { if (t.hp > 0) attackEntity(state.player, t); }
-  }
-  state.player.spellCooldown = 12;
-  endTurn();
-}
-
-// === WIZARD: FIRE WARD + MENU ===
-function activateWizardMenu() {
+function activateConjurerMenu() {
   if (inputLocked || state.gameOver || state.victory) return;
   const p = state.player;
-  // Check if both abilities are on cooldown — show status
-  const spellReady = p.spellCooldown <= 0;
-  const wardReady = p.fireWardCooldown <= 0;
+  const illusionReady = p.illusionCooldown <= 0;
+  const dartReady = p.arcaneDartCooldown <= 0;
   inputLocked = true;
   Audio.resume();
   const overlay = $('levelup-overlay');
-  overlay.querySelector('h1').textContent = '✨ WIZARD';
+  overlay.querySelector('h1').textContent = '🎭 CONJURER';
   $('levelup-label').textContent = 'Choose a spell:';
   const container = $('perk-choices');
   container.innerHTML = '';
-  // Option 1: Arcane Blast
-  const blastBtn = document.createElement('button');
-  blastBtn.className = 'perk-btn';
-  const blastStatus = spellReady ? 'Ready' : `${p.spellCooldown} turns`;
-  blastBtn.innerHTML = `<div class="perk-name">✨ Arcane Blast</div><div class="perk-desc">AoE damage to nearby enemies${spellReady ? '' : ` (${blastStatus})`}</div>`;
-  if (!spellReady) blastBtn.style.opacity = '0.5';
-  const blastHandler = () => {
+
+  const dartBtn = document.createElement('button');
+  dartBtn.className = 'perk-btn';
+  dartBtn.innerHTML = `<div class="perk-name">✨ Arcane Dart</div><div class="perk-desc">Low-damage ranged spell${dartReady ? '' : ` (${p.arcaneDartCooldown} turns)`}</div>`;
+  if (!dartReady) dartBtn.style.opacity = '0.5';
+  const dartHandler = () => {
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
-    if (spellReady) castAoeSpell();
-    else addMessage(`Arcane blast recharging (${p.spellCooldown} turns).`, '');
+    if (dartReady) activateArcaneDart();
+    else addMessage(`Arcane Dart recharging (${p.arcaneDartCooldown} turns).`, '');
   };
-  blastBtn.addEventListener('click', blastHandler);
-  blastBtn.addEventListener('touchend', (e) => { e.preventDefault(); blastHandler(); }, { passive: false });
-  container.appendChild(blastBtn);
-  // Option 2: Fire Ward
-  const wardBtn = document.createElement('button');
-  wardBtn.className = 'perk-btn';
-  const wardStatus = wardReady ? 'Ready' : `${p.fireWardCooldown} turns`;
-  wardBtn.innerHTML = `<div class="perk-name">🔥 Fire Ward</div><div class="perk-desc">Ring of fire spheres (3 turns)${wardReady ? '' : ` (${wardStatus})`}</div>`;
-  if (!wardReady) wardBtn.style.opacity = '0.5';
-  const wardHandler = () => {
+  dartBtn.addEventListener('click', dartHandler);
+  dartBtn.addEventListener('touchend', (e) => { e.preventDefault(); dartHandler(); }, { passive: false });
+  container.appendChild(dartBtn);
+
+  const illusionBtn = document.createElement('button');
+  illusionBtn.className = 'perk-btn';
+  illusionBtn.innerHTML = `<div class="perk-name">🎭 Illusion</div><div class="perk-desc">Summon a decoy${illusionReady ? '' : ` (${p.illusionCooldown} turns)`}</div>`;
+  if (!illusionReady) illusionBtn.style.opacity = '0.5';
+  const illusionHandler = () => {
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
-    if (wardReady) castFireWard();
-    else addMessage(`Fire Ward recharging (${p.fireWardCooldown} turns).`, '');
+    if (illusionReady) activateIllusion();
+    else addMessage(`Illusion not ready. (${p.illusionCooldown} turns)`, '');
   };
-  wardBtn.addEventListener('click', wardHandler);
-  wardBtn.addEventListener('touchend', (e) => { e.preventDefault(); wardHandler(); }, { passive: false });
-  container.appendChild(wardBtn);
-  // Cancel
+  illusionBtn.addEventListener('click', illusionHandler);
+  illusionBtn.addEventListener('touchend', (e) => { e.preventDefault(); illusionHandler(); }, { passive: false });
+  container.appendChild(illusionBtn);
+
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = `<div class="perk-name">❌ Cancel</div>`;
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
   const cancelHandler = () => {
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
@@ -12738,41 +12199,62 @@ function activateWizardMenu() {
   cancelBtn.addEventListener('click', cancelHandler);
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
+
   overlay.classList.add('active');
 }
 
-function castFireWard() {
+function activateArcaneDart() {
   if (inputLocked || state.gameOver || state.victory) return;
   const p = state.player;
-  Audio.resume();
-  haptic(40);
-  const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},{x:1,y:1},{x:-1,y:-1},{x:1,y:-1},{x:-1,y:1}];
-  let placed = 0;
-  for (const d of dirs) {
-    const nx = p.x + d.x, ny = p.y + d.y;
-    if (isWalkable(nx, ny)) {
-      state.entities.push({ type: 'hazard', x: nx, y: ny, glyph: '🔥', name: 'Fire Ward', hazardType: 'fireward', turns: 3 });
-      animateEntityFlash(nx, ny, '#ff6020');
-      placed++;
-      // Damage any enemy standing there immediately
-      const enemy = enemyAt(nx, ny);
-      if (enemy && enemy.hp > 0 && !enemy.isAlly) {
-        const dmg = Math.max(1, 2 + Math.floor(p.level / 3));
-        enemy.hp -= dmg;
-        addMessage(`🔥 ${enemy.name} is scorched! (-${dmg})`, 'good');
-        if (enemy.hp <= 0) killEnemy(enemy);
-      }
-    }
-  }
-  if (placed === 0) {
-    addMessage('No space for fire spheres!', 'damage');
+  if (p.arcaneDartCooldown > 0) {
+    addMessage(`Arcane Dart recharging (${p.arcaneDartCooldown} turns).`, '');
     return;
   }
-  addMessage(`🔥 Fire Ward! ${placed} fire spheres surround you!`, 'good');
-  animateAoeBlast(p.x, p.y, 1.5, '#ff4000');
-  Audio.hit();
-  p.fireWardCooldown = 8;
-  computeFOV();
+  state.throwMode = true;
+  state.throwItem = {
+    item: { name: 'Arcane Dart', damage: 2 + Math.floor(p.level / 4), ammo: Infinity, itemType: 'arcane_dart', range: 8 },
+    index: -1
+  };
+  addMessage('✨ Arcane Dart — choose direction!', 'good');
+  updateUI();
+  render();
+}
+
+function activateMeditate() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.meditateCooldown > 0) {
+    addMessage(`Meditate recharging (${p.meditateCooldown} turns).`, '');
+    return;
+  }
+  if (p.hunger < 30) {
+    addMessage('You are too hungry to concentrate.', 'damage');
+    return;
+  }
+  const currentRoom = state.rooms.find(r => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
+  if (!currentRoom) {
+    addMessage('You need a quiet room to meditate.', 'damage');
+    return;
+  }
+  const hostileInRoom = state.entities.some(e =>
+    e.type === 'enemy' && e.hp > 0 && !e.isAlly &&
+    e.x >= currentRoom.x && e.x < currentRoom.x + currentRoom.w &&
+    e.y >= currentRoom.y && e.y < currentRoom.y + currentRoom.h
+  );
+  if (hostileInRoom) {
+    addMessage('You need a quiet room to meditate.', 'damage');
+    return;
+  }
+  const beforeCount = p.statusEffects.length;
+  const cleansed = new Set(['poison', 'burning', 'webbed', 'frozen', 'wet']);
+  p.statusEffects = p.statusEffects.filter(e => !cleansed.has(e.type));
+  const healAmount = Math.max(1, Math.floor(p.maxHp * 0.2));
+  p.hp = Math.min(p.maxHp, p.hp + healAmount);
+  p.meditateCooldown = 20;
+  Audio.useItem();
+  haptic(40);
+  addMessage(beforeCount !== p.statusEffects.length ? `🧘 You meditate. (+${healAmount} HP, cleansed)` : `🧘 You meditate. (+${healAmount} HP)`, 'good');
+  animateAoeBlast(p.x, p.y, 1.5, '#60c0a0');
   updateUI();
   endTurn();
 }
@@ -12781,6 +12263,10 @@ function activateAimedShot() {
   if (inputLocked || state.gameOver || state.victory) return;
   if (state.player.aimedShotCooldown > 0) {
     addMessage(`Aimed Shot recharging (${state.player.aimedShotCooldown} turns).`, '');
+    return;
+  }
+  if (state.player.equipped.ranged && state.player.arrows <= 0 && !state.player.loadedSpecialArrow) {
+    addMessage('No arrows! Find or buy more.', 'damage');
     return;
   }
   Audio.resume();
@@ -12821,158 +12307,6 @@ function activateDivineHeal() {
   endTurn();
 }
 
-// === BARD: SONG OF REST ===
-function activateSongOfRest() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  if (state.player.songOfRestFloorUsed) {
-    addMessage('Song of Rest already used this floor.', '');
-    return;
-  }
-  Audio.resume();
-  haptic(40);
-  const p = state.player;
-  const bonusHeal = Math.min(state.floor, p.enemiesKilledThisFloor);
-  const healAmount = 3 + bonusHeal;
-  p.hp = Math.min(p.maxHp, p.hp + healAmount);
-  // Heal allies too
-  const allies = state.entities.filter(e => e.type === 'enemy' && e.isAlly && e.hp > 0);
-  for (const ally of allies) {
-    ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
-  }
-  p.songOfRestFloorUsed = true;
-  const allyMsg = allies.length > 0 ? ` and ${allies.length} ally${allies.length > 1 ? 'es' : ''}` : '';
-  addMessage(`🎵 Song of Rest heals you${allyMsg} for ${healAmount} HP!`, 'good');
-  animateAoeBlast(p.x, p.y, 2, '#60c0a0');
-  Audio.useItem();
-  updateUI();
-  endTurn();
-}
-
-// === ARTIFICER: FORGE ===
-function activateForge() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  if (state.player.tinkerFloorUsed) {
-    addMessage('Forge already used this floor.', '');
-    return;
-  }
-  const p = state.player;
-  if (p.gold < 15) {
-    addMessage('Forge costs 15 gold.', 'damage');
-    return;
-  }
-  // Gather all forgeable items (weapons and armors, equipped and inventory)
-  const candidates = [];
-  if (p.equipped.weapon) candidates.push({ item: p.equipped.weapon, label: '⚔️ ' + p.equipped.weapon.name + ' (equipped)', slot: 'weapon' });
-  if (p.equipped.armor) candidates.push({ item: p.equipped.armor, label: '🛡️ ' + p.equipped.armor.name + ' (equipped)', slot: 'armor' });
-  if (p.equipped.ranged) candidates.push({ item: p.equipped.ranged, label: '🏹 ' + p.equipped.ranged.name + ' (equipped)', slot: 'ranged' });
-  for (let i = 0; i < p.inventory.length; i++) {
-    const it = p.inventory[i];
-    if (it.itemType === 'weapon') candidates.push({ item: it, label: '⚔️ ' + it.name + ` [+${it.attack} ATK]`, slot: null });
-    else if (it.itemType === 'armor') candidates.push({ item: it, label: '🛡️ ' + it.name + ` [+${it.defense} DEF]`, slot: null });
-    else if (it.itemType === 'ranged') candidates.push({ item: it, label: '🏹 ' + it.name + ` [${it.damage} DMG]`, slot: null });
-  }
-  if (candidates.length === 0) {
-    addMessage('No weapon or armor to forge.', 'damage');
-    return;
-  }
-  // Show forge picker overlay
-  inputLocked = true;
-  Audio.resume();
-  const overlay = $('levelup-overlay');
-  overlay.querySelector('h1').textContent = '🔧 FORGE';
-  const bonus = p.masterSmith ? 2 : 1;
-  $('levelup-label').textContent = `Choose an item to upgrade (+${bonus}). Cost: 15💰  You have: ${p.gold}💰`;
-  const container = $('perk-choices');
-  container.innerHTML = '';
-  for (const cand of candidates) {
-    const btn = document.createElement('button');
-    btn.className = 'perk-btn';
-    const isWeaponType = cand.item.itemType === 'weapon' || cand.item.itemType === 'ranged';
-    const statLabel = isWeaponType ? `+${bonus} ATK/DMG` : `+${bonus} DEF`;
-    btn.innerHTML = `<div class="perk-name">${cand.label}</div><div class="perk-desc">${statLabel}</div>`;
-    const handler = () => {
-      p.gold -= 15;
-      if (cand.item.itemType === 'weapon' || cand.item.itemType === 'ranged') {
-        const key = cand.item.attack !== undefined ? 'attack' : 'damage';
-        cand.item[key] = (cand.item[key] || 0) + bonus;
-        const val = cand.item[key];
-        cand.item.name = cand.item.name.replace(/ \+\d+$/, '') + ` +${val}`;
-        addMessage(`🔧 Forged: +${bonus} ${key === 'attack' ? 'ATK' : 'DMG'}! (${cand.item.name})`, 'gold');
-      } else {
-        cand.item.defense = (cand.item.defense || 0) + bonus;
-        cand.item.name = cand.item.name.replace(/ \+\d+$/, '') + ` +${cand.item.defense}`;
-        addMessage(`🔧 Forged: +${bonus} DEF! (${cand.item.name})`, 'gold');
-      }
-      p.tinkerFloorUsed = true;
-      animateEntityFlash(p.x, p.y, '#f0a030');
-      Audio.gold();
-      haptic(40);
-      overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
-      overlay.classList.remove('active');
-      inputLocked = false;
-      updateUI();
-    };
-    btn.addEventListener('click', handler);
-    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
-    container.appendChild(btn);
-  }
-  // Cancel button
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'perk-btn';
-  cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = `<div class="perk-name">❌ Cancel</div><div class="perk-desc">Keep your gold</div>`;
-  const cancelHandler = () => {
-    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
-    overlay.classList.remove('active');
-    inputLocked = false;
-  };
-  cancelBtn.addEventListener('click', cancelHandler);
-  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
-  container.appendChild(cancelBtn);
-  overlay.classList.add('active');
-}
-
-// === NINJA: STAR THROW ===
-function activateStarThrow() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  const p = state.player;
-  if (p.starThrowCooldown > 0) {
-    addMessage(`Throwing Stars not ready. (${p.starThrowCooldown} turns)`, '');
-    return;
-  }
-  Audio.resume();
-  haptic(40);
-  const dmg = p.attack + 2;
-  let hitCount = 0;
-  for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-    let x = p.x + dx, y = p.y + dy;
-    let landed = { x: p.x + dx, y: p.y + dy };
-    for (let i = 0; i < 8; i++) {
-      if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) break;
-      const target = enemyAt(x, y);
-      if (target && target.hp > 0 && !target.isAlly) {
-        const def = getEffectiveDefense(target);
-        const d = Math.max(1, dmg - def + Math.floor(Math.random() * 3) - 1);
-        target.hp -= d;
-        addMessage(`🌟 Star hits ${target.name} for ${d}!`, 'good');
-        landed = { x, y };
-        hitCount++;
-        if (target.hp <= 0) killEnemy(target);
-        break;
-      }
-      if (!isWalkable(x, y)) break;
-      landed = { x, y };
-      x += dx; y += dy;
-    }
-    animateProjectile(p.x, p.y, landed.x, landed.y, '🌟');
-  }
-  if (hitCount === 0) addMessage('🌟 Stars fly in all directions!', 'good');
-  p.starThrowCooldown = 6;
-  Audio.hit();
-  updateUI();
-  endTurn();
-}
-
 // === DARK WIZARD: ACID BOLT ===
 function activateAcidBolt() {
   if (inputLocked || state.gameOver || state.victory) return;
@@ -12995,114 +12329,6 @@ function activateAcidBolt() {
     index: -1
   };
   addMessage('☣️ Acid Bolt — choose direction!', 'good');
-  updateUI();
-  render();
-}
-
-// === BRICK MASON: FORTIFY ===
-function activateFortify() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  const p = state.player;
-  if (p.fortifyCharges <= 0) {
-    addMessage('No fortify charges left this floor.', '');
-    return;
-  }
-  // If already in fortify mode, cancel
-  if (state.fortifyMode) {
-    state.fortifyMode = false;
-    state.fortifyCandidates = null;
-    addMessage('Fortify cancelled.', '');
-    updateUI();
-    render();
-    return;
-  }
-  // Find valid adjacent tiles: FLOOR/CORRIDOR to build, WALL (non-border) to demolish
-  const candidates = [];
-  for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-    const nx = p.x + dx, ny = p.y + dy;
-    const t = getTile(nx, ny);
-    if (t === T.FLOOR || t === T.CORRIDOR) {
-      // Build candidate — not occupied by enemy
-      if (enemyAt(nx, ny)) continue;
-      candidates.push({ nx, ny, dx, dy, action: 'build' });
-    } else if (t === T.WALL && nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
-      // Demolish candidate — non-border wall
-      candidates.push({ nx, ny, dx, dy, action: 'demolish' });
-    } else if (t === T.DOOR_OPEN) {
-      // Mason can re-seal open doors
-      candidates.push({ nx, ny, dx, dy, action: 'seal' });
-    }
-  }
-  if (candidates.length === 0) {
-    addMessage('No room to build, demolish, or seal here.', '');
-    return;
-  }
-  Audio.resume();
-  // Enter fortify targeting mode — player sees the map and picks a direction
-  state.fortifyMode = true;
-  state.fortifyCandidates = candidates;
-  const hasBuild = candidates.some(c => c.action === 'build');
-  const hasDemo = candidates.some(c => c.action === 'demolish');
-  const hasSeal = candidates.some(c => c.action === 'seal');
-  const modes = [hasBuild && 'build', hasDemo && 'demolish', hasSeal && 'seal'].filter(Boolean);
-  const modeDesc = modes.join(' or ');
-  addMessage(`🧱 Fortify (${p.fortifyCharges} left) — ${modeDesc}! (hold to cancel)`, 'good');
-  updateUI();
-  render();
-}
-
-function executeFortify(dx, dy) {
-  const p = state.player;
-  if (!state.fortifyMode || !state.fortifyCandidates) return false;
-  const cand = state.fortifyCandidates.find(c => c.dx === dx && c.dy === dy);
-  if (!cand) {
-    addMessage('Cannot build there.', '');
-    return false;
-  }
-  const key = cand.ny * MAP_W + cand.nx;
-  if (cand.action === 'build') {
-    setTile(cand.nx, cand.ny, T.WALL);
-    state.masonWalls.set(key, 5);
-    animateEntityFlash(p.x, p.y, '#a0a0a0');
-    addMessage('🧱 You build a wall!', 'good');
-  } else if (cand.action === 'seal') {
-    setTile(cand.nx, cand.ny, T.DOOR_SEALED);
-    animateEntityFlash(p.x, p.y, '#a0a0a0');
-    addMessage('🚪 You seal the door shut!', 'good');
-  } else {
-    setTile(cand.nx, cand.ny, T.FLOOR);
-    state.masonWalls.delete(key);
-    animateEntityFlash(p.x, p.y, '#c08040');
-    addMessage('🧱 You break through the wall!', 'good');
-  }
-  p.fortifyCharges--;
-  state.fortifyMode = false;
-  state.fortifyCandidates = null;
-  Audio.door();
-  haptic(50);
-  computeFOV();
-  updateUI();
-  endTurn();
-  return true;
-}
-
-// === DAREDEVIL: FLIP ===
-function activateFlip() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  const p = state.player;
-  if (p.flipCooldown > 0) {
-    addMessage(`Flip not ready. (${p.flipCooldown} turns)`, '');
-    return;
-  }
-  if (p.flipMode) {
-    p.flipMode = false;
-    addMessage('Flip cancelled.', '');
-    updateUI();
-    render();
-    return;
-  }
-  p.flipMode = true;
-  addMessage('🤸 Flip — choose direction to jump!', 'good');
   updateUI();
   render();
 }
@@ -13201,23 +12427,6 @@ function activateIllusion() {
   Audio.gold();
   haptic(40);
   computeFOV();
-  updateUI();
-  endTurn();
-}
-
-// === BARTERER: CONJURE RATION ===
-function conjureRation() {
-  if (inputLocked || state.gameOver || state.victory) return;
-  const p = state.player;
-  if (p.hp <= 5) {
-    addMessage('Not enough HP to conjure a ration!', 'damage');
-    return;
-  }
-  p.hp -= 5;
-  p.hunger = Math.min(100, p.hunger + 30);
-  addMessage('🪙 You trade vitality for sustenance. (−5 HP, +30 hunger)', 'good');
-  Audio.gold();
-  haptic(40);
   updateUI();
   endTurn();
 }
