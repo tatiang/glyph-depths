@@ -1551,6 +1551,7 @@
             <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
             <div class="setting-row"><span>Auto-Pick Up</span><div class="toggle on" id="toggle-autopickup"></div></div>
             <div class="setting-row"><span>Auto-Equip Better Gear</span><div class="toggle" id="toggle-autoequip"></div></div>
+            <div class="setting-row"><span>Enemy Intent Indicators</span><div class="toggle on" id="toggle-showIntents"></div></div>
           </div>
         </div>
 
@@ -1697,7 +1698,7 @@
 
         <div style="margin-bottom:10px;">
           <div style="color:var(--gold);font-weight:700;font-size:13px;">💨 Escape Artist</div>
-          <p class="help-note">Evasive specialist (12 HP, +1 ATK, +1 DEF). 15% dodge. Escape Route: teleport to the stairs, once per floor. Leaves ice traps behind when fleeing enemies.</p>
+          <p class="help-note">Evasive specialist (12 HP, +1 ATK, +1 DEF). 15% dodge. Escape Route: teleport to an adjacent room, once per floor. Leaves ice traps behind when fleeing enemies.</p>
         </div>
 
         <div style="margin-bottom:10px;">
@@ -1787,7 +1788,7 @@
         <div class="help-row"><span class="hl">⚔️ Weapon</span><span>Melee weapon — adds ATK to melee hits</span></div>
         <div class="help-row"><span class="hl">🏹 Ranged</span><span>Bow/crossbow — fire arrows at range</span></div>
         <div class="help-row"><span class="hl">🛡️ Armor</span><span>Adds DEF, may have special effects</span></div>
-        <div class="help-row"><span class="hl">💍 Ring</span><span>Passive bonuses (sight, haste, protection, hunger)</span></div>
+        <div class="help-row"><span class="hl">💍 Ring</span><span>Passive bonuses (sight, haste, protection, hunger, detection)</span></div>
       </div>
 
       </div><!-- end PAGE 4 -->
@@ -1991,7 +1992,7 @@
         <div class="help-row"><span class="hl">🟣 Dark Wizard</span><span>Acid Bolt. Poison resist. Dark power.</span></div>
         <div class="help-row"><span class="hl">🧱 Brick Mason</span><span>Fortify walls. High DEF. Tanky.</span></div>
         <div class="help-row"><span class="hl">🤸 Daredevil</span><span>Flip over enemies. Ricochet melee.</span></div>
-        <div class="help-row"><span class="hl">💨 Escape Artist</span><span>Teleport to stairs. Ice traps.</span></div>
+        <div class="help-row"><span class="hl">💨 Escape Artist</span><span>Teleport to adjacent room. Ice traps.</span></div>
         <div class="help-row"><span class="hl">🎭 Conjurer</span><span>Summon illusions to distract enemies.</span></div>
         <div class="help-row"><span class="hl">🪙 Barterer</span><span>Discount shopping. Conjure rations.</span></div>
       </div>
@@ -2000,6 +2001,7 @@
         <div class="help-heading">Quick Tips</div>
         <p class="help-note">
           • Special abilities: double-tap or hold on mobile.<br>
+          • In Aimed Shot mode, tap Special again to cancel on mobile.<br>
           • Your ghost from a past death haunts where you fell.<br>
           • One-way doors seal behind you. Bash sealed doors (5 hits).<br>
           • Cracked walls (amber ▒) can be broken with one more hit.<br>
