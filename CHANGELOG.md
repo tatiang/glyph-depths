@@ -1,5 +1,9 @@
 # Changelog
 
+Apr 3, 2026 — 11:48 PM PT — Made Rogues and Detection Ring users immune to enchanted wall effects
+- Rogues and characters wearing the Ring of Detection no longer get woozy or direction-distortion from enchanted walls.
+- Added the immunity feedback message: "The enchanted walls glow but seem to have no effect on you."
+
 Apr 3, 2026 — 11:41 PM PT — Made allied companions actively defend and engage nearby threats
 - Allies now prioritize enemies threatening the player before chasing distant targets.
 - Ally pursuit uses deeper pathfinding, so summoned and hired companions navigate corridors into fights more reliably.

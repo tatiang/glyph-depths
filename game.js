@@ -1255,6 +1255,7 @@ function createPlayer(classId = 'berserker') {
     wallTrap: null,
     webSlowSkip: false,
     moundSlowPending: false,
+    enchantedImmunityRoomIdx: -1,
     // Conjurer (Sage legacy)
     sageClass: classId === 'conjurer',
     scrollMastery: classId === 'conjurer',
@@ -5468,6 +5469,7 @@ function hasLOS(x1, y1, x2, y2) {
 // === PLAYER ACTIONS ===
 function playerMove(dx, dy) {
   if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
 
   // Woozy effect: check adjacent tiles for enchanted walls
   if (!state.throwMode && !state.fortifyMode) {
@@ -5479,7 +5481,11 @@ function playerMove(dx, dy) {
            }
         }
      }
-     if (nearEnchanted && Math.random() < 0.25) {
+     if (nearEnchanted && hasEnchantedWallImmunity()) {
+        if (!getRoomAt(p.x, p.y)) {
+          addMessage('The enchanted walls glow but seem to have no effect on you.', '');
+        }
+     } else if (nearEnchanted && Math.random() < 0.25) {
         addMessage("The enchanted walls distort your sense of direction!", "damage");
         if (dx !== 0) {
            dy = (Math.random() < 0.5 ? 1 : -1);
@@ -5503,7 +5509,6 @@ function playerMove(dx, dy) {
     return;
   }
 
-  const p = state.player;
   syncPlayerWoozyStatus();
 
   let moveDx = dx, moveDy = dy;
@@ -7422,6 +7427,10 @@ function canDetectSecretWalls() {
   return state.player.classId === 'rogue' || hasRingEffect('detection');
 }
 
+function hasEnchantedWallImmunity() {
+  return state.player.classId === 'rogue' || hasRingEffect('detection');
+}
+
 function getRoomAt(x, y) {
   return state.rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) || null;
 }
@@ -7437,7 +7446,13 @@ function syncPlayerWoozyStatus() {
   const inWoozyRoom = roomIdx >= 0 && roomHasEnchantedWall(roomIdx);
   const effects = Array.isArray(p.statusEffects) ? p.statusEffects : (p.statusEffects = []);
   const woozy = effects.find(e => e.type === 'woozy');
-  if (inWoozyRoom) {
+  if (inWoozyRoom && hasEnchantedWallImmunity()) {
+    if (woozy) p.statusEffects = effects.filter(e => e.type !== 'woozy');
+    if (p.enchantedImmunityRoomIdx !== roomIdx) {
+      addMessage('The enchanted walls glow but seem to have no effect on you.', '');
+      p.enchantedImmunityRoomIdx = roomIdx;
+    }
+  } else if (inWoozyRoom) {
     if (!woozy) {
       addStatusEffect(p, 'woozy', 999);
       addMessage('You feel kind of woozy all of a sudden.', '');
@@ -7447,6 +7462,9 @@ function syncPlayerWoozyStatus() {
   } else if (woozy) {
     p.statusEffects = effects.filter(e => e.type !== 'woozy');
     addMessage('You feel better.', 'good');
+    p.enchantedImmunityRoomIdx = -1;
+  } else {
+    p.enchantedImmunityRoomIdx = -1;
   }
 }
 
