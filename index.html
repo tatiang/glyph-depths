@@ -1,2023 +1,265 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Shards of the Unknown</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
-      --bg: #0a0a0f;
-      --bg-dark: #050508;
-      --text: #c8c8d0;
-      --text-dim: #555566;
-      --gold: #f0c040;
-      --hp-high: #40c040;
-      --hp-mid: #c0c040;
-      --hp-low: #c04040;
-      --accent: #7070c0;
-      --danger: #c04040;
-      --panel: #12121a;
-      --panel-border: #2a2a3a;
-      --item-slot: #1a1a28;
-      --btn: #1e1e30;
-      --btn-active: #2e2e48;
-      --safe-top: env(safe-area-inset-top);
-      --safe-bottom: env(safe-area-inset-bottom);
+      --bg-main: #08080A;
+      --ui-panel: #16161A;
+      --ui-panel-light: #23232B;
+      --ui-border: #3A3A45;
+      --text-main: #E0E0E0;
+      --text-gold: #D4AF37;
+      --text-green: #4CAF50;
+      --text-red: #E53935;
+      --grid-size: 24px;
+      --font-mono: 'Courier New', Courier, monospace;
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
-      width: 100%; height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, 'SF Mono', 'Menlo', monospace;
-      font-size: 14px;
-      touch-action: none;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    #app {
+      margin: 0;
+      padding: 0;
       width: 100%;
       height: 100%;
-      display: flex;
-      flex-direction: column;
-      padding-top: var(--safe-top);
-      padding-bottom: var(--safe-bottom);
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-mono);
     }
 
-    /* === STATUS BAR === */
-    #status-bar {
+    #game-root {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-main);
+    }
+
+    .top-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 12px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--panel-border);
-      flex-shrink: 0;
-      height: 44px;
-      gap: 8px;
-    }
-
-    #status-bar .stat {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-
-    #floor-label { color: var(--accent); font-weight: 600; }
-    #level-label { color: var(--gold); }
-    #gold-label { color: var(--gold); }
-    #hunger-label { color: var(--text-dim); }
-
-    #hp-wrap {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 1;
-      max-width: 140px;
-    }
-
-    #hp-bar-bg {
-      flex: 1;
-      height: 10px;
-      background: var(--bg-dark);
-      border-radius: 5px;
-      overflow: hidden;
-    }
-
-    #hp-bar {
-      height: 100%;
-      background: var(--hp-high);
-      border-radius: 5px;
-      transition: width 0.2s, background-color 0.3s;
-    }
-
-    #hp-text { font-size: 11px; color: var(--text-dim); min-width: 40px; text-align: right; }
-
-    /* === STATUS EFFECT BAR === */
-    #fx-bar {
-      display: flex;
-      align-items: center;
-      padding: 3px 10px;
-      gap: 5px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--panel-border);
-      flex-shrink: 0;
-      min-height: 0;
-      height: 26px;
-      overflow: hidden;
-    }
-    #fx-bar:empty { display: none; }
-    .fx-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 10px;
-      border: 1px solid;
-      white-space: nowrap;
-      line-height: 1.4;
-    }
-    .fx-burning      { color: #ff7050; border-color: rgba(255,112,80,0.5);  background: rgba(255,112,80,0.12); }
-    .fx-frozen       { color: #80d8ff; border-color: rgba(128,216,255,0.5); background: rgba(128,216,255,0.12); }
-    .fx-poison       { color: #80ff60; border-color: rgba(128,255,96,0.5);  background: rgba(128,255,96,0.12); }
-    .fx-webbed       { color: #c8c8c8; border-color: rgba(200,200,200,0.4); background: rgba(200,200,200,0.08); }
-    .fx-invisibility { color: #a0a0ff; border-color: rgba(160,160,255,0.5); background: rgba(160,160,255,0.12); }
-    .fx-strength     { color: #ffb060; border-color: rgba(255,176,96,0.5);  background: rgba(255,176,96,0.12); }
-    .fx-throw-mode   { color: #60ffb0; border-color: rgba(96,255,176,0.5);  background: rgba(96,255,176,0.12); }
-
-    /* === GAME CANVAS === */
-    #canvas-wrap {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-      min-height: 0;
-    }
-
-    #game-canvas {
-      display: block;
-      image-rendering: pixelated;
-    }
-
-    /* Screen shake */
-    #canvas-wrap.shake {
-      animation: shake 0.15s ease-out;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translate(0, 0); }
-      20% { transform: translate(-2px, 1px); }
-      40% { transform: translate(2px, -1px); }
-      60% { transform: translate(-1px, 2px); }
-      80% { transform: translate(1px, -2px); }
-    }
-
-    /* === MESSAGE LOG === */
-    #msg-log-wrap {
-      position: relative;
-      flex-shrink: 0;
-    }
-    #msg-log {
-      padding: 4px 12px;
-      padding-bottom: 18px;
-      background: var(--bg-dark);
-      border-top: 1px solid var(--panel-border);
-      border-bottom: 1px solid var(--panel-border);
-      min-height: 52px;
-      max-height: 72px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-    }
-
-    #msg-log .msg {
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text-dim);
-      white-space: normal;
-      word-wrap: break-word;
-    }
-
-    #msg-log.expanded {
-      max-height: 40vh;
-      justify-content: flex-start;
-    }
-    #msg-log .msg:last-child { color: var(--text); }
-    #msg-log .msg.damage { color: var(--danger); }
-    #msg-log .msg.good { color: var(--hp-high); }
-    #msg-log .msg.gold { color: var(--gold); }
-
-    #msg-log-toggle {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(transparent, var(--bg-dark) 40%);
-      color: var(--text-dim);
-      font-size: 20px;
-      font-weight: bold;
-      opacity: 0.7;
-      cursor: pointer;
-      z-index: 1;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #msg-log-toggle:active { opacity: 1; }
-
-    /* === INVENTORY BAR === */
-    #inv-bar {
-      display: flex;
-      align-items: center;
-      padding: 4px 8px;
-      gap: 4px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--panel-border);
-      flex-shrink: 0;
-      height: 56px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-    }
-
-    #inv-bar::-webkit-scrollbar { display: none; }
-
-    .inv-slot {
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
-      background: var(--item-slot);
-      border: 1px solid var(--panel-border);
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      position: relative;
-      cursor: pointer;
-    }
-
-    .inv-slot.equipped { border-color: var(--gold); box-shadow: 0 0 4px rgba(240, 192, 64, 0.3); }
-    .inv-slot.empty { opacity: 0.3; }
-    .inv-count {
-      position: absolute;
-      bottom: 1px;
-      right: 3px;
-      font-size: 9px;
-      font-weight: bold;
-      color: var(--gold);
-      line-height: 1;
-      pointer-events: none;
-    }
-
-    /* === CONTROLS === */
-    #controls {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      gap: 12px;
       padding: 8px 12px;
-      background: var(--panel);
-      flex-shrink: 0;
-      gap: 8px;
+      background: var(--ui-panel);
+      border-bottom: 1px solid var(--ui-border);
     }
 
-    /* D-Pad */
-    #dpad {
-      display: grid;
-      grid-template-columns: 48px 48px 48px;
-      grid-template-rows: 48px 48px 48px;
-      gap: 2px;
+    .stat { display: flex; align-items: center; gap: 6px; }
+    .hp-track {
+      width: 120px;
+      height: 8px;
+      border: 1px solid var(--ui-border);
+      background: #111114;
     }
-
-    .dpad-btn {
-      background: var(--btn);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      color: var(--text-dim);
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .dpad-btn:active { background: var(--btn-active); color: var(--text); }
-    .dpad-btn.empty { background: transparent; border: none; }
-
-    #dpad-center {
-      background: var(--btn);
-      border-radius: 50%;
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-
-    /* Action buttons */
-    #action-btns {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .action-row {
-      display: flex;
-      gap: 6px;
-    }
-
-    .act-btn {
-      width: 56px;
-      height: 44px;
-      background: var(--btn);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      color: var(--text-dim);
-      font-size: 11px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .act-btn .icon { font-size: 16px; }
-    .act-btn:active { background: var(--btn-active); color: var(--text); }
-
-    #cd-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 3px;
-      width: 0%;
-      border-radius: 0 0 7px 7px;
-      transition: width 0.3s ease;
-      pointer-events: none;
-      background: var(--gold);
-    }
-
-    /* === OVERLAYS === */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(5, 5, 8, 0.92);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: 24px;
-      padding-top: calc(24px + var(--safe-top));
-      padding-bottom: calc(24px + var(--safe-bottom));
-    }
-
-    .overlay.active { display: flex; }
-
-    /* Save/Load slot styles */
-    .save-slot {
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-    }
-    .save-slot-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-    .save-slot-name {
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--gold);
-    }
-    .save-slot-meta {
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-    .save-slot-details {
-      font-size: 12px;
-      color: var(--text);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .save-slot-time {
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-    .save-slot-empty {
-      text-align: center;
-      color: var(--text-dim);
-      font-size: 13px;
-      padding: 8px 0;
-    }
-    .save-slot-actions {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .save-action-btn {
-      flex: 1;
-      padding: 8px 0;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: 6px;
-      border: 1px solid var(--panel-border);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      cursor: pointer;
-      min-height: 44px;
-    }
-    .save-action-btn.save-new,
-    .save-action-btn.save-overwrite {
-      border-color: #4a9;
-      color: #4a9;
-    }
-    .save-action-btn.save-delete {
-      border-color: #944;
-      color: #a55;
-    }
-
-    /* Unified Saves Overlay */
-    .saves-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .saves-auth-bar {
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 48px;
-    }
-    .saves-auth-bar-icon {
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .saves-auth-bar-text {
-      flex: 1;
-      font-size: 12px;
-      color: var(--text-dim);
-      line-height: 1.4;
-    }
-    .saves-auth-bar-text strong {
-      color: var(--accent);
-      display: block;
-      font-size: 13px;
-    }
-    .saves-auth-btn {
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      border-radius: 6px;
-      border: 1px solid var(--accent);
-      background: rgba(112, 112, 192, 0.15);
-      color: var(--accent);
-      cursor: pointer;
-      white-space: nowrap;
-      min-height: 36px;
-      flex-shrink: 0;
-    }
-    .saves-auth-btn.sign-out {
-      border-color: var(--text-dim);
-      background: transparent;
-      color: var(--text-dim);
-      font-size: 11px;
-      padding: 4px 10px;
-      min-height: 30px;
-    }
-    .saves-current-game {
-      background: linear-gradient(135deg, rgba(74, 153, 100, 0.15), rgba(74, 153, 100, 0.05));
-      border: 1px solid #4a9;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 14px;
-    }
-    .saves-current-game-label {
-      font-size: 10px;
-      color: #4a9;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-    }
-    .saves-save-btn {
-      width: 100%;
-      padding: 10px;
-      font-size: 14px;
-      font-weight: 700;
-      border-radius: 8px;
-      border: 1px solid #4a9;
-      background: rgba(74, 153, 100, 0.2);
-      color: #4a9;
-      cursor: pointer;
-      min-height: 44px;
-      letter-spacing: 0.04em;
-    }
-    .saves-section-label {
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-      margin-top: 4px;
-    }
-    .save-slot-badge {
-      display: inline-block;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      padding: 2px 5px;
-      border-radius: 3px;
-      vertical-align: middle;
-      margin-left: 5px;
-    }
-    .save-slot-badge.local {
-      background: rgba(100, 150, 200, 0.15);
-      color: #6ab;
-      border: 1px solid rgba(100, 150, 200, 0.25);
-    }
-    .save-slot-badge.cloud {
-      background: rgba(160, 100, 220, 0.15);
-      color: #a080d0;
-      border: 1px solid rgba(160, 100, 220, 0.25);
-    }
-    .saves-empty {
-      text-align: center;
-      color: var(--text-dim);
-      padding: 30px 20px;
-      font-size: 13px;
-      line-height: 1.7;
-    }
-    .saves-loading {
-      text-align: center;
-      color: var(--text-dim);
-      padding: 12px;
-      font-size: 12px;
-    }
-
-    .overlay h1 {
-      font-size: 28px;
-      margin-bottom: 12px;
-    }
-
-    .overlay h2 {
-      font-size: 18px;
-      color: var(--text-dim);
-      margin-bottom: 20px;
-    }
-
-    .overlay .stats {
-      text-align: center;
-      line-height: 1.8;
-      color: var(--text-dim);
-      font-size: 14px;
-      margin-bottom: 24px;
-    }
-
-    .overlay .stats span { color: var(--text); }
-
-    .big-btn {
-      padding: 14px 40px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .big-btn:active { opacity: 0.8; }
-    #btn-begin:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* Help overlay */
-    #help-overlay {
-      position: fixed; inset: 0;
-      background: rgba(5,5,8,0.96);
-      display: none; flex-direction: column; align-items: center;
-      justify-content: flex-start;
-      padding: 28px 20px 24px;
-      padding-top: calc(28px + var(--safe-top));
-      padding-bottom: calc(24px + var(--safe-bottom));
-      overflow-y: auto;
-      z-index: 120;
-    }
-    #help-overlay.active { display: flex; }
-    .help-section { width: 100%; max-width: 340px; margin-bottom: 14px; }
-    .help-heading {
-      font-size: 10px; letter-spacing: 0.12em; color: var(--gold);
-      font-weight: 700; text-transform: uppercase;
-      border-bottom: 1px solid var(--panel-border);
-      padding-bottom: 3px; margin-bottom: 6px;
-    }
-    .help-row {
-      display: flex; gap: 8px; align-items: baseline;
-      font-size: 12px; color: var(--text-dim); margin-bottom: 4px; line-height: 1.4;
-    }
-    .help-row .hk { color: var(--accent); font-family: monospace; min-width: 32px; flex-shrink: 0; }
-    .help-row .hl { color: var(--text); font-weight: 600; min-width: 60px; flex-shrink: 0; }
-    .help-note { font-size: 11px; color: var(--text-dim); font-style: italic; margin-bottom: 4px; line-height: 1.4; }
-    .help-btn {
-      background: none; border: 1px solid var(--panel-border);
-      color: var(--text-dim); border-radius: 6px;
-      padding: 3px 9px; font-size: 12px; cursor: pointer;
-      font-family: inherit;
-    }
-    .help-btn:hover { border-color: var(--gold); color: var(--gold); }
-
-    /* Class selection */
-    #class-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      padding: 0 8px;
-      width: 100%;
-      max-width: 420px;
-      margin: 0 auto;
-    }
-    #class-pager {
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-      flex: 1;
-    }
-    #class-pager-track {
-      display: flex;
-      transition: transform 0.3s ease;
-      will-change: transform;
+    .hp-fill {
       height: 100%;
+      width: 70%;
+      background: var(--text-red);
     }
-    .class-page {
-      min-width: 100%;
-      box-sizing: border-box;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+
+    .map-wrap {
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding-top: 4px;
-    }
-    .class-page .class-page-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      padding: 0 8px;
-      width: 100%;
-      max-width: 420px;
-    }
-    #class-dots {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      padding: 6px 0 2px 0;
-    }
-    .class-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--panel-border);
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .class-dot.active { background: var(--gold); }
-    .difficulty-row {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      margin-bottom: 4px;
-      width: 100%;
-    }
-    .difficulty-btn {
+      padding: 0;
+      margin: 0;
+      background: var(--bg-main);
       flex: 1;
-      max-width: 96px;
-      padding: 6px 4px;
-      font-size: 12px;
-      background: var(--panel-bg, var(--panel));
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      color: var(--text-dim);
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
     }
-    .difficulty-btn.active {
-      border-color: var(--gold);
-      color: var(--gold);
-      font-weight: 700;
+
+    #map {
+      display: grid;
+      grid-gap: 0px;
+      gap: 0px;
+      margin: 0;
+      padding: 0;
+      line-height: 1;
+      font-family: var(--font-mono);
+      background: var(--bg-main);
     }
-    .difficulty-btn[data-diff="hard"].active {
-      border-color: #ff4444;
-      color: #ff4444;
-    }
-    .class-card {
-      background: var(--panel);
-      border: 2px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 10px 8px;
-      cursor: pointer;
-      text-align: center;
-      transition: border-color 0.15s, background 0.15s;
+
+    .tile {
+      width: var(--grid-size);
+      height: var(--grid-size);
+      margin: 0;
+      padding: 0;
+      border: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
       user-select: none;
-    }
-    .class-card:hover { border-color: color-mix(in srgb, var(--gold) 50%, var(--panel-border)); }
-    .class-card.selected {
-      border-color: var(--gold);
-      background: color-mix(in srgb, var(--gold) 8%, var(--panel));
-    }
-    .class-icon { font-size: 32px; line-height: 1; margin-bottom: 4px; }
-    .class-name { color: var(--gold); font-weight: 700; font-size: 15px; margin-bottom: 3px; letter-spacing: 0.05em; }
-    .class-flavor { color: var(--text-dim); font-size: 11px; font-style: italic; margin-bottom: 6px; line-height: 1.35; }
-    .class-badge-row { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
-    .class-stat { font-size: 10px; background: var(--item-slot); border-radius: 4px; padding: 2px 6px; color: var(--text-dim); white-space: nowrap; }
-    .class-stat.pos { color: var(--hp-high); }
-    .class-stat.neg { color: var(--danger); }
-    .class-start-items { font-size: 10px; color: var(--text-dim); margin-top: 5px; border-top: 1px solid var(--panel-border); padding-top: 4px; line-height: 1.3; }
-
-    /* Level up overlay */
-    #levelup-overlay .perk-choices {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 100%;
-      max-width: 300px;
-    }
-
-    .perk-btn {
-      padding: 14px 16px;
-      background: var(--btn);
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 14px;
-      text-align: left;
-      cursor: pointer;
-      font-family: inherit;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .perk-btn:active { background: var(--btn-active); border-color: var(--gold); }
-
-    .perk-btn .perk-name { font-weight: 600; color: var(--gold); }
-    .perk-btn .perk-desc { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
-
-    /* Item context menu */
-    #item-menu {
-      position: fixed;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 8px;
-      z-index: 110;
-      display: none;
-      min-width: 160px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-
-    #item-menu.active { display: block; }
-
-    #item-menu .item-name {
-      padding: 8px;
-      font-size: 13px;
-      color: var(--gold);
-      border-bottom: 1px solid var(--panel-border);
-      margin-bottom: 4px;
-    }
-
-    #item-menu button {
-      display: block;
-      width: 100%;
-      padding: 10px 8px;
-      background: none;
-      border: none;
-      color: var(--text);
-      font-size: 14px;
-      text-align: left;
-      cursor: pointer;
-      border-radius: 6px;
-      font-family: inherit;
-    }
-
-    #item-menu button:active { background: var(--btn-active); }
-
-    /* Inspect tooltip */
-    #inspect-tip {
-      position: fixed;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      padding: 8px 12px;
-      z-index: 105;
-      display: none;
-      font-size: 12px;
-      max-width: 200px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-
-    #inspect-tip.active { display: block; }
-    #inspect-tip .tip-name { color: var(--gold); font-weight: 600; }
-    #inspect-tip .tip-desc { color: var(--text-dim); margin-top: 4px; }
-
-    /* Minimap overlay */
-    #minimap-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(5, 5, 8, 0.88);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 95;
-      cursor: pointer;
-      padding-top: var(--safe-top);
-      padding-bottom: var(--safe-bottom);
-    }
-
-    #minimap-overlay.active { display: flex; }
-
-    #minimap-canvas {
-      border: 1px solid var(--panel-border);
-      border-radius: 4px;
+      position: relative;
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
       image-rendering: pixelated;
-      width: 90vw;
-      max-height: 75vh;
+    }
+
+    .tile img {
+      width: 100%;
+      height: 100%;
+      display: block;
       object-fit: contain;
-    }
-
-    .minimap-hint {
-      color: var(--text-dim);
-      font-size: 12px;
-      margin-top: 12px;
-    }
-
-    /* Title screen */
-    #title-screen {
-      gap: 0;
-    }
-    #title-screen.class-mode {
-      overflow-y: hidden;
-    }
-    #class-section {
-      flex: 1;
-      min-height: 0;
-      align-items: center;
-    }
-    #class-cards-scroll {
-      width: 100%;
-      max-width: 440px;
-    }
-    #class-footer {
-      width: 100%;
-      max-width: 440px;
-      border-top: 1px solid var(--panel-border);
-      background: rgba(5,5,8,0.85);
-    }
-    #title-section .title-graphic {
-      font-size: 28px;
-      line-height: 1.15;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      opacity: 0;
-      transform: translateY(10px);
-      animation: titleFadeIn 1.5s ease-out 0.3s forwards;
-    }
-    #title-section .title {
-      font-size: 28px;
-      letter-spacing: 3px;
-      color: var(--gold);
-      text-shadow: 0 0 20px rgba(240, 192, 64, 0.4), 0 0 60px rgba(240, 192, 64, 0.15);
-      margin-bottom: 8px;
-      opacity: 0;
-      animation: titleFadeIn 1s ease-out 1.2s forwards;
-    }
-    #title-section .subtitle {
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 28px;
-      font-style: italic;
-      opacity: 0;
-      animation: titleFadeIn 1s ease-out 1.8s forwards;
-    }
-    #title-section .big-btn {
-      opacity: 0;
-      animation: titleFadeIn 0.8s ease-out 2.4s forwards;
-    }
-    #title-section .title-particles {
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    #title-section .title-particles .particle {
-      position: absolute;
-      font-size: 14px;
-      opacity: 0;
-      animation: particleDrift 8s linear infinite;
-    }
-    @keyframes titleFadeIn {
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes particleDrift {
-      0% { opacity: 0; transform: translateY(100vh) rotate(0deg); }
-      10% { opacity: 0.3; }
-      90% { opacity: 0.3; }
-      100% { opacity: 0; transform: translateY(-20px) rotate(180deg); }
+      top: 0;
+      left: 0;
     }
 
-    /* Fade transition */
-    #fade {
-      position: fixed;
-      inset: 0;
-      background: var(--bg);
-      z-index: 200;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
+    .bottom-log {
+      background: var(--ui-panel);
+      color: var(--text-main);
+      border-top: 1px solid var(--ui-border);
+      border-bottom: 1px solid var(--ui-border);
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      min-height: 48px;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
     }
 
-    #fade.active { opacity: 1; pointer-events: all; }
+    .log-good { color: var(--text-green); }
+    .log-warn { color: var(--text-gold); }
+    .log-bad  { color: var(--text-red); }
 
-    /* === FLOOR TRANSITION CARD === */
-    #floor-card {
-      position: fixed;
-      inset: 0;
-      height: 100dvh;
-      height: 100vh; /* fallback for browsers without dvh */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 210;
-      pointer-events: none;
-      opacity: 0;
-      background: transparent;
-    }
-
-    #floor-card.fc-enter {
-      animation: fc-slide-in 0.4s ease-out forwards;
-      pointer-events: all;
-      background: rgba(0, 0, 0, 0.78);
-    }
-
-    #floor-card.fc-exit {
-      animation: fc-slide-out 0.35s ease-in forwards;
-      pointer-events: none;
-      background: rgba(0, 0, 0, 0.78);
-    }
-
-    .floor-card-tap {
-      margin-top: 20px;
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      opacity: 0.7;
-    }
-
-    .floor-card-inner {
-      text-align: center;
-      padding: 32px 40px;
-      border: 1px solid rgba(200, 200, 210, 0.12);
-      border-radius: 12px;
-      background: rgba(5, 5, 8, 0.88);
-      max-width: 320px;
-      width: calc(100% - 48px);
-    }
-
-    .floor-card-floor {
-      font-size: 11px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      margin-bottom: 12px;
-    }
-
-    .floor-card-name {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--gold);
-      margin-bottom: 14px;
-    }
-
-    .floor-card-atmo {
-      font-size: 13px;
-      line-height: 1.65;
-      color: var(--text);
-      font-style: italic;
-    }
-
-    @keyframes fc-slide-in {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0);    }
-    }
-
-    @keyframes fc-slide-out {
-      from { opacity: 1; transform: translateY(0);     }
-      to   { opacity: 0; transform: translateY(-12px); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      #floor-card.fc-enter { animation: fc-fade-in  0.4s  ease-out forwards; }
-      #floor-card.fc-exit  { animation: fc-fade-out 0.35s ease-in  forwards; }
-    }
-
-    @keyframes fc-fade-in  { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes fc-fade-out { from { opacity: 1; } to { opacity: 0; } }
-
-    /* Level up flash */
-    #canvas-wrap.levelup-flash {
-      box-shadow: inset 0 0 40px rgba(240, 192, 64, 0.3);
-    }
-
-    /* Merchant overlay */
-    #merchant-overlay .shop-items {
+    .bottom-controls {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      width: 100%;
-      max-width: 300px;
-      margin-bottom: 16px;
+      padding: 8px 12px 12px;
+      background: var(--ui-panel);
+      border-top: 1px solid var(--ui-border);
     }
 
-    .shop-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px;
-      background: var(--btn);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      color: var(--text);
-      font-size: 14px;
-    }
-
-    .shop-item:active { background: var(--btn-active); }
-    .shop-item .price { color: var(--gold); }
-    .shop-item.expanded { flex-direction: column; align-items: stretch; }
-
-    /* Config pager */
-    .config-pager {
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-      flex: 1;
-    }
-    .config-track {
-      display: flex;
-      transition: transform 0.3s ease;
-      will-change: transform;
-    }
-    .config-page {
-      min-width: 100%;
-      box-sizing: border-box;
-      padding: 0 16px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .config-dots {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 0 6px;
-    }
-    .config-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--text-dim);
-      opacity: 0.35;
-      cursor: pointer;
-      transition: opacity 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .config-dot.active {
-      opacity: 1;
-      background: var(--gold);
-    }
-
-    /* Stats section */
-    .stats-heading {
-      font-size: 10px;
-      letter-spacing: 1.5px;
-      color: var(--text-dim);
-      margin-bottom: 6px;
-    }
-
-    .stats-grid {
+    .item-grid, .action-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 16px;
-      font-size: 13px;
+      gap: 8px;
     }
 
-    .stats-grid .stat-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+    .item-grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
     }
 
-    .stats-grid .stat-label { color: var(--text-dim); }
-    .stats-grid .stat-val { color: var(--text); font-weight: 600; }
-
-    /* Settings overlay */
-    #settings-overlay .setting-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      max-width: 260px;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--panel-border);
+    .action-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .toggle {
-      width: 44px;
-      height: 26px;
-      background: var(--btn);
-      border: 1px solid var(--panel-border);
-      border-radius: 13px;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.2s;
+    .item-slot {
+      aspect-ratio: 1 / 1;
+      min-height: 40px;
+      background-color: var(--bg-main);
+      border: 1px solid #2A2A35;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1);
+      background-size: 80%;
+      background-position: center;
+      background-repeat: no-repeat;
     }
 
-    .toggle.on { background: var(--accent); }
-
-    .toggle::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-
-    .toggle.on::after { transform: translateX(18px); }
-
-    /* Hero icon picker */
-    .hero-picker {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: center;
-      margin: 8px 0;
-    }
-    .hero-choice {
-      width: 40px;
-      height: 40px;
+    .btn {
+      min-height: 40px;
+      background: linear-gradient(to bottom, var(--ui-panel-light), var(--ui-panel));
+      border: 1px solid var(--ui-border);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-weight: bold;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      background: var(--btn);
-      border: 2px solid var(--panel-border);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s, transform 0.15s;
-    }
-    .hero-choice:active { transform: scale(0.92); }
-    .hero-choice.selected {
-      border-color: var(--gold);
-      background: rgba(240, 192, 64, 0.15);
-      box-shadow: 0 0 8px rgba(240, 192, 64, 0.25);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     }
 
-    /* Last words input */
-    #death-overlay .last-words-wrap {
-      margin-top: 12px;
-      margin-bottom: 16px;
-      width: 100%;
-      max-width: 280px;
+    .btn:active {
+      background: linear-gradient(to bottom, var(--ui-panel), var(--ui-panel-light));
+      box-shadow: none;
     }
 
-    #last-words-input {
-      width: 100%;
-      padding: 10px;
-      background: var(--bg-dark);
-      border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 14px;
-      font-family: inherit;
-      text-align: center;
-      outline: none;
+    .btn.enrage {
+      grid-column: 1 / -1;
+      border: 2px solid var(--text-gold);
+      color: var(--text-gold);
+      background: linear-gradient(to bottom, #2A2515, #1A150A);
+      text-shadow: 0 0 6px rgba(212, 175, 55, 0.45);
     }
-
-    #last-words-input::placeholder { color: var(--text-dim); }
-    #last-words-input:focus { border-color: var(--accent); }
-
-    /* Badge Toast */
-    #badge-toast {
-      position: fixed;
-      top: calc(var(--safe-top, 0px) + 4px);
-      left: 50%;
-      transform: translateX(-50%) translateY(-60px);
-      background: linear-gradient(135deg, #2a2010, #3a3018);
-      border: 1px solid var(--gold);
-      border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 13px;
-      color: var(--gold);
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0;
-      transition: transform 0.4s ease, opacity 0.4s ease;
-      white-space: nowrap;
-      box-shadow: 0 2px 12px rgba(240, 192, 64, 0.3);
-    }
-    #badge-toast.active {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-    }
-    .badge-toast-icon { font-size: 16px; margin-right: 4px; }
-    .badge-toast-text { font-weight: 600; }
-
-    /* Badge Overlay Grid */
-    .badge-cat-heading {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--gold);
-      border-bottom: 1px solid var(--panel-border);
-      padding-bottom: 3px;
-      margin-top: 10px;
-      margin-bottom: 6px;
-    }
-    .badge-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-    .badge-cell {
-      width: 56px;
-      text-align: center;
-      padding: 6px 2px;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 6px;
-      cursor: pointer;
-      opacity: 0.35;
-    }
-    .badge-cell.unlocked {
-      opacity: 1;
-      border-color: var(--gold);
-      background: linear-gradient(135deg, #1a1a10, #252518);
-    }
-    .badge-icon { font-size: 20px; line-height: 1.2; }
-    .badge-name { font-size: 7px; color: var(--text-dim); margin-top: 2px; line-height: 1.1; }
-    .badge-cell.unlocked .badge-name { color: var(--text); }
-
-    /* Badge earned pills (death/victory screens) */
-    .badge-earned {
-      display: inline-block;
-      font-size: 11px;
-      padding: 3px 8px;
-      background: linear-gradient(135deg, #2a2010, #3a3018);
-      border: 1px solid var(--gold);
-      border-radius: 4px;
-      color: var(--gold);
-    }
-
-    /* Codex */
-    .codex-tabs { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: 2px; }
-    .codex-tab {
-      background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-dim);
-      padding: 6px 12px; border-radius: 4px; font-size: 12px; font-family: inherit;
-      cursor: pointer; min-height: 36px; -webkit-tap-highlight-color: transparent; transition: border-color 0.15s, color 0.15s;
-    }
-    .codex-tab-active { border-color: #60b0c0 !important; color: #60b0c0 !important; background: rgba(96,176,192,0.08) !important; }
-    .codex-entry {
-      width: 100%; box-sizing: border-box;
-      border-radius: 6px; padding: 10px 12px; margin-bottom: 6px;
-      border: 1px solid var(--panel-border); background: var(--panel-bg);
-    }
-    .codex-entry-unlocked { border-color: #304850; }
-    .codex-entry-locked { opacity: 0.5; }
-    .codex-entry-body { display: flex; gap: 12px; align-items: flex-start; }
-    .codex-glyph-badge {
-      flex-shrink: 0; width: 44px; height: 44px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 26px; border-radius: 8px;
-      background: rgba(96,176,192,0.12); border: 1px solid #304850;
-    }
-    .codex-entry-content { flex: 1; min-width: 0; }
-    .codex-entry-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .codex-entry-icon { font-size: 16px; flex-shrink: 0; }
-    .codex-entry-title { font-size: 13px; font-weight: 600; color: #a0d0da; flex: 1; }
-    .codex-locked-title { color: var(--text-dim); }
-    .codex-entry-text { font-size: 12px; color: var(--text); line-height: 1.5; }
-    .codex-locked-text { color: var(--text-dim); font-style: italic; }
-    .codex-new-badge {
-      font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-      background: #60b0c0; color: #000; padding: 2px 6px; border-radius: 3px;
-      flex-shrink: 0; align-self: center;
-    }
-
-    /* Font size toggle bar (Help / Manual) */
-    .font-size-bar { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
-    .font-btn { background: var(--panel); border: 1px solid var(--panel-border); color: var(--text); padding: 4px 12px; border-radius: 4px; font-size: 14px; min-width: 36px; min-height: 44px; cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent; }
-    .font-btn.active { background: var(--gold); color: #000; }
-    .help-font-sm .help-note, .help-font-sm .help-row { font-size: 11px; }
-    .help-font-md .help-note, .help-font-md .help-row { font-size: 13px; }
-    .help-font-lg .help-note, .help-font-lg .help-row { font-size: 15px; }
-    #manual-search { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text); font-size: 14px; font-family: inherit; margin-bottom: 10px; box-sizing: border-box; -webkit-appearance: none; }
-    #manual-search::placeholder { color: var(--text-dim); }
-    .manual-no-match { display: none !important; }
   </style>
 </head>
 <body>
-  <div id="app">
-    <div id="status-bar">
-      <div class="stat"><span id="floor-label">F1</span></div>
-      <div id="hp-wrap">
-        <span style="font-size:14px">❤️</span>
-        <div id="hp-bar-bg"><div id="hp-bar" style="width:100%"></div></div>
-        <span id="hp-text">15/15</span>
-      </div>
-      <div class="stat"><span id="level-label">Lv.1</span></div>
-      <div class="stat"><span id="hunger-label">🍖 100</span></div>
-      <div class="stat"><span id="arrow-label" style="color:#4a9;display:none;">➶ 0</span></div>
-      <div class="stat"><span id="gold-label">💰 0</span></div>
+  <div id="game-root">
+    <div class="top-bar">
+      <div class="stat">HP <div class="hp-track"><div class="hp-fill"></div></div></div>
+      <div class="stat">LVL 1</div>
+      <div class="stat">FOOD 99</div>
+      <div class="stat">GOLD 11</div>
     </div>
 
-    <div id="rune-bar" style="display:none;text-align:center;padding:2px 4px;font-size:14px;letter-spacing:2px;color:#c0a0ff;"></div>
-    <div id="fx-bar"></div>
-
-    <div id="canvas-wrap">
-      <canvas id="game-canvas"></canvas>
+    <div class="map-wrap">
+      <div id="map" aria-label="game-map"></div>
     </div>
 
-    <div id="msg-log-wrap">
-      <div id="msg-log">
-        <div class="msg">Welcome to Shards of the Unknown. Nothing is what it seems.</div>
-        <div class="msg">Swipe or d-pad to move. Descend 20 floors and defeat the King.</div>
-      </div>
-      <div id="msg-log-toggle">▾</div>
+    <div class="bottom-log" id="log">
+      <div class="log-good">Rat is destroyed! (+2 XP)</div>
+      <div class="log-warn">You pick up 11 gold!</div>
+      <div class="log-bad">You hear something approaching...</div>
     </div>
 
-    <div id="inv-bar">
-      <!-- Inventory slots populated by JS -->
-    </div>
-
-    <div id="controls">
-      <div id="action-btns">
-        <div class="action-row">
-          <div class="act-btn" id="btn-pickup"><span class="icon">✋</span>Get</div>
-          <div class="act-btn" id="btn-stairs"><span class="icon">🚪</span>Stairs</div>
-          <div class="act-btn" id="btn-wait"><span class="icon">⏳</span>Wait</div>
-        </div>
-        <div class="action-row">
-          <div class="act-btn" id="btn-fire" style="display:none;border-color:#4a9;color:#4a9;"><span class="icon">🏹</span>Fire</div>
-          <div class="act-btn" id="btn-closedoor" style="display:none;border-color:#a08030;color:#a08030;"><span class="icon">🚪</span>Close</div>
-          <div class="act-btn" id="btn-minimap"><span class="icon">🗺️</span>Map</div>
-          <div class="act-btn" id="btn-quickuse"><span class="icon">🧪</span>Use</div>
-          <div class="act-btn" id="btn-settings"><span class="icon">⚙️</span>Config</div>
-        </div>
-        <div class="action-row" id="special-row" style="display:none;">
-          <div class="act-btn" id="btn-special" style="flex:1;min-width:0;border-color:var(--gold);color:var(--gold);font-size:12px;letter-spacing:0.04em;font-weight:700;position:relative;overflow:hidden;"><span id="btn-special-text"></span><div id="cd-bar"></div></div>
-        </div>
+    <div class="bottom-controls">
+      <div class="item-grid">
+        <div class="item-slot" style="background-image: url('assets/ui_sword.png');"></div>
+        <div class="item-slot" style="background-image: url('assets/ui_bow.png');"></div>
+        <div class="item-slot" style="background-image: url('assets/ui_shield.png');"></div>
+        <div class="item-slot" style="background-image: url('assets/ui_ring.png');"></div>
+        <div class="item-slot" style="background-image: url('assets/ui_potion.png');"></div>
+        <div class="item-slot" style="background-image: url('assets/ui_potion.png');"></div>
       </div>
 
-      <div id="dpad">
-        <div class="dpad-btn empty"></div>
-        <div class="dpad-btn" data-dir="up">▲</div>
-        <div class="dpad-btn empty"></div>
-        <div class="dpad-btn" data-dir="left">◀</div>
-        <div class="dpad-btn" id="dpad-center" data-dir="wait">●</div>
-        <div class="dpad-btn" data-dir="right">▶</div>
-        <div class="dpad-btn empty"></div>
-        <div class="dpad-btn" data-dir="down">▼</div>
-        <div class="dpad-btn empty"></div>
+      <div class="action-grid">
+        <button class="btn">GET</button>
+        <button class="btn">STAIRS</button>
+        <button class="btn">WAIT</button>
+        <button class="btn">MAP</button>
+        <button class="btn">USE</button>
+        <button class="btn">CONFIG</button>
+        <button class="btn enrage">ENRAGE</button>
       </div>
     </div>
   </div>
 
-  <!-- Overlays -->
-  <div class="overlay" id="title-screen" style="justify-content:flex-start;overflow-y:auto;">
-    <!-- Step 1: Title -->
-    <div id="title-section" style="display:flex;flex-direction:column;align-items:center;width:100%;">
-      <div class="title-particles" id="title-particles"></div>
-      <div class="title-graphic" id="title-graphic"></div>
-      <div class="title">SHARDS OF THE UNKNOWN</div>
-      <div class="subtitle">The depths remember every step.</div>
-      <button class="big-btn" id="btn-start">Descend</button>
-      <button class="big-btn" id="btn-saves-from-title" style="margin-top:8px;background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Saved Games</button>
-      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
-        <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
-        <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
-        <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
-        <button class="help-btn" id="btn-updatelog-from-title" style="animation:none;opacity:1;">📋 Updates</button>
-      </div>
-      <div id="title-badge-count" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
-    </div>
-    <!-- Step 2: Class selection (shown after clicking Descend) -->
-    <div id="class-section" style="display:none;flex-direction:column;width:100%;flex:1;min-height:0;">
-      <div style="color:var(--gold);font-weight:800;font-size:19px;letter-spacing:0.12em;margin-bottom:4px;text-align:center;">CHOOSE YOUR PATH</div>
-      <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;text-align:center;">Each class plays differently. Choose wisely.</div>
-      <div id="class-pager">
-        <div id="class-pager-track"></div>
-      </div>
-      <div id="class-dots"></div>
-      <div id="class-footer" style="padding-top:6px;display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
-        <div id="selected-class-label" style="font-size:13px;color:var(--text-dim);min-height:18px;letter-spacing:0.04em;"></div>
-        <button class="big-btn" id="btn-begin" disabled>Begin Descent</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="overlay" id="death-overlay">
-    <h1>☠️ YOU HAVE PERISHED</h1>
-    <h2 id="death-cause"></h2>
-    <div class="stats" id="death-stats"></div>
-    <div id="death-full-stats" style="display:none; width:100%; max-width:280px; margin:8px auto;">
-      <div class="stats-heading">CHARACTER</div>
-      <div id="death-char-stats" class="stats-grid"></div>
-      <div class="stats-heading" style="margin-top:8px;">EQUIPPED</div>
-      <div id="death-equip-stats" class="stats-grid"></div>
-      <div class="stats-heading" style="margin-top:8px;">INVENTORY</div>
-      <div id="death-inv-stats" class="stats-grid"></div>
-      <div id="death-floor-history"></div>
-      <div class="stats-heading" style="margin-top:8px;">BADGES EARNED</div>
-      <div id="death-badges" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
-      <button class="big-btn" id="btn-close-death-stats" style="margin-top:12px;padding:8px 20px;font-size:13px;width:100%;">Close Stats</button>
-    </div>
-    <div class="last-words-wrap">
-      <input type="text" id="last-words-input" placeholder="Last words... (optional)" maxlength="50">
-    </div>
-    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-      <button class="big-btn" id="btn-death-stats" style="font-size:14px; padding:10px 20px;">View Stats</button>
-      <button class="big-btn" id="btn-restart">Try Again</button>
-    </div>
-  </div>
-
-  <div class="overlay" id="victory-overlay">
-    <h1>👑 VICTORY</h1>
-    <h2>The Depths have been named!</h2>
-    <div class="stats" id="victory-stats"></div>
-    <div id="victory-badge-section" style="width:100%;max-width:280px;margin:10px auto;">
-      <div class="stats-heading">BADGES EARNED</div>
-      <div id="victory-badge-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;"></div>
-    </div>
-    <button class="big-btn" id="btn-victory-restart">Play Again</button>
-  </div>
-
-  <div class="overlay" id="levelup-overlay">
-    <h1 style="color: var(--gold);">⬆️ LEVEL UP</h1>
-    <h2 id="levelup-label"></h2>
-    <div class="perk-choices" id="perk-choices"></div>
-  </div>
-
-  <div class="overlay" id="merchant-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
-    <h1>🧙 MERCHANT</h1>
-    <h2 id="merchant-gold"></h2>
-    <div id="merchant-discount" style="display:none;color:#f0c040;font-size:12px;margin:-6px 0 8px;letter-spacing:0.03em;">💸 Haggle: prices reduced 25%</div>
-    <div class="shop-items" id="shop-items"></div>
-    <button class="big-btn" id="btn-leave-shop" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
-  </div>
-
-  <div class="overlay" id="sage-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
-    <h1>🔮 WANDERING SAGE</h1>
-    <p style="color:var(--text-dim);font-size:13px;margin:-8px 0 12px;">Wisdom, purification, and healing — for a price.</p>
-    <h2 id="sage-gold"></h2>
-    <div class="shop-items" id="sage-services"></div>
-    <button class="big-btn" id="btn-leave-sage" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
-  </div>
-
-  <div class="overlay" id="settings-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(8px + var(--safe-bottom));overflow:hidden;">
-    <h1 style="margin-bottom:4px;flex-shrink:0;">⚙️ Config</h1>
-    <div class="config-dots" id="config-dots">
-      <div class="config-dot active" data-page="0"></div>
-      <div class="config-dot" data-page="1"></div>
-      <div class="config-dot" data-page="2"></div>
-    </div>
-
-    <div class="config-pager" id="config-pager">
-      <div class="config-track" id="config-track">
-
-        <!-- Page 1: Character Stats -->
-        <div class="config-page">
-          <div id="stats-section" style="width:100%;max-width:280px;margin-bottom:16px;">
-            <div class="stats-heading">CHARACTER</div>
-            <div id="char-name" style="font-size:15px;color:var(--gold);font-weight:600;margin-bottom:8px;text-align:center;padding:4px 0;"></div>
-            <div id="char-stats" class="stats-grid"></div>
-            <div id="class-abilities" style="display:none;margin-top:12px;">
-              <div class="stats-heading">CLASS ABILITIES</div>
-              <div id="class-ability-list" style="margin-top:6px;"></div>
-            </div>
-            <div class="stats-heading" style="margin-top:12px;">THIS RUN</div>
-            <div id="run-stats" class="stats-grid"></div>
-            <div class="stats-heading" style="margin-top:12px;">EQUIPPED</div>
-            <div id="equip-stats" class="stats-grid"></div>
-            <div id="rune-section" style="display:none;margin-top:12px;">
-              <div class="stats-heading">GLYPH RUNES ✦</div>
-              <div id="rune-list" style="margin-top:6px;"></div>
-            </div>
-            <div id="synergy-section" style="display:none;margin-top:12px;">
-              <div class="stats-heading">PERK SYNERGIES ⚡</div>
-              <div id="synergy-list" style="margin-top:6px;"></div>
-            </div>
-            <div id="mastery-section" style="display:none;margin-top:12px;">
-              <div class="stats-heading">MASTERY ⭐</div>
-              <div id="mastery-list" style="margin-top:6px;"></div>
-            </div>
-            <div id="status-effects-section" style="display:none;margin-top:12px;">
-              <div class="stats-heading">STATUS EFFECTS</div>
-              <div id="status-effects-list" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Page 2: Settings & Hero Icon -->
-        <div class="config-page">
-          <div style="width:100%;max-width:280px;">
-            <div class="stats-heading" style="margin-bottom:8px;">HERO ICON</div>
-            <div class="hero-picker" id="hero-picker"></div>
-            <div class="stats-heading" style="margin-top:16px; margin-bottom:8px;">SETTINGS</div>
-            <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound"></div></div>
-            <div class="setting-row"><span>Haptics</span><div class="toggle on" id="toggle-haptics"></div></div>
-            <div class="setting-row"><span>D-Pad</span><div class="toggle on" id="toggle-dpad"></div></div>
-            <div class="setting-row"><span>Auto-Pick Up</span><div class="toggle on" id="toggle-autopickup"></div></div>
-            <div class="setting-row"><span>Auto-Equip Better Gear</span><div class="toggle" id="toggle-autoequip"></div></div>
-            <div class="setting-row"><span>Enemy Intent Indicators</span><div class="toggle on" id="toggle-showIntents"></div></div>
-          </div>
-        </div>
-
-        <!-- Page 3: Save/Load & Links -->
-        <div class="config-page">
-          <div style="width:100%;max-width:280px;">
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-              <button class="big-btn" id="btn-saves-game" style="padding:12px 20px;background:var(--panel-bg);border-color:#69b;color:#69b;">💾 Saved Games</button>
-              <button class="big-btn" id="btn-badges-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
-              <button class="big-btn" id="btn-codex-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:#60b0c0;color:#60b0c0;">📖 Codex</button>
-              <button class="big-btn" id="btn-manual-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
-              <button class="big-btn" id="btn-help-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:var(--panel-border);">⚡ Quickstart</button>
-            </div>
-            <div id="game-version" style="margin-top:16px;font-size:13px;color:var(--text-dim);text-align:center;opacity:0.85;font-family:monospace;"></div>
-            <div id="give-up-section" style="margin-top:20px;text-align:center;display:none;">
-              <button class="big-btn" id="btn-give-up" style="padding:10px 24px;background:#2a1515;border:1px solid #803030;color:#e05050;font-size:14px;">☠️ Give Up Run</button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <button class="big-btn" id="btn-close-settings" style="margin-top:8px;flex-shrink:0;">Close</button>
-  </div>
-
-  <div class="overlay" id="manual-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
-    <div style="max-width:340px;width:100%;padding:0 12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <h1 style="font-size:18px;margin:0;">📜 Adventurer's Manual</h1>
-        <button class="help-btn" id="btn-close-manual-top">✕ Close</button>
-      </div>
-      <input type="text" id="manual-search" placeholder="🔍 Search manual..." autocomplete="off" autocorrect="off" spellcheck="false">
-      <div class="font-size-bar" id="manual-font-bar" style="margin-top:0;">
-        <button class="font-btn" data-size="0">A-</button>
-        <button class="font-btn active" data-size="1">A</button>
-        <button class="font-btn" data-size="2">A+</button>
-      </div>
-      <div id="manual-dots" style="display:flex;justify-content:center;gap:6px;margin:8px 0;"></div>
-      <div id="manual-pager" style="overflow:hidden;width:100%;">
-      <div id="manual-pager-track" style="display:flex;transition:transform 0.25s ease;">
-
-      <!-- PAGE 1: Lore -->
-      <div class="manual-page" style="min-width:100%;box-sizing:border-box;">
-      <div class="help-section">
-        <div class="help-heading">The Backstory</div>
-        <p class="help-note">In the age before kingdoms, the city of Erathis the Bright stood where no city should — atop a vein of primordial stone older than language. A scribe named Aldric discovered that certain marks cut into this stone could reshape reality. He called them <em>glyphs</em>.</p>
-        <p class="help-note" style="margin-top:6px;">Aldric catalogued twelve fundamental glyphs — Flame, Frost, Thorns, Vitality, Swiftness, Sight, Greed, Sustenance, Wrath, Warding, Vampirism, and Fortune — each a syllable in a forgotten grammar of creation. Combined, they could unmake and rewrite anything: flesh, stone, time, death.</p>
-        <p class="help-note" style="margin-top:6px;">He carved them all into himself.</p>
-        <p class="help-note" style="margin-top:6px;">The transformation was not kind. Aldric became the Glyph King — immortal, immense, and no longer entirely human. His runes pulled Erathis underground stone by stone. The Sewers formed from the city's drowned foundations. The Crypt grew from the bodies of those who tried to flee. The Citadel rose from the barracks of his runed knights. The Abyss opened where his power tore reality too thin. And the Sanctum — his throne room — crystallized from pure glyph energy, beautiful and lethal.</p>
-        <p class="help-note" style="margin-top:6px;">Now, twenty floors deep, the Glyph King sits in perfect silence, writing and rewriting the laws of his domain. The glyphs scattered across each floor are fragments of his power — and the only weapon that can unmake him. Collect them. Survive his guardians. Descend.</p>
-        <p class="help-note" style="margin-top:6px;">Many have tried. The Crypt has a room for each of them.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">The World</div>
-        <p class="help-note">Twenty floors of the Shards of the Unknown, divided into five biomes:</p>
-        <div class="help-row"><span class="hl">🟢 The Sewers (1–4)</span><span>Drowned ruins of Erathis. Rats, bats, and things that grew in the dark.</span></div>
-        <div class="help-row"><span class="hl">🔵 The Crypt (5–8)</span><span>Built by the dead, for the dead. Goblins, ghosts, and the Lich's domain.</span></div>
-        <div class="help-row"><span class="hl">🔴 The Citadel (9–12)</span><span>The King's fortress. Runed knights and demons still guard the halls.</span></div>
-        <div class="help-row"><span class="hl">🔷 The Abyss (13–16)</span><span>A wound in reality. Void creatures and things from between the words.</span></div>
-        <div class="help-row"><span class="hl">🟣 The Sanctum (17–20)</span><span>The throne of the Glyph King. Crystalline, beautiful, and lethal.</span></div>
-        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Taverns provide rest on floors 5, 10, 14. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
-        <p class="help-note" style="margin-top:6px;">🧱 <strong>Secret Walls</strong> hide throughout the dungeon — bump a wall to crack it, then hit again to break through. Cracked walls turn amber (▒). Rogues can sense nearby secrets with a shimmer. Behind them lies hidden loot worth the search.</p>
-        <p class="help-note" style="margin-top:6px;">🗝️ <strong>Bone Keys</strong> appear on floors 6, 12, and 18. They unlock doors to bonus wings — dangerous side areas with rare loot and tougher enemies.</p>
-        <p class="help-note" style="margin-top:6px;">◊ <strong>Teleport Tiles</strong> are invisible floor glyphs that warp you to a random location when stepped on. Once triggered, they become visible (cyan ◊) and remain active. Appear on floors 3+.</p>
-        <p class="help-note" style="margin-top:6px;">🪨 <strong>Avalanches</strong> occasionally collapse parts of rooms with rocks (25% chance on floors 4+). They never hit the player directly but can reshape the dungeon around you.</p>
-      </div>
-
-      </div><!-- end PAGE 1 -->
-
-      <!-- PAGE 2: Classes -->
-      <div class="manual-page" style="min-width:100%;box-sizing:border-box;">
-      <div class="help-section">
-        <div class="help-heading">Character Classes</div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧝 Adventurer</div>
-          <p class="help-note">The balanced choice. Natural regeneration heals 1 HP every 15 turns. 10% crit chance. Pathfinder: stairs are always visible on the minimap. Starts with Leather Vest and Healing Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Survivor's Instinct — auto-eat food when starving.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🪖 Berserker</div>
-          <p class="help-note">High HP (22) and ATK (+4) but 2× hunger drain. Rage gives +3 ATK below 40% HP. Enrage ability: +5 ATK for 5 turns, once per floor. Starts with Short Sword and 2 Strength Potions.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Undying Fury — survive a lethal hit with 1 HP, once per floor.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🥷 Rogue</div>
-          <p class="help-note">Low HP (10) but deadly precision: 15% dodge, 20% crit. Stealth reduces enemy detection. Starts with 6 Throwing Daggers and Invisibility Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Shadow Step — become invisible for 2 turns after killing an enemy.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧙 Wizard</div>
-          <p class="help-note">Fragile (11 HP, 1 ATK) but scroll effects are doubled. Arcane Blast AoE ability. Starts with Arcane Staff and 3 identified scrolls.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Mana Shield — 25% chance to completely negate incoming damage.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🏹 Ranger</div>
-          <p class="help-note">Survivalist with +2 FOV, 5% dodge, 15% crit. Forager (bonus food/arrows). Aimed Shot: 2× bow damage on 8-turn cooldown. Infinite basic arrows. Starts with Short Bow, Dagger, Throwing Daggers, and a Ration.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Quick Draw — Aimed Shot cooldown reduced from 8 to 5 turns.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">⛪ Cleric</div>
-          <p class="help-note">Holy warrior (18 HP, +2 ATK, +1 DEF). +3 ATK vs undead. Curse immune. Life-drain immune. Divine Heal: full HP restore once per run. Starts with Mace, Healing Potion, Scroll of Identify.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Sanctified Ground — heal 1 HP each time you wait (Space).</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🎵 Bard</div>
-          <p class="help-note">Charismatic performer (12 HP, +1 ATK, +1 DEF). Charm: 25% chance to pacify an enemy on hit. Song of Rest: heal 3 HP on a 10-turn cooldown. Starts with Lute (weapon) and Healing Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Encore — charmed enemies may fight for you.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">⚒️ Artificer</div>
-          <p class="help-note">Master crafter (14 HP, +2 ATK, +1 DEF). Tinker: upgrade a piece of gear for gold, once per floor. Starts with Wrench (weapon), Leather Vest, and extra gold.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Master Smith — upgrades give +2 instead of +1.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🌑 Ninja</div>
-          <p class="help-note">Shadow assassin (11 HP, +3 ATK). 20% dodge, 25% crit chance. Star Throw: ranged shuriken attack on a 6-turn cooldown. High stealth reduces detection range.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🟣 Dark Wizard</div>
-          <p class="help-note">Corrupted mage (12 HP, +2 ATK). Acid Bolt: ranged poison attack on a 7-turn cooldown. Immune to poison. Scroll effects enhanced. Dark knowledge identifies potions.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧱 Brick Mason</div>
-          <p class="help-note">Stone-tough warrior (20 HP, +1 ATK, +3 DEF). Fortify: seal a doorway with a wall, once per floor. Extremely tanky but low offense.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🤸 Daredevil</div>
-          <p class="help-note">Acrobatic fighter (13 HP, +2 ATK). 20% dodge. Flip: jump over an adjacent enemy (4-turn cooldown). Ricochet: melee hits chain to adjacent enemies at 50% then 25% damage.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">💨 Escape Artist</div>
-          <p class="help-note">Evasive specialist (12 HP, +1 ATK, +1 DEF). 15% dodge. Escape Route: teleport to an adjacent room, once per floor. Leaves ice traps behind when fleeing enemies.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🎭 Conjurer</div>
-          <p class="help-note">Trickster mage (11 HP, +2 ATK). Summon illusory decoys to distract enemies (8-turn cooldown). Illusions draw enemy attention away from you.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🪙 Barterer</div>
-          <p class="help-note">Merchant-blooded survivor (14 HP, +1 ATK, +1 DEF). 25% discount at shops. Conjure Ration: sacrifice 5 HP to create food. Starts with extra gold.</p>
-        </div>
-      </div>
-
-      </div><!-- end PAGE 2 -->
-
-      <!-- PAGE 3: Perks, Runes & Synergies -->
-      <div class="manual-page" style="min-width:100%;box-sizing:border-box;">
-      <div class="help-section">
-        <div class="help-heading">Level-Up Perks</div>
-        <p class="help-note" style="margin-bottom:6px;">Gain XP from killing enemies. At each level, choose 1 of 3 random perks. Rare perks appear less often.</p>
-        <div class="help-row"><span class="hl">Extended Vision</span><span>+1 FOV radius (stackable)</span></div>
-        <div class="help-row"><span class="hl">+1 Attack</span><span>Increase base attack</span></div>
-        <div class="help-row"><span class="hl">+1 Defense</span><span>Increase base defense</span></div>
-        <div class="help-row"><span class="hl">Rapid Regen ⭐</span><span>Heal 1 HP every 15 turns (unique)</span></div>
-        <div class="help-row"><span class="hl">+5 Max HP ⭐</span><span>+5 max HP and full heal</span></div>
-        <div class="help-row"><span class="hl">Glass Cannon ⭐</span><span>Double ATK but reduce max HP by 30%</span></div>
-        <div class="help-row"><span class="hl">Vampiric Strikes ⭐</span><span>Heal 20% of damage dealt (unique)</span></div>
-        <div class="help-row"><span class="hl">Iron Skin ⭐</span><span>Reduce all incoming damage by 1 (unique)</span></div>
-        <div class="help-row"><span class="hl">Battle Fury ⭐</span><span>+3 ATK below 30% HP (unique)</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Glyph Runes ✦</div>
-        <p class="help-note" style="margin-bottom:6px;">One rune spawns per floor as a glowing purple symbol. Walk over to collect. Effects are permanent for the run.</p>
-        <div class="help-row"><span class="hl">🔶 Flame</span><span>15% burn chance on hit</span></div>
-        <div class="help-row"><span class="hl">🔷 Frost</span><span>15% freeze chance on hit</span></div>
-        <div class="help-row"><span class="hl">🟢 Thorns</span><span>Reflect 1 damage when hit</span></div>
-        <div class="help-row"><span class="hl">❤️ Vitality</span><span>+3 max HP</span></div>
-        <div class="help-row"><span class="hl">⚡ Swiftness</span><span>+8% dodge</span></div>
-        <div class="help-row"><span class="hl">👁️ Sight</span><span>+1 FOV</span></div>
-        <div class="help-row"><span class="hl">💎 Greed</span><span>+50% gold from enemies</span></div>
-        <div class="help-row"><span class="hl">🍞 Sustenance</span><span>25% slower hunger</span></div>
-        <div class="help-row"><span class="hl">💢 Wrath</span><span>+1 base ATK</span></div>
-        <div class="help-row"><span class="hl">🛡️ Warding</span><span>+1 base DEF, 50% life-drain resist</span></div>
-        <div class="help-row"><span class="hl">🩸 Vampirism</span><span>Heal 1 HP per kill</span></div>
-        <div class="help-row"><span class="hl">🍀 Fortune</span><span>+5% crit chance</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Perk Synergies ⚡</div>
-        <p class="help-note" style="margin-bottom:6px;">Combine specific perks with runes to unlock powerful hidden synergies. Active synergies show in the Stats screen.</p>
-        <div class="help-row"><span class="hl">🔥 Soulfire</span><span>Vampiric Strikes + Flame → burn heals you</span></div>
-        <div class="help-row"><span class="hl">🏰 Fortress</span><span>Iron Skin + Thorns → reflect 3 dmg</span></div>
-        <div class="help-row"><span class="hl">💢 Berserker's Rage</span><span>Battle Fury + Wrath → +5 ATK fury</span></div>
-        <div class="help-row"><span class="hl">🌿 Lifebloom</span><span>Rapid Regen + Vitality → heal 2/tick</span></div>
-        <div class="help-row"><span class="hl">🎯 Deadly Precision</span><span>Glass Cannon + Fortune → +15% crit</span></div>
-        <div class="help-row"><span class="hl">🩸 Blood Lord</span><span>Vampiric Strikes + Vampirism → 35% life steal</span></div>
-      </div>
-
-      </div><!-- end PAGE 3 -->
-
-      <!-- PAGE 4: Mastery, Combat & Equipment -->
-      <div class="manual-page" style="min-width:100%;box-sizing:border-box;">
-      <div class="help-section">
-        <div class="help-heading">Mastery System ⭐</div>
-        <p class="help-note" style="margin-bottom:6px;">Permanent cross-run bonuses earned by completing achievements. These persist forever and apply to all future runs.</p>
-        <div class="help-row"><span class="hl">Adventurer Mastery</span><span>Win as Adventurer → +1 DEF start</span></div>
-        <div class="help-row"><span class="hl">Berserker Mastery</span><span>Win as Berserker → +3 max HP start</span></div>
-        <div class="help-row"><span class="hl">Rogue Mastery</span><span>Win as Rogue → +5% crit start</span></div>
-        <div class="help-row"><span class="hl">Wizard Mastery</span><span>Win as Wizard → +2 ATK start</span></div>
-        <div class="help-row"><span class="hl">Ranger Mastery</span><span>Win as Ranger → start with Hunting Bow</span></div>
-        <div class="help-row"><span class="hl">Cleric Mastery</span><span>Win as Cleric → +3 max HP start</span></div>
-        <div class="help-row"><span class="hl">Bard Mastery</span><span>Win as Bard → +1 DEF, charm chance start</span></div>
-        <div class="help-row"><span class="hl">Artificer Mastery</span><span>Win as Artificer → start with bonus gold</span></div>
-        <div class="help-row"><span class="hl">Veteran</span><span>Win any run → +1 max HP all classes</span></div>
-        <div class="help-row"><span class="hl">Seasoned Slayer</span><span>Kill 100+ enemies total → +1 ATK all</span></div>
-        <div class="help-row"><span class="hl">Rune Adept</span><span>Collect 15+ runes total → floor 1 rune revealed</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Ranged Combat</div>
-        <p class="help-note">Equip a bow in the ranged slot. Press <kbd>F</kbd> or tap 🏹 Fire, then choose a direction. Rangers have infinite basic arrows; other classes must manage arrow supply. Special arrows (🔥 Fire, ❄️ Frost, 💥 Blast, 🗡️ Pierce) can be loaded for bonus effects.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Equipment Slots</div>
-        <div class="help-row"><span class="hl">⚔️ Weapon</span><span>Melee weapon — adds ATK to melee hits</span></div>
-        <div class="help-row"><span class="hl">🏹 Ranged</span><span>Bow/crossbow — fire arrows at range</span></div>
-        <div class="help-row"><span class="hl">🛡️ Armor</span><span>Adds DEF, may have special effects</span></div>
-        <div class="help-row"><span class="hl">💍 Ring</span><span>Passive bonuses (sight, haste, protection, hunger, detection)</span></div>
-      </div>
-
-      </div><!-- end PAGE 4 -->
-
-      <!-- PAGE 5: Enemies & Tips -->
-      <div class="manual-page" style="min-width:100%;box-sizing:border-box;">
-      <div class="help-section">
-        <div class="help-heading">Enemies</div>
-        <p class="help-note"><strong>Tier 1 (F1–4):</strong> Rats, Bats, Skeletons, Slimes — the vermin of drowned Erathis.<br>
-        <strong>Tier 2 (F5–8):</strong> Goblins, Ghosts, Spiders, Ogres — the Crypt's inhabitants.<br>
-        <strong>Tier 3 (F9–12):</strong> Wraiths, Mimics, Necromancers, Demons — the Citadel's runed guardians.<br>
-        <strong>Tier 4 (F13–16):</strong> Dark Knights, Banshees, Hydras, Warlocks — horrors of the Abyss.<br>
-        <strong>Tier 5 (F17–19):</strong> Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches — the Sanctum's last defenders.<br>
-        <strong>Floor 20:</strong> The Glyph King — a three-phase boss fight.</p>
-        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Lich 🧿 (F8), Balrog (F12), Void Titan (F16), Glyph Guardian (F19).</p>
-        <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths/Void Wraiths</strong> drain max HP (Clerics are immune; Glyph of Warding gives 50% resist; shrines can grant full immunity). <strong>Slimes/Hydras</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls. <strong>Demons</strong> leave fire trails.</p>
-        <p class="help-note" style="margin-top:4px;"><strong>Poison</strong> scales with depth: 1 HP/turn (floors 1–6), 2 HP/turn (floors 7–13), 3 HP/turn (floors 14+). Lasts 5 turns.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Tips</div>
-        <p class="help-note">• Rations stack up to 5 per inventory slot — hoard wisely, but food is still scarce.<br>
-        • Equipment found on deeper floors is stronger (+1 ATK/DEF from floor 9, +2 from floor 16).<br>
-        • One-way doors seal behind you. The depths always offer a way forward, never back.<br>
-        • Sealed doors are bound by minor glyphs. Bash them open — the blood price is steep but survivable.<br>
-        • The ghost of your previous run haunts the floor where you fell. Defeat it for its treasure.<br>
-        • Identify potions carefully — some were left as traps by the King's alchemists.<br>
-        • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
-        • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. Drop items while shopping to make room.<br>
-        • Taverns on floors 5, 10, 14 offer respite — buy food, hear one rumor (1 gold), or gamble.<br>
-        • Bump walls to search for secret passages — Rogues can sense them nearby.<br>
-        • Bone Keys (floors 6, 12, 18) unlock bonus wings with rare loot and dangerous foes.<br>
-        • Rogues can close doors behind them (🚪 or <kbd>C</kbd>) — closed doors appear teal on the map.<br>
-        • Adventurers always see stairs on the minimap — the pathfinder's instinct.<br>
-        • Shrines offer random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.<br>
-        • Auto-equip prefers specialty weapons (burn, freeze) over plain ones at the same stats.<br>
-        • Swipe the ⚙️ Config screen to browse Stats, Settings, and Save/Load pages.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Keyboard Shortcuts</div>
-        <div class="help-row"><span class="hl">↑ ↓ ← → / WASD</span><span>Move (hold to repeat)</span></div>
-        <div class="help-row"><span class="hl">Space</span><span>Wait one turn</span></div>
-        <div class="help-row"><span class="hl">G</span><span>Pick up item</span></div>
-        <div class="help-row"><span class="hl">S</span><span>Use stairs (descend)</span></div>
-        <div class="help-row"><span class="hl">F</span><span>Fire ranged weapon</span></div>
-        <div class="help-row"><span class="hl">T</span><span>Throw (daggers/stars)</span></div>
-        <div class="help-row"><span class="hl">M</span><span>Toggle minimap</span></div>
-        <div class="help-row"><span class="hl">I</span><span>Use class ability</span></div>
-        <div class="help-row"><span class="hl">C</span><span>Close door (Rogue/Mason)</span></div>
-        <div class="help-row"><span class="hl">1–8</span><span>Use inventory slot</span></div>
-        <div class="help-row"><span class="hl">Escape</span><span>Close overlay / cancel</span></div>
-        <div class="help-row"><span class="hl">← → arrows</span><span>Navigate paged screens</span></div>
-      </div>
-
-      </div><!-- end PAGE 5 -->
-
-      </div><!-- end manual-pager-track -->
-      </div><!-- end manual-pager -->
-
-      <div style="text-align:center;margin-top:8px;">
-        <button class="big-btn" id="btn-close-manual">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Update Log Overlay -->
-  <div class="overlay" id="updatelog-overlay" style="justify-content:flex-start;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));overflow-y:auto;">
-    <div style="max-width:360px;width:100%;padding:0 12px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <h1 style="font-size:18px;margin:0;">📋 Update Log</h1>
-        <button class="help-btn" id="btn-close-updatelog-top">✕ Close</button>
-      </div>
-      <div id="updatelog-content" style="margin-top:12px;"></div>
-      <div style="text-align:center;margin-top:12px;">
-        <button class="big-btn" id="btn-close-updatelog">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="overlay" id="saves-overlay" style="justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;">
-    <div id="saves-overlay-inner" style="width:100%;max-width:360px;display:flex;flex-direction:column;padding:20px 16px;box-sizing:border-box;"></div>
-  </div>
-
-  <div id="minimap-overlay">
-    <canvas id="minimap-canvas"></canvas>
-    <div class="minimap-hint">Tap to close</div>
-  </div>
-
-  <div id="item-menu"></div>
-
-  <div id="inspect-tip">
-    <div class="tip-name" id="tip-name"></div>
-    <div class="tip-desc" id="tip-desc"></div>
-  </div>
-
-  <div id="fade"></div>
-
-  <!-- Floor Transition Card -->
-  <div id="floor-card" role="status" aria-live="polite" aria-atomic="true">
-    <div class="floor-card-inner">
-      <div class="floor-card-floor" id="floor-card-floor"></div>
-      <div class="floor-card-name" id="floor-card-name"></div>
-      <div class="floor-card-atmo" id="floor-card-atmo"></div>
-      <div class="floor-card-tap">Tap to continue</div>
-    </div>
-  </div>
-
-  <!-- Badge Toast -->
-  <div id="badge-toast"></div>
-
-  <!-- Badge Overlay -->
-  <div class="overlay" id="badge-overlay" style="overflow-y:auto;padding-top:calc(24px + var(--safe-top));padding-bottom:calc(24px + var(--safe-bottom));">
-    <h1 style="color:var(--gold);">🏆 BADGES</h1>
-    <div id="badge-count-display" style="font-size:12px;color:var(--text-dim);margin-bottom:10px;"></div>
-    <div id="badge-tip" style="font-size:11px;color:var(--gold);min-height:16px;margin-bottom:8px;transition:opacity 0.3s;opacity:0;"></div>
-    <div id="badge-grid" style="width:100%;max-width:340px;"></div>
-    <button class="big-btn" id="btn-close-badges" style="margin-top:16px;">Close</button>
-  </div>
-
-  <!-- Codex Overlay -->
-  <div class="overlay" id="codex-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(16px + var(--safe-bottom));overflow:hidden;align-items:center;">
-    <h1 style="color:#60b0c0;margin-bottom:4px;flex-shrink:0;">📖 THE CODEX</h1>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;flex-shrink:0;">Lore discovered through exploration</div>
-    <div class="codex-tabs" id="codex-tabs" style="flex-shrink:0;">
-      <button class="codex-tab codex-tab-active" data-cat="bestiary">Bestiary</button>
-      <button class="codex-tab" data-cat="runes">Runes</button>
-      <button class="codex-tab" data-cat="lore">Ancient Records</button>
-      <button class="codex-tab" data-cat="biomes">Biomes</button>
-    </div>
-    <div id="codex-progress" style="font-size:12px;color:var(--text-dim);margin:6px 0;flex-shrink:0;"></div>
-    <div id="codex-entries" style="width:100%;max-width:360px;overflow-y:auto;flex:1;padding:0 4px;"></div>
-    <button class="big-btn" id="btn-close-codex" style="margin-top:10px;flex-shrink:0;">Close</button>
-  </div>
-
-  <!-- Help / Instructions Overlay -->
-  <div id="help-overlay">
-    <div style="width:100%;max-width:340px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <h1 style="font-size:18px;margin:0;">⚡ Quickstart</h1>
-        <button class="help-btn" id="btn-close-help">✕ Close</button>
-      </div>
-      <div class="font-size-bar" id="help-font-bar">
-        <button class="font-btn" data-size="0">A-</button>
-        <button class="font-btn active" data-size="1">A</button>
-        <button class="font-btn" data-size="2">A+</button>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Goal</div>
-        <p class="help-note">Descend 20 floors. Defeat the Glyph King on floor 20. Survive.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Controls</div>
-        <div class="help-row"><span class="hl">Move</span><span>D-pad / WASD / arrow keys. Hold for repeat.</span></div>
-        <div class="help-row"><span class="hl">Attack</span><span>Walk into an enemy to hit it.</span></div>
-        <div class="help-row"><span class="hl">Wait</span><span>⏳ button or Space — skip a turn.</span></div>
-        <div class="help-row"><span class="hl">Fire</span><span>🏹 button or <kbd>F</kbd> — shoot an equipped bow.</span></div>
-        <div class="help-row"><span class="hl">Throw</span><span><kbd>T</kbd> — hurl throwing daggers.</span></div>
-        <div class="help-row"><span class="hl">Stairs</span><span>🚪 button or <kbd>S</kbd> — descend when on stairs.</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Items &amp; Inventory</div>
-        <p class="help-note">Walk over items to auto-pick up. Tap an inventory slot to Equip, Use, Throw, or Drop. Potions and scrolls are unidentified until used — effects randomize each run.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Hunger</div>
-        <p class="help-note">Hunger drains over time. At 0 you lose HP. Eat rations 🍖 to restore it. Rations stack up to 5 per slot. Food is scarce — manage it carefully.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Key Mechanics</div>
-        <div class="help-row"><span class="hl">✦ Runes</span><span>One per floor. Walk over to collect. Permanent bonus for the run.</span></div>
-        <div class="help-row"><span class="hl">⛩️ Shrines</span><span>Trade HP or gold for stat boosts or drain immunity.</span></div>
-        <div class="help-row"><span class="hl">🧱 Secret Walls</span><span>Bump walls twice — first hit cracks, second breaks through for loot.</span></div>
-        <div class="help-row"><span class="hl">◊ Teleport Tiles</span><span>Invisible floor glyphs that warp you to a random location.</span></div>
-        <div class="help-row"><span class="hl">🗝️ Bonus Wings</span><span>Find Bone Keys (F6, 12, 18) to unlock side areas.</span></div>
-        <div class="help-row"><span class="hl">⚡ Synergies</span><span>Combine perks + runes for powerful hidden combos.</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">NPCs</div>
-        <p class="help-note">🧙 Merchants (F3,7,11,15,19) sell gear. 🔮 Sages (F2,5,9,13,17) uncurse and heal. 🍺 Taverns (F5,10,14) sell food and rumors. 🗣️ Shades give lore hints.</p>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">15 Classes</div>
-        <p class="help-note">Each class has unique stats, abilities, and an exclusive ★ perk. See the 📜 Manual for full details.</p>
-        <div class="help-row"><span class="hl">🧝 Adventurer</span><span>Balanced. Regen + Pathfinder.</span></div>
-        <div class="help-row"><span class="hl">🪖 Berserker</span><span>High ATK. Rage mode. 2× hunger.</span></div>
-        <div class="help-row"><span class="hl">🥷 Rogue</span><span>Dodge + crit. Stealth. Close doors.</span></div>
-        <div class="help-row"><span class="hl">🧙 Wizard</span><span>Double scrolls. AoE blast.</span></div>
-        <div class="help-row"><span class="hl">🏹 Ranger</span><span>+2 FOV. Infinite arrows. Aimed Shot.</span></div>
-        <div class="help-row"><span class="hl">⛪ Cleric</span><span>Holy Aura. Curse/drain immune.</span></div>
-        <div class="help-row"><span class="hl">🎵 Bard</span><span>Charm enemies. Song of Rest heal.</span></div>
-        <div class="help-row"><span class="hl">⚒️ Artificer</span><span>Upgrade gear with gold.</span></div>
-        <div class="help-row"><span class="hl">🌑 Ninja</span><span>Stealth kills. Star Throw ranged attack.</span></div>
-        <div class="help-row"><span class="hl">🟣 Dark Wizard</span><span>Acid Bolt. Poison resist. Dark power.</span></div>
-        <div class="help-row"><span class="hl">🧱 Brick Mason</span><span>Fortify walls. High DEF. Tanky.</span></div>
-        <div class="help-row"><span class="hl">🤸 Daredevil</span><span>Flip over enemies. Ricochet melee.</span></div>
-        <div class="help-row"><span class="hl">💨 Escape Artist</span><span>Teleport to adjacent room. Ice traps.</span></div>
-        <div class="help-row"><span class="hl">🎭 Conjurer</span><span>Summon illusions to distract enemies.</span></div>
-        <div class="help-row"><span class="hl">🪙 Barterer</span><span>Discount shopping. Conjure rations.</span></div>
-      </div>
-
-      <div class="help-section">
-        <div class="help-heading">Quick Tips</div>
-        <p class="help-note">
-          • Special abilities: double-tap or hold on mobile.<br>
-          • In Aimed Shot mode, tap Special again to cancel on mobile.<br>
-          • Your ghost from a past death haunts where you fell.<br>
-          • One-way doors seal behind you. Bash sealed doors (5 hits).<br>
-          • Cracked walls (amber ▒) can be broken with one more hit.<br>
-          • Teleport tiles are invisible until triggered — stay alert on deeper floors.<br>
-          • Auto-equip (⚙️ Config) picks up better gear for you.<br>
-          • See the 📜 Manual for full class guides, enemy lists, synergies, and lore.
-        </p>
-      </div>
-
-      <div style="text-align:center;margin-top:8px;">
-        <button class="big-btn" id="btn-close-help-bottom">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="audio.js"></script>
-  <script src="game.js"></script>
+  <script>
+    function renderMap(map2D, container = document.getElementById('map')) {
+      const rows = map2D.length;
+      const cols = rows ? map2D[0].length : 0;
+
+      container.style.gridTemplateColumns = `repeat(${cols}, var(--grid-size))`;
+      container.style.gridTemplateRows = `repeat(${rows}, var(--grid-size))`;
+
+      const frag = document.createDocumentFragment();
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const ch = map2D[y][x];
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+
+          if (ch === '#') {
+            tile.style.backgroundImage = "url('assets/wall_dark_stone.png')";
+          } else if (ch === '.') {
+            tile.style.backgroundImage = "url('assets/floor_flagstone.png')";
+          } else if (ch === '@' || ch === 'r' || ch === '*') {
+            tile.style.backgroundImage = "url('assets/floor_flagstone.png')";
+
+            const img = document.createElement('img');
+            if (ch === '@') img.src = 'assets/player_helmet.png';
+            if (ch === 'r') img.src = 'assets/enemy_rat.png';
+            if (ch === '*') img.src = 'assets/loot_gold.png';
+            img.alt = ch;
+            tile.appendChild(img);
+          } else {
+            tile.style.backgroundImage = "url('assets/floor_flagstone.png')";
+          }
+
+          frag.appendChild(tile);
+        }
+      }
+
+      container.replaceChildren(frag);
+    }
+  </script>
 </body>
 </html>
