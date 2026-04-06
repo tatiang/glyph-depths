@@ -1170,7 +1170,7 @@ function newRun(classId = 'berserker') {
   applyMasteryBonuses(classId);
   const className = getClassDef(classId).name || 'Berserker';
   // Welcome messages with player name and class
-  addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into the Shards of the Unknown.`, 'gold');
+  addMessage(`${state.playerName} ${state.playerEpithet} ${className} descends into Unknown Depths.`, 'gold');
   const activeMasteries = getActiveMasteries(classId);
   if (activeMasteries.length > 0) {
     addMessage(`Mastery bonuses: ${activeMasteries.map(m => m.name).join(', ')}`, 'gold');
@@ -2640,7 +2640,7 @@ const NPC_LORE = [
   "A shade recalls: \"I once found three runes on a single floor. The synergy made me invincible. For two floors. Then I met something that didn't care about synergies.\"",
   // Humor and personality
   "A ghost laughs to itself: \"The Glyph King sends his regards. I don't know what that means. I've been saying it for centuries because another ghost told me to.\"",
-  "A spectral figure gestures broadly: \"Welcome to the Shards of the Unknown! Population: declining. Amenities: merchants who can't leave and taverns that serve ghost ale. Enjoy your stay.\"",
+  "A spectral figure gestures broadly: \"Welcome to Unknown Depths! Population: declining. Amenities: merchants who can't leave and taverns that serve ghost ale. Enjoy your stay.\"",
   "A translucent cook grumbles: \"Rations in this dungeon taste like cardboard soaked in regret. But they keep you alive, so eat them and stop complaining.\"",
   "A shade of a locksmith mutters: \"Bone keys. Who makes keys out of bone? Aldric, that's who. The man was practical in the worst possible way.\"",
   "A ghost waves dismissively: \"Everyone asks how to beat the King. Nobody asks how the King is doing. The answer is: bored, immortal, and rewriting the laws of physics for fun.\"",
