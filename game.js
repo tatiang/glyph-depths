@@ -63,6 +63,7 @@ const BADGE_DEFS = [
   { id: 'win_conjurer', name: "Conjurer's Phantom", icon: '🎭', desc: 'Win as Conjurer', cat: 'class' },
   { id: 'win_monk', name: "Monk's Enlightenment", icon: '📿', desc: 'Win as Monk', cat: 'class' },
   { id: 'win_beastmaster', name: "Beastmaster's Call", icon: '🐺', desc: 'Win as Beastmaster', cat: 'class' },
+  { id: 'win_elementalist', name: "Elementalist's Crucible", icon: '🧪', desc: 'Win as Elementalist', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -345,6 +346,7 @@ const MASTERY_DEFS = [
   { id: 'conj_mastery', trigger: 'win_conjurer',   name: 'Conjurer Mastery',    desc: 'All Conjurers start with Illusion cooldown 6 instead of 8', classReq: 'conjurer', bonus: { fastIllusion: true } },
   { id: 'monk_mastery', trigger: 'win_monk',       name: 'Monk Mastery',        desc: 'All Monks gain +1 DEF',                   classReq: 'monk',       bonus: { defense: 1 } },
   { id: 'bm_mastery',   trigger: 'win_beastmaster',name: 'Beastmaster Mastery', desc: 'All Beastmasters start with +3 max HP',   classReq: 'beastmaster',bonus: { maxHp: 3 } },
+  { id: 'elem_mastery', trigger: 'win_elementalist', name: 'Elementalist Mastery', desc: 'Vial of Slime cooldown 8 instead of 10', classReq: 'elementalist', bonus: { fastVial: true } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -400,7 +402,7 @@ function showMasteryToast(mastery) {
 }
 
 function getMasteryBonuses(classId) {
-  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, charmBonus: 0, necroBonus: 0, upgradeBow: false, revealRune: false, fastFlip: false, extraEscape: false, fastIllusion: false, startGold: 0 };
+  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, charmBonus: 0, necroBonus: 0, upgradeBow: false, revealRune: false, fastFlip: false, extraEscape: false, fastIllusion: false, fastVial: false, startGold: 0 };
   for (const m of MASTERY_DEFS) {
     if (!masteryState[m.id]) continue;
     if (m.classReq && m.classReq !== classId) continue;
@@ -415,6 +417,7 @@ function getMasteryBonuses(classId) {
     if (m.bonus.fastFlip) bonuses.fastFlip = true;
     if (m.bonus.extraEscape) bonuses.extraEscape = true;
     if (m.bonus.fastIllusion) bonuses.fastIllusion = true;
+    if (m.bonus.fastVial) bonuses.fastVial = true;
     if (m.bonus.startGold) bonuses.startGold += m.bonus.startGold;
   }
   return bonuses;
@@ -686,6 +689,16 @@ const CLASS_DEFS = [
     startItems: 'Leather Vest · Healing Potion',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
     passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
+  },
+  {
+    id: 'elementalist', name: 'Elementalist', icon: '🧪',
+    flavor: 'A volatile caster who turns the battlefield into a hazard zone.',
+    hp: 12, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🧪 Elemental Immune · Bump = Acid-Soaked · ⚡ Thunderclap',
+    startItems: 'Rusty Dagger · Healing Potion · Scroll of Mapping',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
   }
 ];
 
@@ -758,6 +771,13 @@ function normalizeLoadedPlayer(player) {
   player.sharpDealer = false;
   player.encore = false;
   player.backstab = false;
+  // Elementalist
+  player.poisonImmune = player.classId === 'elementalist';
+  player.acidImmune = player.classId === 'elementalist';
+  player.fireImmune = player.classId === 'elementalist';
+  player.vialOfSlimeCooldown = Math.max(0, player.vialOfSlimeCooldown || 0);
+  player.thunderclapCooldown = Math.max(0, player.thunderclapCooldown || 0);
+  player.chainLightning = !!player.chainLightning;
   if (!player.classState) {
     player.classState = { haggledThisFloor: false, appraisedThisFloor: false, floorKills: 0, iceTraps: [], fortifiedThisFloor: false, illusionEntity: null };
   }
@@ -1273,6 +1293,13 @@ function createPlayer(classId = 'berserker') {
     sageClass: classId === 'conjurer',
     scrollMastery: classId === 'conjurer',
     ancientTongue: false,
+    // Elementalist
+    poisonImmune: classId === 'elementalist',
+    acidImmune: classId === 'elementalist',
+    fireImmune: classId === 'elementalist',
+    vialOfSlimeCooldown: 0,
+    thunderclapCooldown: 0,
+    chainLightning: false,
     // Soul Amulet
     soulFragments: 0,
     defPurchases: 0, // Sage shop: tracks escalating +1 DEF cost
@@ -1371,6 +1398,12 @@ function applyClassStartingItems(classId) {
     if (armor) p.equipped.armor = { ...armor };
     const healPotion = potionNames.find(n => n.id === 'healing');
     if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+  } else if (classId === 'elementalist') {
+    p.equipped.weapon = { name: 'Rusty Dagger', glyph: '🗡️', itemType: 'weapon', attack: 1, tier: 1, special: null };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
+    const mapScroll = scrollNames.find(n => n.id === 'mapping');
+    if (mapScroll) { scrollIdentified[mapScroll.id] = true; p.inventory.push(makeScroll(mapScroll)); }
   }
 }
 
@@ -4261,6 +4294,12 @@ function attackEntity(attacker, defender) {
     }
   }
 
+  // Elementalist: bump attacks apply Acid-Soaked
+  if (isPlayer && !targetIsPlayer && defender.hp > 0 && state.player.classId === 'elementalist') {
+    addStatusEffect(defender, 'acid_soaked', 3);
+    addMessage(`🧪 ${defender.name} is acid-soaked! (-3 DEF)`, 'good');
+  }
+
   // Glyph Rune effects: flame, frost on player attack
   if (isPlayer && !targetIsPlayer && defender.hp > 0) {
     if (hasRune('flame') && Math.random() < 0.15) {
@@ -4414,6 +4453,7 @@ function getEffectiveDefense(entity) {
   // Aquatic enemies get +1 DEF when on or adjacent to water
   let def = entity.defense + (entity.aquaticDefBonus || 0);
   if (hasStatusEffect(entity, 'weakened')) def -= 2;
+  if (hasStatusEffect(entity, 'acid_soaked')) def -= 3;
   return Math.max(0, def);
 }
 
@@ -4730,6 +4770,7 @@ function showLevelUp() {
     { name: 'Double Shot', desc: 'Fire 2 arrows in one turn', apply: () => { state.player.doubleShot = true; }, rare: false, unique: true, flag: 'doubleShot', classOnly: 'ranger' },
     { name: 'Necrotic Surge', desc: 'Acid bolt splashes poison to adjacent foes', apply: () => { state.player.necroticSurge = true; }, rare: false, unique: true, flag: 'necroticSurge', classOnly: 'darkwizard' },
     { name: 'Smoke Screen', desc: 'Teleport leaves a 3-turn smoke cloud behind', apply: () => { state.player.smokeScreen = true; }, rare: false, unique: true, flag: 'smokeScreen', classOnly: 'escapeartist' },
+    { name: 'Chain Lightning', desc: 'Thunderclap chains to enemies within 2 tiles of hit targets', apply: () => { state.player.chainLightning = true; }, rare: true, unique: true, flag: 'chainLightning', classOnly: 'elementalist' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -4782,6 +4823,11 @@ function showLevelUp() {
 
 // === STATUS EFFECTS ===
 function addStatusEffect(entity, type, turns) {
+  // Elementalist immunities
+  if (entity === state?.player) {
+    if (type === 'poison' && state.player.poisonImmune) { addMessage('🧪 Your elemental attunement neutralizes the poison!', 'good'); return; }
+    if (type === 'burning' && state.player.fireImmune) { addMessage('🧪 Your elemental attunement absorbs the flames!', 'good'); return; }
+  }
   const existing = entity.statusEffects?.find(s => s.type === type);
   if (existing) { existing.turns = Math.max(existing.turns, turns); return; }
   if (!entity.statusEffects) entity.statusEffects = [];
@@ -4866,6 +4912,7 @@ function processEntityEffects(entity) {
       if (isPlayer && eff.type === 'phasing') addMessage('You solidify again.', '');
       if (isPlayer && eff.type === 'wet') addMessage('You dry off.', '');
       if (isPlayer && (eff.type === 'waterwalk' || eff.type === 'walk_on_water')) addMessage('Your feet feel heavy again.', '');
+      if (!isPlayer && eff.type === 'acid_soaked') addMessage(`${entity.name}'s acid coating dissolves.`, '');
     }
   }
 
@@ -5461,6 +5508,15 @@ function tryMoveEnemy(enemy, nx, ny) {
     addMessage(`💨 ${enemy.name} stumbles through the smoke!`, 'good');
     removeEntity(smoke);
   }
+
+  // Acid hazard: enemies that step in acid take damage and become acid-soaked
+  const acidPool = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'acid' && e.x === nx && e.y === ny);
+  if (acidPool && !enemy.isAlly && enemy.hp > 0) {
+    enemy.hp -= 1;
+    addStatusEffect(enemy, 'acid_soaked', 2);
+    addMessage(`🧪 ${enemy.name} sizzles in acid! (-1 HP)`, 'good');
+    if (enemy.hp <= 0) killEnemy(enemy);
+  }
 }
 
 function hasLOS(x1, y1, x2, y2) {
@@ -5941,7 +5997,9 @@ function playerMove(dx, dy) {
   // Check for hazards
   const hazard = state.entities.find(e => e.type === 'hazard' && e.x === nx && e.y === ny);
   if (hazard && hazard.hazardType === 'fire') {
-    if (hasStatusEffect(state.player, 'wet')) {
+    if (state.player.fireImmune) {
+      // Elementalist fire immunity
+    } else if (hasStatusEffect(state.player, 'wet')) {
       // Wet status extinguishes fire hazard
       removeEntity(hazard);
       addMessage('Your wet body douses the fire!', 'good');
@@ -5955,6 +6013,12 @@ function playerMove(dx, dy) {
     const alreadySlowed = hasStatusEffect(state.player, 'web_slowed');
     applyStatusEffect(state.player, 'web_slowed', 3);
     if (!alreadySlowed) addMessage('🕸 You step into a spider web! You are slowed.', 'damage');
+  }
+  if (hazard && hazard.hazardType === 'acid' && !state.player.acidImmune) {
+    state.player.hp -= 1;
+    addStatusEffect(state.player, 'acid_soaked', 2);
+    addMessage('You step in acid! (-1 HP)', 'damage');
+    if (state.player.hp <= 0) { playerDeath('acid', '🧪'); return; }
   }
 
   // Check for NPC (friendly shade — cannot be attacked, gives lore)
@@ -7307,6 +7371,8 @@ function endTurn() {
   if (state.player.arcaneDartCooldown > 0) state.player.arcaneDartCooldown--;
   if (state.player.weakenCooldown > 0) state.player.weakenCooldown--;
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
+  if (state.player.vialOfSlimeCooldown > 0) state.player.vialOfSlimeCooldown--;
+  if (state.player.thunderclapCooldown > 0) state.player.thunderclapCooldown--;
 
   // Expire illusion entities
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -9478,6 +9544,19 @@ function updateUI() {
         setBtn('🧘 MEDITATE', true, '#60c0a0');
         setBar(100, '#60c0a0');
       }
+    } else if (cls === 'elementalist') {
+      spRow.style.display = '';
+      const vialMax = getMasteryBonuses(cls).fastVial ? 8 : 10;
+      if (p.vialOfSlimeCooldown <= 0 && p.thunderclapCooldown <= 0) {
+        setBtn('🧪 SPELLS', true, '#80ff00');
+        setBar(100, '#80ff00');
+      } else if (p.vialOfSlimeCooldown <= 0 || p.thunderclapCooldown <= 0) {
+        setBtn(`🧪 SPELLS ${Math.max(p.vialOfSlimeCooldown, p.thunderclapCooldown)}t`, true, '#80ff00');
+        setBar(100, '#80ff00');
+      } else {
+        setBtn(`🧪 SPELLS ${Math.min(p.vialOfSlimeCooldown, p.thunderclapCooldown)}t`, false, '#80ff00');
+        setBar(((vialMax - p.vialOfSlimeCooldown) / vialMax) * 100, '#80ff00');
+      }
     } else {
       spRow.style.display = '';
       setBtn('No special ability', false);
@@ -10185,6 +10264,7 @@ function setupInput() {
     else if (state.player.classId === 'darkwizard') activateAcidBolt();
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
     else if (state.player.classId === 'conjurer') activateConjurerMenu();
+    else if (state.player.classId === 'elementalist') activateElementalistMenu();
     else if (state.player.classId === 'monk') activateMeditate();
     spArmed = false;
   };
@@ -10649,6 +10729,11 @@ function showSettings() {
           abilities.push({ icon: '♻️', name: 'Rapid Regeneration', desc: 'Heals 1 HP every 15 turns' });
           abilities.push({ icon: '🐾', name: 'Beast Charm', desc: '70% chance to win over Bats, Slimes, and Spiders on hit' });
           break;
+        case 'elementalist':
+          abilities.push({ icon: '🧪', name: 'Caustic Attunement', desc: 'Immune to poison, fire, and acid. Bump attacks acid-soak foes (-3 DEF, 3t)' });
+          abilities.push({ icon: '🟢', name: 'Vial of Slime', desc: `3×3 acid pool, 5 turns (${p.vialOfSlimeCooldown > 0 ? p.vialOfSlimeCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '⚡', name: 'Thunderclap', desc: `AoE lightning, stuns acid-soaked foes (${p.thunderclapCooldown > 0 ? p.thunderclapCooldown + 't CD' : 'Ready'})` });
+          break;
       }
       // Add unlocked class-specific perks
       const classPerkFlags = [
@@ -10660,6 +10745,7 @@ function showSettings() {
         { flag: 'doubleShot', icon: '🏹', name: 'Double Shot', desc: 'Fire 2 arrows in one turn' },
         { flag: 'necroticSurge', icon: '☣️', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
         { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
+        { flag: 'chainLightning', icon: '⚡', name: 'Chain Lightning', desc: 'Thunderclap chains to nearby enemies' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -10792,6 +10878,7 @@ function showSettings() {
     walk_on_water:{ icon: '🌊', text: 'Water Walk',  color: '#40c0ff' },
     waterwalk:    { icon: '🌊', text: 'Water Walk',  color: '#40c0ff' },
     woozy:        { icon: '🌀', text: 'Woozy',       color: '#c080ff' },
+    acid_soaked:  { icon: '🧪', text: 'Acid-Soaked', color: '#80ff00' },
   };
   const effects = p ? (p.statusEffects || []) : [];
   if (effects.length > 0) {
@@ -11950,7 +12037,8 @@ function renderStatusFX() {
     phasing:      { icon: '👻', text: 'Phase',   cls: 'fx-invisibility' },
     walk_on_water:{ icon: '🌊', text: 'Water',   cls: 'fx-invisibility' },
     waterwalk:    { icon: '🌊', text: 'Water',   cls: 'fx-invisibility' },
-    woozy:        { icon: '🌀', text: 'Woozy',   cls: 'fx-poison' }
+    woozy:        { icon: '🌀', text: 'Woozy',   cls: 'fx-poison' },
+    acid_soaked:  { icon: '🧪', text: 'Acid',    cls: 'fx-poison' }
   };
 
   let html = '';
@@ -12768,6 +12856,169 @@ function activateIllusion() {
   haptic(40);
   computeFOV();
   updateUI();
+  endTurn();
+}
+
+// === ELEMENTALIST ABILITIES ===
+function activateElementalistMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  const vialReady = p.vialOfSlimeCooldown <= 0;
+  const thunderReady = p.thunderclapCooldown <= 0;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🧪 ELEMENTALIST';
+  $('levelup-label').textContent = 'Choose a spell:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+
+  const vialBtn = document.createElement('button');
+  vialBtn.className = 'perk-btn';
+  vialBtn.innerHTML = `<div class="perk-name">🟢 Vial of Slime</div><div class="perk-desc">Create 3×3 acid pool${vialReady ? '' : ` (${p.vialOfSlimeCooldown} turns)`}</div>`;
+  if (!vialReady) vialBtn.style.opacity = '0.5';
+  const vialHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (vialReady) activateVialOfSlime();
+    else addMessage(`Vial of Slime recharging (${p.vialOfSlimeCooldown} turns).`, '');
+  };
+  vialBtn.addEventListener('click', vialHandler);
+  vialBtn.addEventListener('touchend', (e) => { e.preventDefault(); vialHandler(); }, { passive: false });
+  container.appendChild(vialBtn);
+
+  const thunderBtn = document.createElement('button');
+  thunderBtn.className = 'perk-btn';
+  thunderBtn.innerHTML = `<div class="perk-name">⚡ Thunderclap</div><div class="perk-desc">AoE lightning, stuns acid-soaked foes${thunderReady ? '' : ` (${p.thunderclapCooldown} turns)`}</div>`;
+  if (!thunderReady) thunderBtn.style.opacity = '0.5';
+  const thunderHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    if (thunderReady) activateThunderclap();
+    else addMessage(`Thunderclap recharging (${p.thunderclapCooldown} turns).`, '');
+  };
+  thunderBtn.addEventListener('click', thunderHandler);
+  thunderBtn.addEventListener('touchend', (e) => { e.preventDefault(); thunderHandler(); }, { passive: false });
+  container.appendChild(thunderBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+
+  overlay.classList.add('active');
+}
+
+function activateVialOfSlime() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.vialOfSlimeCooldown > 0) {
+    addMessage(`Vial of Slime recharging (${p.vialOfSlimeCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(40);
+  const maxCD = getMasteryBonuses('elementalist').fastVial ? 8 : 10;
+  let placed = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const ax = p.x + dx, ay = p.y + dy;
+      if (ax < 0 || ax >= MAP_W || ay < 0 || ay >= MAP_H) continue;
+      const tile = getTile(ax, ay);
+      if (tile === T.WALL || tile === T.DOOR_SEALED) continue;
+      // Don't stack acid on existing acid
+      if (state.entities.some(e => e.type === 'hazard' && e.hazardType === 'acid' && e.x === ax && e.y === ay)) continue;
+      state.entities.push({ type: 'hazard', hazardType: 'acid', x: ax, y: ay, glyph: '🟢', turns: 5 });
+      placed++;
+    }
+  }
+  p.vialOfSlimeCooldown = maxCD;
+  addMessage(`🟢 You hurl a vial of slime! ${placed} acid tiles created.`, 'good');
+  animateAoeBlast(p.x, p.y, 1.5, '#80ff00');
+  Audio.useItem();
+  updateUI();
+  render();
+  endTurn();
+}
+
+function activateThunderclap() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.thunderclapCooldown > 0) {
+    addMessage(`Thunderclap recharging (${p.thunderclapCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(50);
+  const damage = 3 + Math.floor(state.floor / 4);
+  let hitCount = 0;
+  const hitEnemies = [];
+
+  // Hit all enemies in 8 adjacent tiles
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      const tx = p.x + dx, ty = p.y + dy;
+      const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0 && !e.isAlly && e.x === tx && e.y === ty);
+      for (const enemy of enemies) {
+        enemy.hp -= damage;
+        hitCount++;
+        hitEnemies.push(enemy);
+        // Stun acid-soaked enemies
+        if (hasStatusEffect(enemy, 'acid_soaked')) {
+          addStatusEffect(enemy, 'frozen', 1);
+          addMessage(`⚡ ${enemy.name} is shocked and stunned! (-${damage})`, 'good');
+        } else {
+          addMessage(`⚡ ${enemy.name} is struck by lightning! (-${damage})`, 'good');
+        }
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+  }
+
+  // Chain Lightning perk: also hit enemies within 2 tiles of any hit target
+  if (p.chainLightning && hitEnemies.length > 0) {
+    const alreadyHit = new Set(hitEnemies);
+    for (const hit of hitEnemies) {
+      const nearby = state.entities.filter(e =>
+        e.type === 'enemy' && e.hp > 0 && !e.isAlly && !alreadyHit.has(e) &&
+        Math.abs(e.x - hit.x) <= 2 && Math.abs(e.y - hit.y) <= 2
+      );
+      for (const chain of nearby) {
+        alreadyHit.add(chain);
+        const chainDmg = Math.max(1, Math.floor(damage / 2));
+        chain.hp -= chainDmg;
+        hitCount++;
+        if (hasStatusEffect(chain, 'acid_soaked')) {
+          addStatusEffect(chain, 'frozen', 1);
+          addMessage(`⚡ Lightning chains to ${chain.name}! Stunned! (-${chainDmg})`, 'good');
+        } else {
+          addMessage(`⚡ Lightning chains to ${chain.name}! (-${chainDmg})`, 'good');
+        }
+        if (chain.hp <= 0) killEnemy(chain);
+      }
+    }
+  }
+
+  if (hitCount === 0) {
+    addMessage('⚡ Thunderclap crackles — but no enemies nearby!', '');
+  }
+  p.thunderclapCooldown = 8;
+  animateAoeBlast(p.x, p.y, 1.5, '#ffff40');
+  Audio.useItem();
+  screenShake();
+  updateUI();
+  render();
   endTurn();
 }
 
