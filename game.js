@@ -616,7 +616,7 @@ const CLASS_DEFS = [
   {
     id: 'ranger',
     name: 'Ranger',
-    icon: '🏹',
+    icon: '🏹', img: 'images/ranger.png',
     flavor: 'Survivalist and sharpshooter. Sees further, forages better.',
     hp: 13, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.05, critChance: 0.15,
@@ -638,7 +638,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
   },
   {
-    id: 'darkwizard', name: 'Dark Wizard', icon: '💀',
+    id: 'darkwizard', name: 'Dark Wizard', icon: '💀', img: 'images/dark-wizard.png',
     flavor: 'Frail but fearsome. Magic doubles in your hands, and the dead serve you.',
     hp: 10, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
@@ -688,6 +688,18 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
   }
 ];
+
+// Preloaded Image objects for classes with custom artwork (keyed by img path)
+const classImageCache = {};
+function preloadClassImages() {
+  for (const cls of CLASS_DEFS) {
+    if (cls.img && !classImageCache[cls.img]) {
+      const img = new Image();
+      img.src = cls.img;
+      classImageCache[cls.img] = img;
+    }
+  }
+}
 
 const LEGACY_CLASS_REMAP = {
   adventurer: 'beastmaster',
@@ -814,6 +826,7 @@ const $ = id => document.getElementById(id);
 function boot() {
   canvas = $('game-canvas');
   ctxC = canvas.getContext('2d');
+  preloadClassImages();
   loadSettings();
   loadBadges();
   loadCodex();
@@ -978,7 +991,7 @@ function showClassSelect() {
         `;
       } else {
         card.innerHTML = `
-          <div class="class-icon">${cls.icon}</div>
+          <div class="class-icon">${cls.img ? `<img src="${cls.img}" class="class-img" alt="${cls.name}">` : cls.icon}</div>
           <div class="class-name">${cls.name}</div>
           <div class="class-flavor">${cls.flavor}</div>
           <div class="class-badge-row">
@@ -9216,12 +9229,19 @@ function render() {
   ctx.font = `${Math.floor(ts * 0.7)}px monospace`;
   ctx.fillStyle = playerTileColor;
   ctx.fillText(playerTileGlyph, playerSX, playerSY);
-  ctx.font = `${Math.floor(ts * 0.75)}px serif`;
-  ctx.fillStyle = '#ffffff';
   if (hasStatusEffect(p, 'invisibility')) {
     ctx.globalAlpha = 0.4;
   }
-  ctx.fillText(p.glyph, playerSX, playerSY);
+  const playerClassDef = getClassDef(p.classId);
+  const playerClassImg = playerClassDef && playerClassDef.img && classImageCache[playerClassDef.img];
+  if (playerClassImg && playerClassImg.complete && playerClassImg.naturalWidth > 0) {
+    const imgSize = Math.floor(ts * 0.92);
+    ctx.drawImage(playerClassImg, playerSX - imgSize / 2, playerSY - imgSize / 2, imgSize, imgSize);
+  } else {
+    ctx.font = `${Math.floor(ts * 0.75)}px serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(p.glyph, playerSX, playerSY);
+  }
   ctx.globalAlpha = 1.0;
 
   // Danger border — red glow when low HP or low food
