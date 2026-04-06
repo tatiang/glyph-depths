@@ -616,7 +616,7 @@ const CLASS_DEFS = [
   {
     id: 'ranger',
     name: 'Ranger',
-    icon: '🏹',
+    icon: '🏹', img: 'images/ranger.png',
     flavor: 'Survivalist and sharpshooter. Sees further, forages better.',
     hp: 13, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.05, critChance: 0.15,
