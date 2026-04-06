@@ -605,16 +605,14 @@ const CLASS_DEFS = [
     passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
   },
   {
-    id: 'rogue',
-    name: 'Rogue',
-    icon: '🥷',
-    flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
-    hp: 10, attack: 3, defense: 1,
-    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
-    passive: '👁 15% Dodge · 20% Crit · 🦶 Roundhouse Kick (Lv 5)',
-    startItems: '6 Throwing Daggers · Invis Potion',
-    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }]
+    id: 'escapeartist', name: 'Escape Artist', icon: '💨',
+    flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
+    hp: 12, attack: 2, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
+    passive: '❄️ Ice Traps on retreat · 💥 Ricochet · 💨 Escape Route',
+    startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }]
   },
   {
     id: 'ranger',
@@ -629,6 +627,18 @@ const CLASS_DEFS = [
     passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }]
   },
   {
+    id: 'rogue',
+    name: 'Rogue',
+    icon: '🥷',
+    flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
+    hp: 10, attack: 3, defense: 1,
+    hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
+    passive: '👁 15% Dodge · 20% Crit · 🦶 Roundhouse Kick (Lv 5)',
+    startItems: '6 Throwing Daggers · Invis Potion',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }]
+  },
+  {
     id: 'cleric',
     name: 'Cleric',
     icon: '⛪',
@@ -641,26 +651,6 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
   },
   {
-    id: 'darkwizard', name: 'Dark Wizard', icon: '💀', img: 'images/dark-wizard.png',
-    flavor: 'Frail but fearsome. Magic doubles in your hands, and the dead serve you.',
-    hp: 10, attack: 1, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '✨ Arcane Affinity: scrolls ×2 · 💀 Necromance',
-    startItems: 'Arcane Staff · 3 identified scrolls · Healing Potion',
-    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
-  },
-  {
-    id: 'escapeartist', name: 'Escape Artist', icon: '💨',
-    flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
-    hp: 12, attack: 2, defense: 1,
-    hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
-    passive: '❄️ Ice Traps on retreat · 💥 Ricochet · 💨 Escape Route',
-    startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }]
-  },
-  {
     id: 'conjurer', name: 'Conjurer', icon: '🎭',
     flavor: 'Weaves phantoms from thin air, armed with all the answers.',
     hp: 12, attack: 2, defense: 0,
@@ -671,14 +661,24 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }]
   },
   {
-    id: 'monk', name: 'Monk', icon: '📿',
-    flavor: 'Requires no steel. Fists, focus, and inner stillness replace all gear.',
-    hp: 12, attack: 0, defense: 0,
-    hungerRate: 1, dodgeBonus: 0.10, critChance: 0.15,
-    passive: '🥋 ATK/DEF scale with level · 🧘 Meditate · 🌊 Walk on Water',
-    startItems: 'Healing Potion · Enchanted Lute',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
-    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
+    id: 'darkwizard', name: 'Dark Wizard', icon: '💀', img: 'images/dark-wizard.png',
+    flavor: 'Frail but fearsome. Magic doubles in your hands, and the dead serve you.',
+    hp: 10, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '✨ Arcane Affinity: scrolls ×2 · 💀 Necromance',
+    startItems: 'Arcane Staff · 3 identified scrolls · Healing Potion',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
+  },
+  {
+    id: 'elementalist', name: 'Elementalist', icon: '🧪',
+    flavor: 'A volatile caster who turns the battlefield into a hazard zone.',
+    hp: 12, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
+    passive: '🧪 Elemental Immune · Bump = Acid-Soaked · ⚡ Thunderclap',
+    startItems: 'Rusty Dagger · Healing Potion · Scroll of Mapping',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
   },
   {
     id: 'beastmaster', name: 'Beastmaster', icon: '🐺',
@@ -691,14 +691,14 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
   },
   {
-    id: 'elementalist', name: 'Elementalist', icon: '🧪',
-    flavor: 'A volatile caster who turns the battlefield into a hazard zone.',
-    hp: 12, attack: 1, defense: 0,
-    hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
-    passive: '🧪 Elemental Immune · Bump = Acid-Soaked · ⚡ Thunderclap',
-    startItems: 'Rusty Dagger · Healing Potion · Scroll of Mapping',
-    statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
+    id: 'monk', name: 'Monk', icon: '📿',
+    flavor: 'Requires no steel. Fists, focus, and inner stillness replace all gear.',
+    hp: 12, attack: 0, defense: 0,
+    hungerRate: 1, dodgeBonus: 0.10, critChance: 0.15,
+    passive: '🥋 ATK/DEF scale with level · 🧘 Meditate · 🌊 Walk on Water',
+    startItems: 'Healing Potion · Enchanted Lute',
+    statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
+    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
   }
 ];
 
