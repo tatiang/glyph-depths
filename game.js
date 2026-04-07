@@ -7995,6 +7995,58 @@ function deleteSaveSlot(slot) {
   localStorage.removeItem(SAVE_PREFIX + slot);
 }
 
+function downloadSaveFile(slotKey) {
+  const raw = localStorage.getItem(SAVE_PREFIX + slotKey);
+  if (!raw) return;
+  let fileName = 'glyph-depths-save.json';
+  try {
+    const data = JSON.parse(raw);
+    const name = (data.state.playerName || 'save').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const floor = data.state.floor || '?';
+    fileName = 'glyph-depths-' + name + '-floor' + floor + '.json';
+  } catch (e) {}
+  const blob = new Blob([raw], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importSaveFile(listEl, cloudSaves, fromTitle) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const raw = e.target.result;
+        const data = JSON.parse(raw);
+        if (!data || !data.state) { addMessage('Invalid save file.', 'damage'); return; }
+        // Find the next empty slot, or fall back to slot 1
+        let slot = null;
+        for (let i = 1; i <= SAVE_SLOTS; i++) {
+          if (!localStorage.getItem(SAVE_PREFIX + i)) { slot = i; break; }
+        }
+        if (!slot) slot = 1;
+        localStorage.setItem(SAVE_PREFIX + slot, raw);
+        _renderSavesList(listEl, _getLocalSaves(), Array.isArray(cloudSaves) ? cloudSaves : [], fromTitle, false);
+        addMessage('Save imported!', 'good');
+      } catch (err) {
+        addMessage('Failed to import save.', 'damage');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 function getSaveSlotInfo(slot) {
   try {
     const raw = localStorage.getItem(SAVE_PREFIX + slot);
@@ -8167,7 +8219,7 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
         const errText = document.createElement('div');
         errText.className = 'saves-auth-bar-text';
         errText.style.color = '#f64';
-        errText.textContent = 'Sign-in failed. Try again or use a different browser on iOS.';
+        errText.textContent = 'Sign-in failed. Try again.';
         const retryBtn = document.createElement('button');
         retryBtn.className = 'saves-auth-btn';
         retryBtn.textContent = 'Retry';
@@ -8371,6 +8423,17 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
     btnRow.appendChild(loadBtn);
 
+    if (save.storage === 'local') {
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'save-action-btn';
+      dlBtn.textContent = '\u2B07 Export';
+      dlBtn.title = 'Download save as a file';
+      const dlFn = () => downloadSaveFile(save.slotKey);
+      dlBtn.addEventListener('click', dlFn);
+      dlBtn.addEventListener('touchend', (e) => { e.preventDefault(); dlFn(); }, { passive: false });
+      btnRow.appendChild(dlBtn);
+    }
+
     const delBtn = document.createElement('button');
     delBtn.className = 'save-action-btn save-delete';
     delBtn.textContent = '\uD83D\uDDD1';
@@ -8439,6 +8502,16 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     errEl.textContent = 'Could not load cloud saves. Check your connection and try again.';
     listEl.appendChild(errEl);
   }
+
+  // Import button — always visible so user can load a save from a downloaded file
+  const importBtn = document.createElement('button');
+  importBtn.className = 'saves-auth-btn';
+  importBtn.style.cssText = 'width:100%;margin-top:10px;min-height:44px;font-size:13px;';
+  importBtn.textContent = '\u2B06 Import Save from File';
+  const importFn = () => importSaveFile(listEl, cloudSaves, fromTitle);
+  importBtn.addEventListener('click', importFn);
+  importBtn.addEventListener('touchend', (e) => { e.preventDefault(); importFn(); }, { passive: false });
+  listEl.appendChild(importBtn);
 }
 
 
@@ -8517,7 +8590,16 @@ function initFirebase() {
     const unsub = firebase.auth().onAuthStateChanged(user => {
       unsub();
       if (user) firebaseUser = user;
-      resolve();
+      // Handle result from signInWithRedirect (iOS non-standalone flow).
+      // getRedirectResult() only returns a user the first time after a redirect;
+      // subsequent calls return { user: null } so the message won't repeat.
+      firebase.auth().getRedirectResult().then(result => {
+        if (result && result.user) {
+          firebaseUser = result.user;
+          addMessage(`\u2601\uFE0F Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+        }
+        resolve();
+      }).catch(() => resolve());
     });
   });
 }
@@ -8525,6 +8607,18 @@ function initFirebase() {
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
+
+  // iOS Safari (non-standalone) blocks signInWithPopup due to cross-origin storage
+  // partitioning (ITP). Use signInWithRedirect instead — the page navigates to Google
+  // and back. The result is picked up by getRedirectResult() in initFirebase().
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
+  if (isIOS && window.navigator.standalone !== true) {
+    return firebase.auth().signInWithRedirect(provider).then(() => {
+      // Page is about to navigate away; return a promise that never resolves
+      // so the caller's .then() doesn't fire before navigation completes.
+      return new Promise(() => {});
+    });
+  }
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -8534,7 +8628,7 @@ function cloudSignIn() {
       if (settled) return;
       settle();
       firebaseUser = result.user;
-      addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+      addMessage(`\u2601\uFE0F Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
       resolve(firebaseUser);
     }).catch(err => {
       if (settled) return;
@@ -8542,16 +8636,15 @@ function cloudSignIn() {
       reject(err);
     });
 
-    // On iOS/mobile, signInWithPopup opens a new tab. If the Firebase auth
-    // handler at authDomain fails (cross-origin storage partitioning), the
-    // promise above never settles. Detect when the user returns to the app
-    // tab and fail gracefully after a brief grace period.
+    // On mobile, signInWithPopup opens a new tab. If the Firebase auth
+    // handler at authDomain fails, the promise above never settles. Detect
+    // when the user returns to the app tab and fail gracefully.
     function onVisible() {
       if (document.visibilityState !== 'visible' || settled) return;
       setTimeout(() => {
         if (settled) return;
         settle();
-        reject(new Error('Sign-in did not complete. On iOS Safari, try Chrome or Firefox.'));
+        reject(new Error('Sign-in did not complete.'));
       }, 3000);
     }
     // Delay listener so the initial tab-switch from opening the popup doesn't trigger it
