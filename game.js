@@ -2758,6 +2758,7 @@ function showSage(sage) {
 function renderSageServices(sage) {
   const p = state.player;
   $('sage-gold').textContent = `Your gold: ${p.gold}`;
+  renderEquippedStrip('sage-equipped');
   const container = $('sage-services');
   container.innerHTML = '';
 
@@ -6057,36 +6058,21 @@ function playerMove(dx, dy) {
   // Check for merchant
   const merchant = state.entities.find(e => e.type === 'merchant' && e.x === nx && e.y === ny);
   if (merchant) {
-    if (merchant.visited) {
-      addMessage('The merchant shrugs. "Nothing more to offer this level."', '');
-      endTurn();
-    } else {
-      showMerchant(merchant);
-    }
+    showMerchant(merchant);
     return;
   }
 
   // Check for sage
   const sage = state.entities.find(e => e.type === 'sage' && e.x === nx && e.y === ny);
   if (sage) {
-    if (sage.visited) {
-      addMessage('The sage nods quietly. "I have done all I can for now."', '');
-      endTurn();
-    } else {
-      showSage(sage);
-    }
+    showSage(sage);
     return;
   }
 
   // Check for tavern
   const tavern = state.entities.find(e => e.type === 'tavern' && e.x === nx && e.y === ny);
   if (tavern) {
-    if (tavern.visited) {
-      addMessage('The barkeep waves. "Come back next floor!"', '');
-      endTurn();
-    } else {
-      showTavern(tavern);
-    }
+    showTavern(tavern);
     return;
   }
 
@@ -7031,6 +7017,86 @@ function recordLocalPurchase(entity, key) {
 }
 
 // === MERCHANT ===
+function renderEquippedStrip(containerId) {
+  const strip = $(containerId);
+  if (!strip) return;
+  const p = state.player;
+  const slots = [
+    { key: 'weapon', label: '⚔️' },
+    { key: 'ranged', label: '🏹' },
+    { key: 'armor',  label: '🛡️' },
+    { key: 'ring',   label: '💍' },
+  ];
+  strip.innerHTML = '';
+  let activeDetail = null;
+
+  for (const { key, label } of slots) {
+    const item = p.equipped[key];
+    const chip = document.createElement('div');
+    chip.className = 'shop-equip-chip' + (item ? '' : ' is-empty');
+    if (item && item.cursed && item.curseRevealed) chip.classList.add('is-cursed');
+
+    let statText = '';
+    if (item) {
+      if (item.itemType === 'weapon')      statText = `+${item.attack}A`;
+      else if (item.itemType === 'ranged') statText = `${item.damage}D`;
+      else if (item.itemType === 'armor')  statText = `+${item.defense}D`;
+      else if (item.itemType === 'ring' && item.special) statText = item.special.slice(0, 5);
+    }
+
+    chip.innerHTML = item
+      ? `<span class="shop-equip-chip__glyph">${item.glyph}</span>` +
+        `<span style="font-size:10px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;">${item.name.split(' ')[0]}</span>` +
+        (statText ? `<span class="shop-equip-chip__stat">${statText}</span>` : '')
+      : `<span class="shop-equip-chip__glyph">${label}</span>` +
+        `<span style="font-size:10px;color:var(--text-dim);">—</span>`;
+
+    if (item) {
+      const toggleDetail = (e) => {
+        e.stopPropagation();
+        if (activeDetail) {
+          activeDetail.remove();
+          const prev = strip.querySelector('.detail-open');
+          if (prev) prev.classList.remove('detail-open');
+          if (activeDetail._ownerChip === chip) { activeDetail = null; return; }
+          activeDetail = null;
+        }
+        let desc = (item.desc && item.desc !== '???') ? item.desc
+          : item.itemType === 'weapon' ? `+${item.attack} ATK melee weapon.`
+          : item.itemType === 'ranged' ? `${item.damage} DMG, range ${item.range}.`
+          : item.itemType === 'armor'  ? `+${item.defense} DEF armor.`
+          : item.special || '';
+        if (item.cursed && item.curseRevealed) desc += ' ⚠ CURSED';
+        const detail = document.createElement('div');
+        detail.className = 'shop-equip-detail';
+        detail._ownerChip = chip;
+        detail.innerHTML =
+          `<div class="shop-equip-detail__name">${item.glyph} ${item.name}</div>` +
+          `<div class="shop-equip-detail__desc">${desc}</div>`;
+        chip.classList.add('detail-open');
+        chip.appendChild(detail);
+        activeDetail = detail;
+      };
+      chip.addEventListener('click', toggleDetail);
+      chip.addEventListener('touchend', (e) => { e.preventDefault(); toggleDetail(e); }, { passive: false });
+    }
+    strip.appendChild(chip);
+  }
+
+  // Dismiss detail on tap elsewhere in the overlay
+  const overlay = strip.closest('.overlay');
+  if (overlay) {
+    overlay.addEventListener('click', () => {
+      if (activeDetail) {
+        activeDetail.remove();
+        const open = strip.querySelector('.detail-open');
+        if (open) open.classList.remove('detail-open');
+        activeDetail = null;
+      }
+    }, { once: true });
+  }
+}
+
 function showMerchant(merchant) {
   merchant.visited = true;
   inputLocked = true;
@@ -7069,6 +7135,7 @@ function renderDropSection(container, refreshCallback) {
 
 function renderShopItems(merchant) {
   $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+  renderEquippedStrip('merchant-equipped');
   const discountEl = $('merchant-discount');
   if (discountEl) discountEl.style.display = 'none';
   const container = $('shop-items');
