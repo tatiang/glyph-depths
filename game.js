@@ -595,7 +595,7 @@ const CLASS_DEFS = [
   {
     id: 'berserker',
     name: 'Berserker',
-    icon: '🪖',
+    icon: '🪖', img: 'images/berserker.png',
     flavor: 'Hits hard but burns through food. Rage sharpens at the brink.',
     hp: 22, attack: 4, defense: 0,
     hungerRate: 1.5, dodgeBonus: 0, critChance: 0.10,
@@ -651,7 +651,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
   },
   {
-    id: 'conjurer', name: 'Conjurer', icon: '🎭',
+    id: 'conjurer', name: 'Conjurer', icon: '🎭', img: 'images/conjurer.png',
     flavor: 'Weaves phantoms from thin air, armed with all the answers.',
     hp: 12, attack: 2, defense: 0,
     hungerRate: 1, dodgeBonus: 0.10, critChance: 0.10,
