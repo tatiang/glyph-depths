@@ -605,7 +605,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
   },
   {
-    id: 'escapeartist', name: 'Escape Artist', icon: '💨',
+    id: 'escapeartist', name: 'Escape Artist', icon: '💨', img: 'images/escape-artist.png',
     flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
     hp: 12, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
@@ -629,7 +629,7 @@ const CLASS_DEFS = [
   {
     id: 'rogue',
     name: 'Rogue',
-    icon: '🥷',
+    icon: '🥷', img: 'images/rogue.png',
     flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
     hp: 10, attack: 3, defense: 1,
     hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
@@ -641,7 +641,7 @@ const CLASS_DEFS = [
   {
     id: 'cleric',
     name: 'Cleric',
-    icon: '⛪',
+    icon: '⛪', img: 'images/cleric.png',
     flavor: 'Holy warrior. Undead fear the faithful. Heals through devotion.',
     hp: 18, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
