@@ -1062,6 +1062,34 @@
     .shop-item .price { color: var(--gold); }
     .shop-item.expanded { flex-direction: column; align-items: stretch; }
 
+    /* Equipped gear strip inside shop overlays */
+    .shop-equipped-strip {
+      display: flex; gap: 6px; width: 100%; max-width: 300px;
+      margin-bottom: 10px; flex-wrap: nowrap;
+    }
+    .shop-equip-chip {
+      flex: 1; min-height: 44px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1px;
+      padding: 4px 2px; background: var(--btn);
+      border: 1px solid var(--panel-border); border-radius: 6px;
+      cursor: pointer; color: var(--text); font-size: 11px;
+      text-align: center; line-height: 1.2; overflow: visible; position: relative;
+    }
+    .shop-equip-chip.is-empty { opacity: 0.35; pointer-events: none; }
+    .shop-equip-chip.is-cursed { border-color: #ff6040; }
+    .shop-equip-chip__glyph { font-size: 16px; line-height: 1; }
+    .shop-equip-chip__stat { color: var(--accent); font-size: 10px; white-space: nowrap; }
+    .shop-equip-detail {
+      position: absolute; top: calc(100% + 4px); left: 50%;
+      transform: translateX(-50%); width: 180px;
+      background: var(--bg-dark); border: 1px solid var(--accent);
+      border-radius: 8px; padding: 8px 10px; z-index: 20;
+      font-size: 12px; color: var(--text); box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      pointer-events: none;
+    }
+    .shop-equip-detail__name { color: var(--gold); font-weight: 600; margin-bottom: 4px; }
+    .shop-equip-detail__desc { color: var(--text-dim); line-height: 1.4; }
+
     /* Config pager */
     .config-pager {
       width: 100%;
@@ -1485,6 +1513,7 @@
     <h1>🧙 MERCHANT</h1>
     <h2 id="merchant-gold"></h2>
     <div id="merchant-discount" style="display:none;color:#f0c040;font-size:12px;margin:-6px 0 8px;letter-spacing:0.03em;">💸 Haggle: prices reduced 25%</div>
+    <div id="merchant-equipped" class="shop-equipped-strip"></div>
     <div class="shop-items" id="shop-items"></div>
     <button class="big-btn" id="btn-leave-shop" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
   </div>
@@ -1493,6 +1522,7 @@
     <h1>🔮 WANDERING SAGE</h1>
     <p style="color:var(--text-dim);font-size:13px;margin:-8px 0 12px;">Wisdom, purification, and healing — for a price.</p>
     <h2 id="sage-gold"></h2>
+    <div id="sage-equipped" class="shop-equipped-strip"></div>
     <div class="shop-items" id="sage-services"></div>
     <button class="big-btn" id="btn-leave-sage" style="margin-top:8px;position:sticky;bottom:8px;z-index:2;background:var(--bg-dark);border-color:var(--accent);">Leave</button>
   </div>
