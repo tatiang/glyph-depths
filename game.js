@@ -671,7 +671,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
   },
   {
-    id: 'elementalist', name: 'Elementalist', icon: '🧪',
+    id: 'elementalist', name: 'Elementalist', icon: '🧪', img: 'images/elementalist.png',
     flavor: 'A volatile caster who turns the battlefield into a hazard zone.',
     hp: 12, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
