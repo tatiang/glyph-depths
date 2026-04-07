@@ -8682,6 +8682,7 @@ function cloudSaveGame(slotName) {
     state: serializeState(),
     potionNames, scrollNames, potionIdentified, scrollIdentified,
     badgesEarnedThisRun,
+    badgeState, badgeCounts,
     uid: firebaseUser.uid,
     displayName: firebaseUser.displayName || '',
     slotName: slotName || 'Cloud Save',
@@ -8708,6 +8709,20 @@ function cloudLoadGame(slotName) {
   return firestoreTimeout(firebaseDb.collection('saves').doc(docId).get()).then(doc => {
     if (!doc.exists) { addMessage('No cloud save found.', 'damage'); return false; }
     const data = doc.data();
+    // Merge saved badgeState into local badgeState (union — never remove earned badges)
+    if (data.badgeState && typeof data.badgeState === 'object') {
+      for (const [id, val] of Object.entries(data.badgeState)) {
+        if (val?.unlocked && !badgeState[id]?.unlocked) {
+          badgeState[id] = val;
+        }
+      }
+    }
+    if (data.badgeCounts && typeof data.badgeCounts === 'object') {
+      for (const [key, val] of Object.entries(data.badgeCounts)) {
+        badgeCounts[key] = Math.max(badgeCounts[key] || 0, val || 0);
+      }
+    }
+    saveBadges();
     // Reuse local load logic
     const raw = JSON.stringify({ version: data.version, timestamp: data.timestamp, state: data.state, potionNames: data.potionNames, scrollNames: data.scrollNames, potionIdentified: data.potionIdentified, scrollIdentified: data.scrollIdentified, badgesEarnedThisRun: data.badgesEarnedThisRun });
     localStorage.setItem('_cloud_load_tmp', raw);
