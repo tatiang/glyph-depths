@@ -824,6 +824,41 @@
     #inspect-tip .tip-name { color: var(--gold); font-weight: 600; }
     #inspect-tip .tip-desc { color: var(--text-dim); margin-top: 4px; }
 
+    #gear-detail {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 140px;
+      z-index: 115;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      max-width: 300px;
+      width: calc(100% - 32px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      display: none;
+    }
+    #gear-detail.active { display: block; }
+    #gd-header {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 6px;
+    }
+    #gd-header .gd-glyph { font-size: 20px; }
+    #gd-header .gd-name { color: var(--gold); font-weight: 600; font-size: 14px; flex: 1; }
+    #gd-header .gd-rarity { font-size: 11px; }
+    #gd-stats { font-size: 12px; color: var(--text); margin-bottom: 4px; }
+    #gd-stats div { margin: 2px 0; }
+    #gd-special { font-size: 12px; color: #80c8ff; margin-bottom: 4px; display: none; }
+    #gd-special.has-content { display: block; }
+    #gd-extra { font-size: 11px; color: var(--text-dim); display: none; }
+    #gd-extra.has-content { display: block; }
+    #gd-extra div { margin: 2px 0; }
+
     /* Minimap overlay */
     #minimap-overlay {
       position: fixed;
@@ -1884,6 +1919,13 @@
   <div id="inspect-tip">
     <div class="tip-name" id="tip-name"></div>
     <div class="tip-desc" id="tip-desc"></div>
+  </div>
+
+  <div id="gear-detail">
+    <div id="gd-header"></div>
+    <div id="gd-stats"></div>
+    <div id="gd-special"></div>
+    <div id="gd-extra"></div>
   </div>
 
   <div id="fade"></div>

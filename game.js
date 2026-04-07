@@ -1540,6 +1540,26 @@ const GLYPH_RUNES = [
   { id: 'fortune',   name: 'Glyph of Fortune',    symbol: '🍀', desc: '+5% crit chance', effect: 'fortune' },
 ];
 
+const SPECIAL_DESC = {
+  cleave:     'Splash damage to an adjacent enemy on hit',
+  burn:       'Sets enemies on fire for 3 turns',
+  freeze:     'Chance to freeze enemies for 1 turn',
+  vampiric:   'Heal 1 HP when you kill an enemy',
+  chaos:      'Random bonus damage, but -1 DEF while equipped',
+  arcane:     'Enhanced magical attacks',
+  heavy:      'Reduces enemy ATK by 1',
+  stealth:    '+2 stealth detection, +15% dodge chance',
+  thorns:     'Reflects 1 damage to melee attackers',
+  sight:      'Expands your field of vision',
+  haste:      'Move and act faster',
+  protection: '+3 DEF while equipped',
+  hunger:     'Hunger increases more slowly',
+  detection:  'Reveals secret walls and hidden objects',
+  lantern:    '+3 FOV while fueled (1 fuel per turn)',
+  soul:       'Collect soul fragments from kills, spend 5 to heal 10 HP',
+  pierce:     'Ignores 1 point of enemy DEF',
+};
+
 // === CODEX DATA ===
 const CODEX_BESTIARY_DATA = [
   { id: 'bestiary_rat',              icon: '🐀', cat: 'bestiary', title: 'Sewer Rat',          text: 'Once pets of Erathis\'s inhabitants, warped by ambient rune energy into lean scavengers. They flee when wounded — a rare show of wisdom in these depths.' },
@@ -9594,24 +9614,7 @@ function renderInventory() {
 
   function showSlotInfo(item, el) {
     if (!item) return;
-    let desc = '';
-    if (item.desc && item.desc !== '???') desc = item.desc;
-    else if (item.itemType === 'ranged') desc = `${item.damage || 0} DMG, ${item.range || 0} range`;
-    else if (item.attack) desc = `+${item.attack} Attack`;
-    else if (item.defense) desc = `+${item.defense} Defense`;
-    else if (item.itemType === 'ring' && item.special) desc = `Ring effect: ${item.special}`;
-    else desc = 'No additional details.';
-    $('tip-name').textContent = `${item.glyph} ${item.name}`;
-    $('tip-desc').textContent = desc;
-    const tip = $('inspect-tip');
-    const rect = el.getBoundingClientRect();
-    const cx = Math.max(8, Math.min(rect.left + rect.width / 2 - 100, window.innerWidth - 208));
-    const cy = Math.max(8, rect.top - 68);
-    tip.style.left = `${cx}px`;
-    tip.style.top = `${cy}px`;
-    tip.classList.add('active');
-    setTimeout(() => tip.classList.remove('active'), 2200);
-    haptic(20);
+    showGearDetail(item);
   }
 
   // Helper: slot tap for menu, long-press for inspect tooltip
@@ -9830,6 +9833,9 @@ function showItemMenu(item, index, event) {
   } else if (item.itemType === 'song') {
     actions.push({ label: 'Play', fn: () => { useItem(item, index); closeItemMenu(); }});
   }
+  if (['weapon', 'armor', 'ring', 'ranged'].includes(item.itemType)) {
+    actions.push({ label: 'Info', fn: () => { closeItemMenu(); showGearDetail(item); } });
+  }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
     // Replace menu content with an inline confirmation — stop outside-close from firing during transition
@@ -9950,6 +9956,13 @@ function showEquippedMenu(eq, event) {
     menu.appendChild(fuelDiv);
   }
 
+  const infoBtn = document.createElement('button');
+  infoBtn.textContent = 'Info';
+  const infoFn = () => { closeItemMenu(); showGearDetail(item); };
+  infoBtn.addEventListener('click', (e) => { e.stopPropagation(); infoFn(); });
+  infoBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); infoFn(); }, { passive: false });
+  menu.appendChild(infoBtn);
+
   const unequipBtn = document.createElement('button');
   unequipBtn.textContent = 'Unequip';
   unequipBtn.addEventListener('click', (e) => { e.stopPropagation(); unequipFn(); });
@@ -9979,6 +9992,95 @@ function showEquippedMenu(eq, event) {
 
 function closeItemMenu() {
   $('item-menu').classList.remove('active');
+}
+
+function closeGearDetail() {
+  $('gear-detail').classList.remove('active');
+}
+
+function showGearDetail(item) {
+  if (!item || inputLocked) return;
+  closeGearDetail();
+
+  // Header: glyph + name + rarity tag
+  const header = $('gd-header');
+  header.innerHTML = '';
+  const glyphSpan = document.createElement('span');
+  glyphSpan.className = 'gd-glyph';
+  glyphSpan.textContent = item.glyph;
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'gd-name';
+  nameSpan.textContent = item.name;
+  const raritySpan = document.createElement('span');
+  raritySpan.className = 'gd-rarity';
+  if (item.tier >= 3 && item.special) {
+    raritySpan.textContent = '[Epic]';
+    raritySpan.style.color = '#ffcc00';
+  } else if (item.tier === 3) {
+    raritySpan.textContent = '[Rare]';
+    raritySpan.style.color = '#aa44ff';
+  } else if (item.tier === 2) {
+    raritySpan.textContent = '[Uncommon]';
+    raritySpan.style.color = '#44aaff';
+  }
+  header.appendChild(glyphSpan);
+  header.appendChild(nameSpan);
+  if (raritySpan.textContent) header.appendChild(raritySpan);
+
+  // Stats
+  const stats = $('gd-stats');
+  stats.innerHTML = '';
+  if (item.itemType === 'weapon') {
+    if (item.attack) { const d = document.createElement('div'); d.textContent = `ATK +${item.attack}`; stats.appendChild(d); }
+  } else if (item.itemType === 'armor') {
+    if (item.defense) { const d = document.createElement('div'); d.textContent = `DEF +${item.defense}`; stats.appendChild(d); }
+  } else if (item.itemType === 'ranged') {
+    const d = document.createElement('div'); d.textContent = `DMG ${item.damage || 0}, Range ${item.range || 0}`; stats.appendChild(d);
+  } else if (item.itemType === 'ring') {
+    if (item.attack) { const d = document.createElement('div'); d.textContent = `ATK +${item.attack}`; stats.appendChild(d); }
+    if (item.defense) { const d = document.createElement('div'); d.textContent = `DEF +${item.defense}`; stats.appendChild(d); }
+  }
+  if (item.value) { const d = document.createElement('div'); d.textContent = `Value: ${item.value}g`; stats.appendChild(d); }
+
+  // Special effect
+  const special = $('gd-special');
+  special.innerHTML = '';
+  special.classList.remove('has-content');
+  if (item.special && SPECIAL_DESC[item.special]) {
+    special.textContent = `\u2728 ${item.special}: ${SPECIAL_DESC[item.special]}`;
+    special.classList.add('has-content');
+  } else if (item.special) {
+    special.textContent = `\u2728 ${item.special}`;
+    special.classList.add('has-content');
+  }
+
+  // Extra info
+  const extra = $('gd-extra');
+  extra.innerHTML = '';
+  extra.classList.remove('has-content');
+  const extraLines = [];
+  if (item.cursed && item.curseRevealed) extraLines.push('\u26a0 CURSED — cannot unequip without Remove Curse');
+  if (item.special === 'lantern' && state.player) extraLines.push(`Fuel: ${state.player.lanternFuel} turns remaining`);
+  if (item.special === 'soul' && state.player) extraLines.push(`Soul fragments: ${state.player.soulFragments}`);
+  if (item.loadedArrow) extraLines.push(`Loaded: ${item.loadedArrow.name}`);
+  if (item.desc && item.desc !== '???') extraLines.push(item.desc);
+  for (const line of extraLines) {
+    const d = document.createElement('div');
+    d.textContent = line;
+    extra.appendChild(d);
+  }
+  if (extraLines.length) extra.classList.add('has-content');
+
+  $('gear-detail').classList.add('active');
+  haptic(20);
+
+  setTimeout(() => {
+    const closer = (e) => {
+      if (!$('gear-detail').contains(e.target)) closeGearDetail();
+    };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
 }
 
 function closeMenuOnOutside(e) {
