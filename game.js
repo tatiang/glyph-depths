@@ -4494,6 +4494,8 @@ function killEnemy(enemy) {
   state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
+  haptic(30);
+  animateEnemyDeath(enemy.x, enemy.y, enemy.ai === 'boss');
 
   // Soul Amulet: collect fragment on kill
   if (hasRingEffect('soul')) {
@@ -4616,6 +4618,7 @@ function playerDeath(killerName, killerGlyph) {
   Audio.stopAmbient();
   Audio.death();
   haptic(100);
+  animateDeathVignette();
 
   // Auto-delete save slot if this run was loaded from a save
   if (state._loadedFromSlot != null) {
@@ -4701,7 +4704,7 @@ function playerDeath(killerName, killerGlyph) {
 
   setTimeout(() => {
     $('death-overlay').classList.add('active');
-  }, 300);
+  }, 700);
 }
 
 function showVictory() {
@@ -6408,11 +6411,8 @@ function playerDescend() {
       updateUI();
       const newBiome = getBiomeKey(state.floor);
       Audio.startAmbient(newBiome);
-      if (newBiome !== getBiomeKey(state.floor - 1)) {
-        showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
-      } else {
-        inputLocked = false;
-      }
+      const briefCard = newBiome === getBiomeKey(state.floor - 1);
+      showFloorCard(state.floor, newBiome, () => { inputLocked = false; }, briefCard);
     } catch (err) {
       console.error('[Glyph Depths] Descend transition failed:', err);
       addMessage('The descent wavers, but you regain your footing.', 'damage');
@@ -7652,6 +7652,12 @@ function screenShake() {
   setTimeout(() => $('canvas-wrap').classList.remove('shake'), 150);
 }
 
+function screenShakeLight() {
+  const wrap = $('canvas-wrap');
+  wrap.classList.add('shake-light');
+  setTimeout(() => wrap.classList.remove('shake-light'), 100);
+}
+
 function haptic(ms) {
   if (settings.haptics && navigator.vibrate) navigator.vibrate(ms);
 }
@@ -7724,6 +7730,62 @@ function animateDamageNumber(mapX, mapY, amount, isCrit, targetIsPlayer) {
   requestAnimationFrame(tickAnimations);
 }
 
+function animateEnemyDeath(mapX, mapY, isBoss) {
+  const p = state.player;
+  const ts = tileSize;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const cx = (mapX - camX) * ts + ts / 2;
+  const cy = (mapY - camY) * ts + ts / 2;
+
+  screenShakeLight();
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const count = isBoss ? 12 : (5 + Math.floor(Math.random() * 2));
+    const color = isBoss ? '#ffd700' : '#ff4444';
+    const minSpeed = isBoss ? 0.08 : 0.05;
+    const maxSpeed = isBoss ? 0.16 : 0.12;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+      activeAnimations.push({
+        type: 'deathParticle',
+        cx, cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        color, t: 0, dur: 350
+      });
+    }
+    requestAnimationFrame(tickAnimations);
+  }
+}
+
+function animateDeathVignette() {
+  const p = state.player;
+  const ts = tileSize;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const cx = (p.x - camX) * ts + ts / 2;
+  const cy = (p.y - camY) * ts + ts / 2;
+
+  activeAnimations.push({ type: 'deathVignette', t: 0, dur: 700 });
+
+  const wrap = $('canvas-wrap');
+  wrap.classList.add('death-flash');
+  setTimeout(() => wrap.classList.remove('death-flash'), 200);
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const speed = 0.06 + Math.random() * 0.06;
+      activeAnimations.push({
+        type: 'deathParticle',
+        cx, cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        color: '#ff2222', t: 0, dur: 500
+      });
+    }
+  }
+  requestAnimationFrame(tickAnimations);
+}
+
 let lastAnimTime = 0;
 function tickAnimations(now) {
   if (!lastAnimTime) lastAnimTime = now;
@@ -7785,6 +7847,27 @@ function tickAnimations(now) {
       ctx.fillText(a.text, a.cx, yDraw);
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1.0;
+    } else if (a.type === 'deathParticle') {
+      const px = a.cx + a.vx * a.t;
+      const py = a.cy + a.vy * a.t;
+      const alpha = 1 - progress;
+      const radius = Math.max(0.5, 2.5 * (1 - progress * 0.5));
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    } else if (a.type === 'deathVignette') {
+      const alpha = Math.min(progress * 1.5, 1.0) * 0.65;
+      const grad = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, canvas.width * 0.15,
+        canvas.width / 2, canvas.height / 2, canvas.width * 0.75
+      );
+      grad.addColorStop(0, 'rgba(100, 0, 0, 0)');
+      grad.addColorStop(1, `rgba(180, 0, 0, ${alpha})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     if (progress >= 1) {
@@ -12068,7 +12151,7 @@ const FLOOR_CARD_DATA = {
   }
 };
 
-function showFloorCard(floor, biomeKey, onDone) {
+function showFloorCard(floor, biomeKey, onDone, brief) {
   const card = $('floor-card');
   const biome = getFloorBiome(floor);
   const data  = FLOOR_CARD_DATA[biomeKey] || FLOOR_CARD_DATA.sewers;
@@ -12076,6 +12159,12 @@ function showFloorCard(floor, biomeKey, onDone) {
   $('floor-card-floor').textContent = 'Floor ' + floor;
   $('floor-card-name').textContent  = biome.name;
   $('floor-card-atmo').textContent  = data.atmo;
+
+  // Show/hide tap hint based on mode
+  const tapHint = card.querySelector('.floor-card-tap');
+  if (tapHint) tapHint.style.opacity = brief ? '0' : '';
+
+  Audio.floorReveal();
 
   const EXIT_MS   =  350;
   const SAFETY_MS = EXIT_MS + 400;
@@ -12110,11 +12199,16 @@ function showFloorCard(floor, biomeKey, onDone) {
     dismiss();
   }
 
-  // Accept tap after minimum display time
-  setTimeout(function() {
-    card.addEventListener('click', onTap);
-    card.addEventListener('touchend', onTap, { passive: false });
-  }, MIN_MS);
+  if (brief) {
+    // Brief mode: auto-dismiss after 1.2s, no tap needed
+    setTimeout(dismiss, 1200);
+  } else {
+    // Accept tap after minimum display time
+    setTimeout(function() {
+      card.addEventListener('click', onTap);
+      card.addEventListener('touchend', onTap, { passive: false });
+    }, MIN_MS);
+  }
 }
 
 function getBiomeKey(floor) {

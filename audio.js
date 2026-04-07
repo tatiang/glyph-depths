@@ -226,6 +226,15 @@ const Audio = (() => {
     }, 220);
   }
 
+  function floorReveal() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Short ascending tonal chime — signals floor card entry
+    osc('triangle', 330, 0.25, [0.01, 0.04, 0.45, 0.15]);
+    setTimeout(() => osc('triangle', 440, 0.22, [0.01, 0.04, 0.4, 0.14]), 130);
+    setTimeout(() => osc('sine', 550, 0.18, [0.01, 0.03, 0.35, 0.12]), 260);
+  }
+
   // Title / intro music — mysterious descending melody with reverb-like echoes
   function titleMusic() {
     if (!ctx || !enabled) return;
@@ -487,7 +496,7 @@ const Audio = (() => {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, keyUnlock, miss, crit, merchant, boss, danger, titleMusic,
+    door, keyUnlock, miss, crit, merchant, boss, danger, floorReveal, titleMusic,
     startAmbient, stopAmbient, setAmbientMuted
   };
 })();
