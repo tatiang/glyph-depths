@@ -1027,6 +1027,20 @@ function boot() {
   setupUI();
   showTitle();
   window.addEventListener('resize', () => { setupCanvas(); if (state) render(); });
+
+  // After a signInWithRedirect (iOS Safari), the page reloads at the title screen.
+  // Detect the pending redirect, load Firebase to process getRedirectResult(), and
+  // automatically reopen the saves overlay so the user lands where they left off.
+  try {
+    if (sessionStorage.getItem('glyphdepths_auth_redirect') && isFirebaseConfigured()) {
+      sessionStorage.removeItem('glyphdepths_auth_redirect');
+      loadFirebaseSDK().then(() => initFirebase()).then(() => {
+        if (firebaseUser) {
+          showSavesOverlay(true);
+        }
+      }).catch(() => {});
+    }
+  } catch(e) {}
 }
 
 function setupCanvas() {
@@ -8666,6 +8680,7 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
       // which point Firebase reads the auth state from IndexedDB.
       if (window.navigator.standalone === true) {
         if (signInBtn.dataset.step === 'waiting') {
+          try { sessionStorage.setItem('glyphdepths_auth_redirect', '1'); } catch(e) {}
           location.reload();
           return;
         }
@@ -9088,6 +9103,7 @@ function cloudSignIn() {
   // and back. The result is picked up by getRedirectResult() in initFirebase().
   const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
   if (isIOS && window.navigator.standalone !== true) {
+    try { sessionStorage.setItem('glyphdepths_auth_redirect', '1'); } catch(e) {}
     return firebase.auth().signInWithRedirect(provider).then(() => {
       // Page is about to navigate away; return a promise that never resolves
       // so the caller's .then() doesn't fire before navigation completes.
