@@ -492,11 +492,21 @@ const Audio = (() => {
     ambientGain.gain.linearRampToValueAtTime(muted ? 0 : 1.0, now + 0.3);
   }
 
+  function bishopSpell() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Rising arcane/divine chord: sine + triangle harmonics
+    osc('sine', 523, 0.35, [0.01, 0.05, 0.5, 0.15]);
+    osc('triangle', 659, 0.25, [0.02, 0.06, 0.4, 0.18], 5);
+    setTimeout(() => osc('sine', 784, 0.3, [0.01, 0.04, 0.35, 0.12]), 80);
+    setTimeout(() => osc('triangle', 1047, 0.15, [0.01, 0.03, 0.3, 0.15]), 160);
+  }
+
   return {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
     door, keyUnlock, miss, crit, merchant, boss, danger, floorReveal, titleMusic,
-    startAmbient, stopAmbient, setAmbientMuted
+    startAmbient, stopAmbient, setAmbientMuted, bishopSpell
   };
 })();
