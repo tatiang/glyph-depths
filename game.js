@@ -349,6 +349,7 @@ const MASTERY_DEFS = [
   { id: 'bm_mastery',   trigger: 'win_beastmaster',name: 'Beastmaster Mastery', desc: 'All Beastmasters start with +3 max HP',   classReq: 'beastmaster',bonus: { maxHp: 3 } },
   { id: 'elem_mastery', trigger: 'win_elementalist', name: 'Elementalist Mastery', desc: 'Vial of Slime cooldown 8 instead of 10', classReq: 'elementalist', bonus: { fastVial: true } },
   { id: 'bsh_mastery',  trigger: 'win_bishop',      name: 'Bishop Mastery',       desc: 'Minor Heal cooldown halved (8→4)',       classReq: 'bishop',       bonus: { fastHeal: true } },
+  { id: 'es_mastery',   trigger: 'win_earthshaker', name: 'Earthshaker Mastery',  desc: 'Tectonic Slam base cooldown 8 instead of 10', classReq: 'earthshaker', bonus: { fastSlam: true } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -712,6 +713,16 @@ const CLASS_DEFS = [
     startItems: 'Arcane Staff · Healing Potion · Scroll of Mapping',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
     passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }]
+  },
+  {
+    id: 'earthshaker', name: 'Earthshaker', icon: '🌋', img: 'images/earthshaker.png',
+    flavor: 'Tuned to the deep frequencies of the dungeon, the Earthshaker uses the maze\'s very foundations as a weapon.',
+    hp: 15, attack: 3, defense: 0,
+    hungerRate: 1.0, dodgeBonus: 0, critChance: 0.10,
+    passive: '🌋 Tectonic Slam (tiers w/ level) · 🔔 Tremorsense · 🪨 Surefooted',
+    startItems: 'Mace · Ration',
+    statBadges: [{ label: '15 HP', cls: 'pos' }, { label: '+3 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Surefooted', cls: 'pos' }, { label: 'Tremorsense', cls: 'pos' }, { label: '🌋 Tectonic', cls: 'pos' }]
   }
 ];
 
@@ -1042,7 +1053,7 @@ function showClassSelect() {
     grid.className = 'class-page-grid';
 
     for (const cls of pageCls) {
-      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop') && !hasBadge('maze_master');
+      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop' || cls.id === 'earthshaker') && !hasBadge('maze_master');
       
       const card = document.createElement('div');
       card.className = 'class-card' + (isLocked ? ' locked-class' : '');
@@ -1342,6 +1353,14 @@ function createPlayer(classId = 'berserker') {
     arcaneResonance: false,
     twinCast: false,
     divineAegis: false,
+    // Earthshaker
+    tectonicSlamCooldown: 0,
+    tremorsense: classId === 'earthshaker',
+    surefooted: classId === 'earthshaker',
+    faultlineCriticals: classId === 'earthshaker',
+    aftershock: false,
+    seismicResonance: false,
+    tremorMastery: false,
     // Elementalist
     poisonImmune: classId === 'elementalist',
     acidImmune: classId === 'elementalist',
@@ -1462,6 +1481,9 @@ function applyClassStartingItems(classId) {
     if (healPotion) { p.inventory.push(makePotion(healPotion)); }
     const mapScroll = scrollNames.find(n => n.id === 'mapping');
     if (mapScroll) { p.inventory.push(makeScroll(mapScroll)); }
+  } else if (classId === 'earthshaker') {
+    p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
+    p.inventory.push({ ...FOOD, stack: 1 });
   }
 }
 
@@ -2424,6 +2446,7 @@ function isWalkable(x, y) {
     // Chasm is passable only if a bridge entity spans it
     return state.entities.some(e => e.type === 'bridge' && e.x === x && e.y === y && e.hp > 0);
   }
+  if (t === T.RUBBLE && state && state.player && state.player.surefooted) return true;
   return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.WATER && t !== T.STALAGMITE && t !== T.WATERFALL;
   // TELEPORT, TELEPORT_VIS, BRIDGE, STEPPING_STONE, MOUND, ICY_PATH, FIRE_PATH are walkable (floor-like)
 }
@@ -3787,6 +3810,11 @@ function triggerAvalanche() {
     addMessage('The earth rumbles! Rocks collapse in a nearby chamber.', 'damage');
     haptic(60);
     Audio.hit();
+    // Adrenaline Surge (Earthshaker passive)
+    if (state.player.classId === 'earthshaker') {
+      addStatusEffect(state.player, 'strength', 5);
+      addMessage('The tremor empowers you! (+2 ATK, 5 turns)', 'good');
+    }
   }
 }
 
@@ -4253,7 +4281,22 @@ function attackEntity(attacker, defender) {
     ? (state.player.critChance || 0.10)
     : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
   if (attacker === state.player && hasRune('fortune')) critChance += hasSynergy('deadly_precision') ? 0.15 : 0.05;
-  const isCrit = Math.random() < critChance;
+  // Faultline Criticals (Earthshaker): auto-crit frozen foes or foes pinned against walls
+  let forceCrit = false;
+  if (attacker === state.player && state.player.faultlineCriticals && defender !== state.player) {
+    if (hasStatusEffect(defender, 'frozen')) {
+      forceCrit = true;
+    } else {
+      const dx = Math.sign(defender.x - attacker.x);
+      const dy = Math.sign(defender.y - attacker.y);
+      const bx = defender.x + dx, by = defender.y + dy;
+      const bt = getTile(bx, by);
+      if (bx < 0 || bx >= MAP_W || by < 0 || by >= MAP_H || bt === T.WALL || bt === T.RUBBLE || bt === T.DOOR_SEALED || bt === T.ENCHANTED_WALL) {
+        forceCrit = true;
+      }
+    }
+  }
+  const isCrit = forceCrit || Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
   if (ambushBonus > 1) damage *= ambushBonus;
@@ -4856,6 +4899,9 @@ function showLevelUp() {
     { name: 'Arcane Resonance', desc: 'All spell cooldowns reduced by 2 turns', apply: () => { state.player.arcaneResonance = true; }, rare: false, unique: true, flag: 'arcaneResonance', classOnly: 'bishop' },
     { name: 'Twin Cast', desc: 'Magic Missile fires 2 bolts', apply: () => { state.player.twinCast = true; }, rare: true, unique: true, flag: 'twinCast', classOnly: 'bishop' },
     { name: 'Divine Aegis', desc: 'Healing spells also grant +1 DEF (blessed) for 5 turns', apply: () => { state.player.divineAegis = true; }, rare: false, unique: true, flag: 'divineAegis', classOnly: 'bishop' },
+    { name: 'Aftershock', desc: 'Tectonic Slam cooldown reduced by 3 turns', apply: () => { state.player.aftershock = true; }, rare: false, unique: true, flag: 'aftershock', classOnly: 'earthshaker' },
+    { name: 'Seismic Resonance', desc: 'Tectonic Slam applies 2-turn poison to surviving enemies', apply: () => { state.player.seismicResonance = true; }, rare: true, unique: true, flag: 'seismicResonance', classOnly: 'earthshaker' },
+    { name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles (from 3)', apply: () => { state.player.tremorMastery = true; }, rare: false, unique: true, flag: 'tremorMastery', classOnly: 'earthshaker' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -7525,6 +7571,7 @@ function endTurn() {
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
   if (state.player.vialOfSlimeCooldown > 0) state.player.vialOfSlimeCooldown--;
   if (state.player.thunderclapCooldown > 0) state.player.thunderclapCooldown--;
+  if (state.player.tectonicSlamCooldown > 0) state.player.tectonicSlamCooldown--;
   if (state.player.bishopSpellCooldowns) {
     for (const id of Object.keys(state.player.bishopSpellCooldowns)) {
       if (state.player.bishopSpellCooldowns[id] > 0) state.player.bishopSpellCooldowns[id]--;
@@ -9921,6 +9968,18 @@ function updateUI() {
         setBtn(`🔮 SPELLS ${minCD}t`, false, '#cc88ff');
         setBar(0, '#cc88ff');
       }
+    } else if (cls === 'earthshaker') {
+      spRow.style.display = '';
+      const slamMax = getMasteryBonuses(cls).fastSlam ? 8 : 10;
+      const slamCD = p.aftershock ? Math.max(1, slamMax - 3) : slamMax;
+      const tier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+      if (p.tectonicSlamCooldown > 0) {
+        setBtn(`🌋 SLAM ${p.tectonicSlamCooldown}t (T${tier})`, false, '#c06020');
+        setBar(((slamCD - p.tectonicSlamCooldown) / slamCD) * 100, '#c06020');
+      } else {
+        setBtn(`🌋 TECTONIC SLAM (T${tier})`, true, '#c06020');
+        setBar(100, '#c06020');
+      }
     } else {
       spRow.style.display = '';
       setBtn('No special ability', false);
@@ -10713,6 +10772,7 @@ function setupInput() {
     else if (state.player.classId === 'elementalist') activateElementalistMenu();
     else if (state.player.classId === 'monk') activateMeditate();
     else if (state.player.classId === 'bishop') activateBishopMenu();
+    else if (state.player.classId === 'earthshaker') activateTectonicSlam();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -11181,6 +11241,16 @@ function showSettings() {
           abilities.push({ icon: '🟢', name: 'Vial of Slime', desc: `3×3 acid pool, 5 turns (${p.vialOfSlimeCooldown > 0 ? p.vialOfSlimeCooldown + 't CD' : 'Ready'})` });
           abilities.push({ icon: '⚡', name: 'Thunderclap', desc: `AoE lightning, stuns acid-soaked foes (${p.thunderclapCooldown > 0 ? p.thunderclapCooldown + 't CD' : 'Ready'})` });
           break;
+        case 'earthshaker': {
+          const esTier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+          const esTierDescs = ['', 'radius 1, no stun', 'radius 2, stun, breaks secret walls', 'radius 3, stun, breaks doors', 'entire room, stun, clears rubble'];
+          abilities.push({ icon: '🌋', name: 'Tectonic Slam', desc: `Tier ${esTier} — AoE seismic blast (${p.tectonicSlamCooldown > 0 ? p.tectonicSlamCooldown + 't CD' : 'Ready'}) [${esTierDescs[esTier]}]` });
+          abilities.push({ icon: '🔔', name: 'Tremorsense', desc: `Sense enemies within ${p.tremorMastery ? 5 : 3} tiles through walls (minimap)` });
+          abilities.push({ icon: '🪨', name: 'Surefooted', desc: 'Walk through rubble tiles freely' });
+          abilities.push({ icon: '⚡', name: 'Faultline Criticals', desc: 'Auto-crit stunned foes or foes pinned against walls' });
+          abilities.push({ icon: '🌿', name: 'Adrenaline Surge', desc: '+2 ATK for 5 turns when an avalanche strikes' });
+          break;
+        }
       }
       // Add unlocked class-specific perks
       const classPerkFlags = [
@@ -11193,6 +11263,9 @@ function showSettings() {
         { flag: 'necroticSurge', icon: '☣️', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
         { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
         { flag: 'chainLightning', icon: '⚡', name: 'Chain Lightning', desc: 'Thunderclap chains to nearby enemies' },
+        { flag: 'aftershock', icon: '🌋', name: 'Aftershock', desc: 'Tectonic Slam cooldown -3 turns' },
+        { flag: 'seismicResonance', icon: '☠️', name: 'Seismic Resonance', desc: 'Tectonic Slam poisons survivors (2t)' },
+        { flag: 'tremorMastery', icon: '🔔', name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -11979,6 +12052,20 @@ function renderMinimap() {
     if (!state.visible[idx]) continue;
     ctx.fillStyle = '#cc44ff';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
+  // Tremorsense (Earthshaker): draw amber dots for nearby non-visible enemies
+  if (state.player.tremorsense) {
+    const tRange = state.player.tremorMastery ? 5 : 3;
+    for (const e of state.entities) {
+      if (e.type !== 'enemy' || e.hp <= 0 || e.isAlly) continue;
+      const dist = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
+      if (dist > tRange) continue;
+      const idx = e.y * MAP_W + e.x;
+      if (state.visible[idx]) continue; // already shown below
+      ctx.fillStyle = '#c06020';
+      ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+    }
   }
 
   // Draw visible enemies
@@ -13505,6 +13592,111 @@ function activateThunderclap() {
   p.thunderclapCooldown = 8;
   animateAoeBlast(p.x, p.y, 1.5, '#ffff40');
   Audio.useItem();
+  screenShake();
+  updateUI();
+  render();
+  endTurn();
+}
+
+// === EARTHSHAKER ABILITIES ===
+function activateTectonicSlam() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.tectonicSlamCooldown > 0) {
+    addMessage(`Tectonic Slam recharging (${p.tectonicSlamCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(50);
+
+  const tier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+  const damage = 3 + p.attack + Math.floor(state.floor / 3);
+  let hitCount = 0;
+  const hitEnemies = [];
+  const terraformTiles = [];
+
+  // Determine affected area
+  let affectedTiles = [];
+  if (tier === 4) {
+    // Entire room the player is in; fall back to radius 3 in corridors
+    const pRoom = state.rooms ? state.rooms.find(r =>
+      p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
+    ) : null;
+    if (pRoom) {
+      for (let ry = pRoom.y; ry < pRoom.y + pRoom.h; ry++) {
+        for (let rx = pRoom.x; rx < pRoom.x + pRoom.w; rx++) {
+          if (rx === p.x && ry === p.y) continue;
+          affectedTiles.push({ x: rx, y: ry });
+        }
+      }
+    } else {
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          affectedTiles.push({ x: p.x + dx, y: p.y + dy });
+        }
+      }
+    }
+  } else {
+    const radius = tier; // tier 1=1, tier 2=2, tier 3=3
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        affectedTiles.push({ x: p.x + dx, y: p.y + dy });
+      }
+    }
+  }
+
+  // Hit enemies in affected area
+  for (const { x, y } of affectedTiles) {
+    const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0 && !e.isAlly && e.x === x && e.y === y);
+    for (const enemy of enemies) {
+      enemy.hp -= damage;
+      hitCount++;
+      hitEnemies.push(enemy);
+      if (tier >= 2) addStatusEffect(enemy, 'frozen', 1);
+      addMessage(`🌋 ${enemy.name} shaken by tremor! (-${damage})${tier >= 2 ? ' Stunned!' : ''}`, 'good');
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    // Terrain effects
+    const t = getTile(x, y);
+    if (tier >= 2 && t === T.WALL_SECRET) terraformTiles.push({ x, y, to: T.FLOOR, secret: true });
+    if (tier >= 3 && (t === T.DOOR_SEALED || t === T.DOOR_LOCKED)) terraformTiles.push({ x, y, to: T.DOOR_OPEN });
+    if (tier === 4 && t === T.RUBBLE) terraformTiles.push({ x, y, to: T.FLOOR });
+  }
+
+  // Apply terrain changes
+  let anyTerrain = false;
+  for (const tf of terraformTiles) {
+    setTile(tf.x, tf.y, tf.to);
+    anyTerrain = true;
+    if (tf.secret) {
+      const secretItem = generateRandomItem(state.floor);
+      if (secretItem) {
+        state.entities.push(createItemEntity(secretItem, tf.x, tf.y));
+        addMessage(`A ${secretItem.name} was hidden in the wall!`, 'gold');
+      }
+    }
+  }
+  if (anyTerrain) computeFOV();
+
+  // Seismic Resonance perk: survivors get 2-turn poison
+  if (p.seismicResonance) {
+    for (const enemy of hitEnemies) {
+      if (enemy.hp > 0) addStatusEffect(enemy, 'poisoned', 2);
+    }
+  }
+
+  if (hitCount === 0) {
+    addMessage('🌋 The ground shakes — but no enemies nearby!', '');
+  }
+
+  const baseCooldown = getMasteryBonuses('earthshaker').fastSlam ? 8 : 10;
+  p.tectonicSlamCooldown = p.aftershock ? Math.max(1, baseCooldown - 3) : baseCooldown;
+
+  animateAoeBlast(p.x, p.y, tier === 4 ? 4 : tier + 0.5, '#c06020');
+  if (typeof Audio.earthshake === 'function') Audio.earthshake();
+  else Audio.hit();
   screenShake();
   updateUI();
   render();
