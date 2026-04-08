@@ -64,6 +64,7 @@ const BADGE_DEFS = [
   { id: 'win_monk', name: "Monk's Enlightenment", icon: '📿', desc: 'Win as Monk', cat: 'class' },
   { id: 'win_beastmaster', name: "Beastmaster's Call", icon: '🐺', desc: 'Win as Beastmaster', cat: 'class' },
   { id: 'win_elementalist', name: "Elementalist's Crucible", icon: '🧪', desc: 'Win as Elementalist', cat: 'class' },
+  { id: 'win_bishop', name: "Bishop's Blessing", icon: '🔮', desc: 'Win as Bishop', cat: 'class' },
   // Challenge
   { id: 'speed_runner', name: 'Speed Runner', icon: '⚡', desc: 'Win in under 1000 turns', cat: 'challenge' },
   { id: 'perfectionist', name: 'Perfectionist', icon: '🎯', desc: 'Win on your very first run', cat: 'challenge' },
@@ -347,6 +348,7 @@ const MASTERY_DEFS = [
   { id: 'monk_mastery', trigger: 'win_monk',       name: 'Monk Mastery',        desc: 'All Monks gain +1 DEF',                   classReq: 'monk',       bonus: { defense: 1 } },
   { id: 'bm_mastery',   trigger: 'win_beastmaster',name: 'Beastmaster Mastery', desc: 'All Beastmasters start with +3 max HP',   classReq: 'beastmaster',bonus: { maxHp: 3 } },
   { id: 'elem_mastery', trigger: 'win_elementalist', name: 'Elementalist Mastery', desc: 'Vial of Slime cooldown 8 instead of 10', classReq: 'elementalist', bonus: { fastVial: true } },
+  { id: 'bsh_mastery',  trigger: 'win_bishop',      name: 'Bishop Mastery',       desc: 'Minor Heal cooldown halved (8→4)',       classReq: 'bishop',       bonus: { fastHeal: true } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -402,7 +404,7 @@ function showMasteryToast(mastery) {
 }
 
 function getMasteryBonuses(classId) {
-  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, charmBonus: 0, necroBonus: 0, upgradeBow: false, revealRune: false, fastFlip: false, extraEscape: false, fastIllusion: false, fastVial: false, startGold: 0 };
+  const bonuses = { maxHp: 0, attack: 0, defense: 0, critChance: 0, charmBonus: 0, necroBonus: 0, upgradeBow: false, revealRune: false, fastFlip: false, extraEscape: false, fastIllusion: false, fastVial: false, fastHeal: false, startGold: 0 };
   for (const m of MASTERY_DEFS) {
     if (!masteryState[m.id]) continue;
     if (m.classReq && m.classReq !== classId) continue;
@@ -418,6 +420,7 @@ function getMasteryBonuses(classId) {
     if (m.bonus.extraEscape) bonuses.extraEscape = true;
     if (m.bonus.fastIllusion) bonuses.fastIllusion = true;
     if (m.bonus.fastVial) bonuses.fastVial = true;
+    if (m.bonus.fastHeal) bonuses.fastHeal = true;
     if (m.bonus.startGold) bonuses.startGold += m.bonus.startGold;
   }
   return bonuses;
@@ -699,7 +702,41 @@ const CLASS_DEFS = [
     startItems: 'Healing Potion · Enchanted Lute',
     statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
     passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
+  },
+  {
+    id: 'bishop', name: 'Bishop', icon: '🔮',
+    flavor: 'Fragile but formidable. A hybrid mage-cleric with a deep spell repertoire that grows with each level.',
+    hp: 10, attack: 1, defense: 0,
+    hungerRate: 1, dodgeBonus: 0, critChance: 0.05,
+    passive: '📖 All items identified · 🔮 Spell Menu (grows with level)',
+    startItems: 'Arcane Staff · Healing Potion · Scroll of Mapping',
+    statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }]
   }
+];
+
+// === BISHOP SPELLS ===
+const BISHOP_SPELLS = [
+  { id: 'magic_missile', name: 'Magic Missile', icon: '✨', levelReq: 1, cooldown: 4,  type: 'ranged',
+    desc: (p) => `${2 + Math.floor(p.level / 3)} damage, range 8` },
+  { id: 'minor_heal',    name: 'Minor Heal',    icon: '💚', levelReq: 1, cooldown: 8,  type: 'self',
+    desc: () => 'Heal 15% max HP' },
+  { id: 'identify',      name: 'Identify',      icon: '📖', levelReq: 3, cooldown: 0,  type: 'instant',
+    desc: () => 'Reveal 1 unknown item type (free)' },
+  { id: 'sleep',         name: 'Sleep',         icon: '😴', levelReq: 3, cooldown: 10, type: 'ranged',
+    desc: () => 'Lullaby enemy 6 turns, no damage' },
+  { id: 'poison_cloud',  name: 'Poison Cloud',  icon: '☁️', levelReq: 5, cooldown: 12, type: 'aoe_self',
+    desc: () => '3×3 poison gas, 4 turns' },
+  { id: 'dispel',        name: 'Dispel',        icon: '🌀', levelReq: 5, cooldown: 15, type: 'self',
+    desc: () => 'Remove all debuffs' },
+  { id: 'holy_nova',     name: 'Holy Nova',     icon: '☀️', levelReq: 7, cooldown: 14, type: 'aoe_adjacent',
+    desc: (p) => `${3 + Math.floor(state.floor / 3)} dmg adjacent + heal 10% HP` },
+  { id: 'uncurse',       name: 'Uncurse',       icon: '🛡️', levelReq: 7, cooldown: 0,  type: 'instant',
+    desc: () => 'Remove curse from all equipped items (free)' },
+  { id: 'arcane_storm',  name: 'Arcane Storm',  icon: '⚡', levelReq: 9, cooldown: 20, type: 'room_all',
+    desc: (p) => `${4 + p.level} dmg to all visible enemies` },
+  { id: 'major_heal',    name: 'Major Heal',    icon: '💛', levelReq: 9, cooldown: 25, type: 'self',
+    desc: () => 'Heal 50% max HP, cleanse poison/burn' },
 ];
 
 // Preloaded Image objects for classes with custom artwork (keyed by img path)
@@ -755,7 +792,7 @@ function normalizeLoadedPlayer(player) {
   player.hasRegen = player.classId === 'beastmaster' ? true : !!player.hasRegen;
   player.arcaneAffinity = player.classId === 'darkwizard';
   player.sageClass = player.classId === 'conjurer';
-  player.scrollMastery = player.classId === 'conjurer';
+  player.scrollMastery = player.classId === 'conjurer' || player.classId === 'bishop';
   player.teleportSight = ['rogue', 'escapeartist'].includes(player.classId);
   player.manaShield = false;
   player.fireWard = false;
@@ -771,6 +808,13 @@ function normalizeLoadedPlayer(player) {
   player.sharpDealer = false;
   player.encore = false;
   player.backstab = false;
+  // Bishop
+  if (!player.bishopSpellCooldowns || typeof player.bishopSpellCooldowns !== 'object') {
+    player.bishopSpellCooldowns = {};
+  }
+  player.arcaneResonance = !!player.arcaneResonance;
+  player.twinCast = !!player.twinCast;
+  player.divineAegis = !!player.divineAegis;
   // Elementalist
   player.poisonImmune = player.classId === 'elementalist';
   player.acidImmune = player.classId === 'elementalist';
@@ -998,7 +1042,7 @@ function showClassSelect() {
     grid.className = 'class-page-grid';
 
     for (const cls of pageCls) {
-      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster') && !hasBadge('maze_master');
+      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop') && !hasBadge('maze_master');
       
       const card = document.createElement('div');
       card.className = 'class-card' + (isLocked ? ' locked-class' : '');
@@ -1291,8 +1335,13 @@ function createPlayer(classId = 'berserker') {
     enchantedImmunityRoomIdx: -1,
     // Conjurer (Sage legacy)
     sageClass: classId === 'conjurer',
-    scrollMastery: classId === 'conjurer',
+    scrollMastery: classId === 'conjurer' || classId === 'bishop',
     ancientTongue: false,
+    // Bishop
+    bishopSpellCooldowns: {},
+    arcaneResonance: false,
+    twinCast: false,
+    divineAegis: false,
     // Elementalist
     poisonImmune: classId === 'elementalist',
     acidImmune: classId === 'elementalist',
@@ -1404,6 +1453,15 @@ function applyClassStartingItems(classId) {
     if (healPotion) { potionIdentified[healPotion.id] = true; p.inventory.push(makePotion(healPotion)); }
     const mapScroll = scrollNames.find(n => n.id === 'mapping');
     if (mapScroll) { scrollIdentified[mapScroll.id] = true; p.inventory.push(makeScroll(mapScroll)); }
+  } else if (classId === 'bishop') {
+    // Bishop starts with all items identified
+    for (const pn of potionNames) potionIdentified[pn.id] = true;
+    for (const sn of scrollNames) scrollIdentified[sn.id] = true;
+    p.equipped.weapon = { name: 'Arcane Staff', glyph: '🪄', itemType: 'weapon', attack: 2, tier: 1, special: 'arcane' };
+    const healPotion = potionNames.find(n => n.id === 'healing');
+    if (healPotion) { p.inventory.push(makePotion(healPotion)); }
+    const mapScroll = scrollNames.find(n => n.id === 'mapping');
+    if (mapScroll) { p.inventory.push(makeScroll(mapScroll)); }
   }
 }
 
@@ -4385,14 +4443,14 @@ function getPlayerWeaponAttackContribution(player = state.player) {
   let bonus = player.equipped.weapon?.attack || 0;
   if (bonus <= 0) return 0;
   if (player.classId === 'cleric') bonus -= 1;
-  if (player.classId === 'darkwizard' || player.classId === 'conjurer') bonus -= 1;
+  if (player.classId === 'darkwizard' || player.classId === 'conjurer' || player.classId === 'bishop') bonus -= 1;
   return Math.max(0, bonus);
 }
 
 function getPlayerRangedDamageBonus(player = state.player) {
   if (!player || player.classId === 'monk') return 0;
   let bonus = 0;
-  if (player.classId === 'darkwizard' || player.classId === 'conjurer') bonus -= 2;
+  if (player.classId === 'darkwizard' || player.classId === 'conjurer' || player.classId === 'bishop') bonus -= 2;
   return bonus;
 }
 
@@ -4771,6 +4829,9 @@ function showLevelUp() {
     { name: 'Necrotic Surge', desc: 'Acid bolt splashes poison to adjacent foes', apply: () => { state.player.necroticSurge = true; }, rare: false, unique: true, flag: 'necroticSurge', classOnly: 'darkwizard' },
     { name: 'Smoke Screen', desc: 'Teleport leaves a 3-turn smoke cloud behind', apply: () => { state.player.smokeScreen = true; }, rare: false, unique: true, flag: 'smokeScreen', classOnly: 'escapeartist' },
     { name: 'Chain Lightning', desc: 'Thunderclap chains to enemies within 2 tiles of hit targets', apply: () => { state.player.chainLightning = true; }, rare: true, unique: true, flag: 'chainLightning', classOnly: 'elementalist' },
+    { name: 'Arcane Resonance', desc: 'All spell cooldowns reduced by 2 turns', apply: () => { state.player.arcaneResonance = true; }, rare: false, unique: true, flag: 'arcaneResonance', classOnly: 'bishop' },
+    { name: 'Twin Cast', desc: 'Magic Missile fires 2 bolts', apply: () => { state.player.twinCast = true; }, rare: true, unique: true, flag: 'twinCast', classOnly: 'bishop' },
+    { name: 'Divine Aegis', desc: 'Healing spells also grant +1 DEF (blessed) for 5 turns', apply: () => { state.player.divineAegis = true; }, rare: false, unique: true, flag: 'divineAegis', classOnly: 'bishop' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -6019,6 +6080,10 @@ function playerMove(dx, dy) {
     addStatusEffect(state.player, 'acid_soaked', 2);
     addMessage('You step in acid! (-1 HP)', 'damage');
     if (state.player.hp <= 0) { playerDeath('acid', '🧪'); return; }
+  }
+  if (hazard && hazard.hazardType === 'poison_gas' && !state.player.poisonImmune) {
+    addStatusEffect(state.player, 'poison', 3);
+    addMessage('☁️ You inhale poison gas!', 'damage');
   }
 
   // Check for NPC (friendly shade — cannot be attacked, gives lore)
@@ -7373,6 +7438,11 @@ function endTurn() {
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
   if (state.player.vialOfSlimeCooldown > 0) state.player.vialOfSlimeCooldown--;
   if (state.player.thunderclapCooldown > 0) state.player.thunderclapCooldown--;
+  if (state.player.bishopSpellCooldowns) {
+    for (const id of Object.keys(state.player.bishopSpellCooldowns)) {
+      if (state.player.bishopSpellCooldowns[id] > 0) state.player.bishopSpellCooldowns[id]--;
+    }
+  }
 
   // Expire illusion entities
   for (let i = state.entities.length - 1; i >= 0; i--) {
@@ -9557,6 +9627,22 @@ function updateUI() {
         setBtn(`🧪 SPELLS ${Math.min(p.vialOfSlimeCooldown, p.thunderclapCooldown)}t`, false, '#80ff00');
         setBar(((vialMax - p.vialOfSlimeCooldown) / vialMax) * 100, '#80ff00');
       }
+    } else if (cls === 'bishop') {
+      spRow.style.display = '';
+      const cds = p.bishopSpellCooldowns || {};
+      const availableSpells = BISHOP_SPELLS.filter(s => p.level >= s.levelReq);
+      const readyCount = availableSpells.filter(s => !(cds[s.id] > 0)).length;
+      const allOnCD = availableSpells.length > 0 && readyCount === 0;
+      const minCD = availableSpells.length > 0
+        ? Math.min(...availableSpells.filter(s => cds[s.id] > 0).map(s => cds[s.id]).filter(v => v > 0))
+        : 0;
+      if (availableSpells.length === 0 || readyCount > 0) {
+        setBtn(`🔮 SPELLS (${availableSpells.length})`, true, '#cc88ff');
+        setBar(100, '#cc88ff');
+      } else {
+        setBtn(`🔮 SPELLS ${minCD}t`, false, '#cc88ff');
+        setBar(0, '#cc88ff');
+      }
     } else {
       spRow.style.display = '';
       setBtn('No special ability', false);
@@ -10266,6 +10352,7 @@ function setupInput() {
     else if (state.player.classId === 'conjurer') activateConjurerMenu();
     else if (state.player.classId === 'elementalist') activateElementalistMenu();
     else if (state.player.classId === 'monk') activateMeditate();
+    else if (state.player.classId === 'bishop') activateBishopMenu();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
@@ -12184,7 +12271,9 @@ function throwProjectile(dx, dy, isSecondShot) {
   const isRangedShot = item.itemType === 'ranged_shot';
   const isAcidBolt = item.itemType === 'acid_bolt';
   const isArcaneDart = item.itemType === 'arcane_dart';
-  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart ? (item.range || 8) : 8);
+  const isBishopMissile = item.itemType === 'bishop_missile';
+  const isBishopSleep = item.itemType === 'bishop_sleep';
+  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart || isBishopMissile || isBishopSleep ? (item.range || 8) : 8);
   const p = state.player;
 
   let x = p.x + dx;
@@ -12207,8 +12296,9 @@ function throwProjectile(dx, dy, isSecondShot) {
       landX = x; landY = y;
       const def = Math.max(0, getEffectiveDefense(target) - pierceDef - piercingArrowDef);
       const baseDmg = (item.damage || item.attack || 1) + bonusDmg;
-      const dmg = Math.max(1, baseDmg - def + Math.floor(Math.random() * 3) - 1);
-      target.hp -= dmg;
+      // Bishop Sleep does 0 damage — skip damage formula
+      const dmg = isBishopSleep ? 0 : Math.max(1, baseDmg - def + Math.floor(Math.random() * 3) - 1);
+      if (dmg > 0) target.hp -= dmg;
 
       if (isAimedShot) {
         addMessage(`🏹 Aimed Shot hits ${target.name} for ${dmg}!`, 'good');
@@ -12219,6 +12309,10 @@ function throwProjectile(dx, dy, isSecondShot) {
         addMessage(`☣️ Acid Bolt hits ${target.name} for ${dmg}!`, 'good');
       } else if (isArcaneDart) {
         addMessage(`✨ Arcane Dart hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isBishopMissile) {
+        addMessage(`✨ Magic Missile hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isBishopSleep) {
+        addMessage(`😴 ${target.name} drifts to sleep!`, 'good');
       } else {
         addMessage(`Your dagger strikes ${target.name} for ${dmg}!`, 'good');
       }
@@ -12286,9 +12380,17 @@ function throwProjectile(dx, dy, isSecondShot) {
     }
   }
 
+  // Bishop Magic Missile: Twin Cast fires a second bolt
+  if (isBishopMissile && p.twinCast && hit && hitTarget) {
+    const twinDmg = Math.max(1, (item.damage || 1) - 1);
+    hitTarget.hp -= twinDmg;
+    addMessage(`✨ Twin Cast! Second bolt hits for ${twinDmg}!`, 'good');
+    if (hitTarget.hp <= 0) killEnemy(hitTarget);
+  }
+
   // Animation — delay endTurn until projectile animation finishes so enemies
   // don't move while the projectile is still visually in flight
-  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
+  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : isBishopMissile ? '✨' : isBishopSleep ? '😴' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
   // Check if double shot will fire after this — if so, don't attach endTurn callback to this animation
   const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && p.arrows > 0;
   const deferEndTurn = true; // always defer endTurn until animation completes
@@ -12320,6 +12422,22 @@ function throwProjectile(dx, dy, isSecondShot) {
   if (isArcaneDart) {
     if (!hit) addMessage('The dart flickers into the dark.', '');
     state.player.arcaneDartCooldown = 5;
+  }
+
+  if (isBishopMissile) {
+    if (!hit) addMessage('✨ The missile streaks into the darkness.', '');
+    const baseCd = BISHOP_SPELLS.find(s => s.id === 'magic_missile')?.cooldown || 4;
+    p.bishopSpellCooldowns.magic_missile = p.arcaneResonance ? Math.max(1, baseCd - 2) : baseCd;
+  }
+
+  if (isBishopSleep) {
+    if (!hit) addMessage('😴 The lullaby dissipates harmlessly.', '');
+    else if (hitTarget) {
+      addStatusEffect(hitTarget, 'frozen', 6);
+      addMessage(`😴 ${hitTarget.name} falls into a magical slumber!`, 'good');
+    }
+    const baseCd = BISHOP_SPELLS.find(s => s.id === 'sleep')?.cooldown || 10;
+    p.bishopSpellCooldowns.sleep = p.arcaneResonance ? Math.max(1, baseCd - 2) : baseCd;
   }
 
   if (isAimedShot) {
@@ -13021,6 +13139,231 @@ function activateThunderclap() {
   render();
   endTurn();
 }
+
+// === BISHOP ABILITIES ===
+function activateBishopMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🔮 BISHOP';
+  $('levelup-label').textContent = 'Choose a spell:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+  container.style.overflowY = 'auto';
+  container.style.maxHeight = '70vh';
+
+  const availableSpells = BISHOP_SPELLS.filter(s => p.level >= s.levelReq);
+
+  for (const spell of availableSpells) {
+    const cd = (p.bishopSpellCooldowns && p.bishopSpellCooldowns[spell.id]) || 0;
+    const ready = cd <= 0;
+    const btn = document.createElement('button');
+    btn.className = 'perk-btn';
+    const descText = typeof spell.desc === 'function' ? spell.desc(p) : spell.desc;
+    const cdText = ready ? '' : ` (${cd} turns)`;
+    btn.innerHTML = `<div class="perk-name">${spell.icon} ${spell.name}</div><div class="perk-desc">${descText}${cdText}</div>`;
+    if (!ready) btn.style.opacity = '0.5';
+    const spellRef = spell;
+    const handler = () => {
+      container.style.overflowY = '';
+      container.style.maxHeight = '';
+      overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+      overlay.classList.remove('active');
+      inputLocked = false;
+      if (ready) castBishopSpell(spellRef);
+      else addMessage(`${spellRef.name} recharging (${cd} turns).`, '');
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
+    container.appendChild(btn);
+  }
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  const cancelHandler = () => {
+    container.style.overflowY = '';
+    container.style.maxHeight = '';
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+
+  overlay.classList.add('active');
+}
+
+function castBishopSpell(spell) {
+  if (!spell) return;
+  const p = state.player;
+  Audio.bishopSpell();
+
+  if (spell.type === 'ranged') {
+    // Enter targeting mode
+    const itemType = spell.id === 'sleep' ? 'bishop_sleep' : 'bishop_missile';
+    const dmg = spell.id === 'magic_missile' ? (2 + Math.floor(p.level / 3)) : 0;
+    state.throwMode = true;
+    state.throwItem = {
+      item: { name: spell.name, damage: dmg, ammo: Infinity, itemType, range: 8 },
+      index: -1
+    };
+    addMessage(`${spell.icon} ${spell.name} — choose direction!`, 'good');
+    updateUI();
+    render();
+    return; // throwProjectile will call endTurn
+  }
+
+  const baseCd = spell.cooldown;
+  const cd = p.arcaneResonance ? Math.max(1, baseCd - 2) : baseCd;
+
+  if (spell.id === 'minor_heal') {
+    const heal = Math.max(1, Math.floor(p.maxHp * 0.15));
+    p.hp = Math.min(p.maxHp, p.hp + heal);
+    addMessage(`💚 Minor Heal: +${heal} HP`, 'good');
+    haptic(30);
+    if (p.divineAegis) {
+      p.defense += 1;
+      addMessage('✨ Divine Aegis: +1 DEF for 5 turns!', 'good');
+      setTimeout(() => { if (state.player) { state.player.defense = Math.max(0, state.player.defense - 1); updateUI(); } }, 5 * 1000);
+    }
+    if (baseCd > 0) p.bishopSpellCooldowns.minor_heal = getMasteryBonuses('bishop').fastHeal ? Math.max(1, Math.floor(baseCd / 2)) : cd;
+
+  } else if (spell.id === 'identify') {
+    // Reveal 1 unknown potion or scroll type
+    const unknownPotions = potionNames.filter(n => !potionIdentified[n.id]);
+    const unknownScrolls = scrollNames.filter(n => !scrollIdentified[n.id]);
+    const unknowns = [...unknownPotions.map(n => ({ t: 'potion', n })), ...unknownScrolls.map(n => ({ t: 'scroll', n }))];
+    if (unknowns.length === 0) {
+      addMessage('📖 All item types are already known.', '');
+      inputLocked = false;
+      return; // no turn cost, no cooldown
+    }
+    const pick = unknowns[Math.floor(Math.random() * unknowns.length)];
+    if (pick.t === 'potion') potionIdentified[pick.n.id] = true;
+    else scrollIdentified[pick.n.id] = true;
+    refreshIdentifiedItems();
+    addMessage(`📖 Identify reveals: ${pick.n.name}!`, 'good');
+    // No cooldown for Identify
+
+  } else if (spell.id === 'poison_cloud') {
+    let placed = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const ax = p.x + dx, ay = p.y + dy;
+        if (ax < 0 || ax >= MAP_W || ay < 0 || ay >= MAP_H) continue;
+        const tile = getTile(ax, ay);
+        if (tile === T.WALL || tile === T.DOOR_SEALED) continue;
+        if (state.entities.some(e => e.type === 'hazard' && e.hazardType === 'poison_gas' && e.x === ax && e.y === ay)) continue;
+        state.entities.push({ type: 'hazard', hazardType: 'poison_gas', x: ax, y: ay, glyph: '☁️', turns: 4 });
+        placed++;
+      }
+    }
+    addMessage(`☁️ Poison Cloud fills the area! (${placed} tiles)`, 'good');
+    animateAoeBlast(p.x, p.y, 1.5, '#88cc44');
+    haptic(40);
+    p.bishopSpellCooldowns.poison_cloud = cd;
+
+  } else if (spell.id === 'dispel') {
+    const cleansed = new Set(['poison', 'burning', 'webbed', 'frozen', 'wet', 'acid_soaked', 'weaken']);
+    const before = p.statusEffects.length;
+    p.statusEffects = p.statusEffects.filter(e => !cleansed.has(e.type));
+    const removed = before - p.statusEffects.length;
+    if (removed > 0) {
+      addMessage(`🌀 Dispel removes ${removed} debuff${removed !== 1 ? 's' : ''}!`, 'good');
+    } else {
+      addMessage('🌀 Dispel: no debuffs to remove.', '');
+    }
+    haptic(30);
+    p.bishopSpellCooldowns.dispel = cd;
+
+  } else if (spell.id === 'holy_nova') {
+    const dmg = Math.max(1, 3 + Math.floor(state.floor / 3));
+    let hits = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0 && !e.isAlly && e.x === p.x + dx && e.y === p.y + dy);
+        for (const enemy of enemies) {
+          enemy.hp -= dmg;
+          addMessage(`☀️ Holy Nova strikes ${enemy.name} for ${dmg}!`, 'good');
+          hits++;
+          if (enemy.hp <= 0) killEnemy(enemy);
+        }
+      }
+    }
+    const heal = Math.max(1, Math.floor(p.maxHp * 0.10));
+    p.hp = Math.min(p.maxHp, p.hp + heal);
+    addMessage(`☀️ Holy Nova! ${hits > 0 ? hits + ' enemies struck. ' : ''}+${heal} HP`, 'good');
+    animateAoeBlast(p.x, p.y, 1.5, '#ffee80');
+    haptic(40);
+    if (p.divineAegis) {
+      p.defense += 1;
+      addMessage('✨ Divine Aegis: +1 DEF for 5 turns!', 'good');
+      setTimeout(() => { if (state.player) { state.player.defense = Math.max(0, state.player.defense - 1); updateUI(); } }, 5 * 1000);
+    }
+    p.bishopSpellCooldowns.holy_nova = cd;
+
+  } else if (spell.id === 'uncurse') {
+    const slots = ['weapon', 'armor', 'ring', 'ranged'];
+    const hasCursed = slots.some(slot => p.equipped[slot]?.cursed);
+    if (!hasCursed) {
+      addMessage('🛡️ No cursed items equipped.', '');
+      inputLocked = false;
+      return; // no turn cost, no cooldown
+    }
+    let removed = 0;
+    for (const slot of slots) {
+      if (p.equipped[slot]?.cursed) { p.equipped[slot].cursed = false; removed++; }
+    }
+    addMessage(`🛡️ Uncurse purifies ${removed} item${removed !== 1 ? 's' : ''}!`, 'good');
+    haptic(30);
+    // No cooldown for Uncurse
+
+  } else if (spell.id === 'arcane_storm') {
+    const dmg = Math.max(1, 4 + p.level);
+    let hits = 0;
+    const visibleEnemies = state.entities.filter(e =>
+      e.type === 'enemy' && e.hp > 0 && !e.isAlly &&
+      state.visible && state.visible[e.y * MAP_W + e.x]
+    );
+    for (const enemy of visibleEnemies) {
+      enemy.hp -= dmg;
+      addMessage(`⚡ Arcane Storm blasts ${enemy.name} for ${dmg}!`, 'good');
+      hits++;
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    if (hits === 0) addMessage('⚡ Arcane Storm: no visible enemies!', '');
+    animateAoeBlast(p.x, p.y, 2.5, '#cc88ff');
+    screenShake();
+    haptic(60);
+    p.bishopSpellCooldowns.arcane_storm = cd;
+
+  } else if (spell.id === 'major_heal') {
+    const heal = Math.max(1, Math.floor(p.maxHp * 0.50));
+    p.hp = Math.min(p.maxHp, p.hp + heal);
+    p.statusEffects = p.statusEffects.filter(e => e.type !== 'poison' && e.type !== 'burning');
+    addMessage(`💛 Major Heal: +${heal} HP, poison/burn cleansed!`, 'good');
+    haptic(40);
+    if (p.divineAegis) {
+      p.defense += 1;
+      addMessage('✨ Divine Aegis: +1 DEF for 5 turns!', 'good');
+      setTimeout(() => { if (state.player) { state.player.defense = Math.max(0, state.player.defense - 1); updateUI(); } }, 5 * 1000);
+    }
+    p.bishopSpellCooldowns.major_heal = cd;
+  }
+
+  updateUI();
+  render();
+  endTurn();
+}
+
+// Handle poison_gas hazard in player movement — applied in playerMove check for hazards
+// (poison_gas uses existing acid hazard pattern, handled by the entity step-on check)
 
 // === BOOT ===
 document.addEventListener('DOMContentLoaded', boot);
