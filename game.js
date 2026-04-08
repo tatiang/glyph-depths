@@ -684,7 +684,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
   },
   {
-    id: 'beastmaster', name: 'Beastmaster', icon: '🐺',
+    id: 'beastmaster', name: 'Beastmaster', icon: '🐺', img: 'images/beastmaster.png',
     flavor: 'Never hunts alone. A loyal hound fights continuously by your side.',
     hp: 12, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
@@ -694,7 +694,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
   },
   {
-    id: 'monk', name: 'Monk', icon: '📿',
+    id: 'monk', name: 'Monk', icon: '📿', img: 'images/monk.png',
     flavor: 'Requires no steel. Fists, focus, and inner stillness replace all gear.',
     hp: 12, attack: 0, defense: 0,
     hungerRate: 1, dodgeBonus: 0.10, critChance: 0.15,
@@ -704,7 +704,7 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
   },
   {
-    id: 'bishop', name: 'Bishop', icon: '🔮',
+    id: 'bishop', name: 'Bishop', icon: '🔮', img: 'images/bishop.png',
     flavor: 'Fragile but formidable. A hybrid mage-cleric with a deep spell repertoire that grows with each level.',
     hp: 10, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.05,
