@@ -606,17 +606,36 @@ const CLASS_DEFS = [
     passive: '⚡ Rage: +3 ATK below 40% HP · 🍖 1.5× hunger',
     startItems: 'Short Sword · 2× Strength Potions',
     statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+4 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
+    passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }],
+    lore: 'An exile who learned that pain is just noise. The deeper you go, the sharper the instincts — and the hungrier the rage.',
+    activeAbilities: [
+      { name: '⚡ Enrage (once/floor)', desc: 'Manually trigger Rage mode for 5 turns — +3 ATK regardless of HP.' }
+    ],
+    passiveAbilities: [
+      { name: '🔥 Rage', desc: 'When below 40% HP, gain +3 ATK automatically.' },
+      { name: '🍖 Voracious', desc: 'Burns hunger 1.5× faster than other classes.' },
+      { name: '💥 10% Crit', desc: 'Each attack has a 10% chance to deal double damage.' }
+    ]
   },
   {
     id: 'escapeartist', name: 'Escape Artist', icon: '💨', img: 'images/escape-artist.png',
-    flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
+    flavor: 'Leave nothing behind but traps and regrets. Acrobatic and evasive.',
     hp: 12, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
     passive: '❄️ Ice Traps on retreat · 💥 Ricochet · 💨 Escape Route',
     startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }]
+    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }],
+    lore: 'Spent years learning that the best fight is the one you walked away from. Every doorway is an exit; every enemy a reason to move faster.',
+    activeAbilities: [
+      { name: '💨 Escape Route', desc: 'Teleport to a random safe tile when surrounded. Costs 1 HP.' },
+      { name: '💥 Ricochet', desc: 'Thrown daggers bounce to hit a second adjacent target.' }
+    ],
+    passiveAbilities: [
+      { name: '❄️ Ice Traps', desc: 'Retreating from an adjacent enemy leaves a trap that stuns on contact (up to 3 active).' },
+      { name: '👁 20% Dodge', desc: 'Evades 1 in 5 incoming attacks entirely.' },
+      { name: '🗡 15% Crit', desc: 'Higher critical strike chance than most classes.' }
+    ]
   },
   {
     id: 'ranger',
@@ -628,7 +647,17 @@ const CLASS_DEFS = [
     passive: '👁 +2 FOV · Forager',
     startItems: 'Short Bow · 50 Arrows · 4 Throwing Daggers · Ration',
     statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }]
+    passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }],
+    lore: 'Grew up mapping territory no one else would enter. Knows which roots to eat and exactly how far a bodkin point will travel before it stops.',
+    activeAbilities: [
+      { name: '🏹 Aimed Shot', desc: 'Charges for 1 turn then fires a guaranteed-hit arrow dealing +4 bonus damage.' },
+      { name: '🗡 Throw Dagger', desc: 'Hurl a dagger for ranged damage. Daggers are consumed.' }
+    ],
+    passiveAbilities: [
+      { name: '👁 +2 FOV', desc: 'Sees 2 tiles further than other classes.' },
+      { name: '🌿 Forager', desc: 'Finds food more frequently; rations restore more hunger.' },
+      { name: '🎯 15% Crit', desc: 'Arrows and daggers have an elevated critical hit rate.' }
+    ]
   },
   {
     id: 'rogue',
@@ -640,7 +669,17 @@ const CLASS_DEFS = [
     passive: '👁 15% Dodge · 20% Crit · 🦶 Roundhouse Kick (Lv 5)',
     startItems: '6 Throwing Daggers · Invis Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }]
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }],
+    lore: 'Never relied on armor — too slow, too loud. A single precise strike outweighs a hundred swings that land on nothing.',
+    activeAbilities: [
+      { name: '🦶 Roundhouse Kick (Lv 5)', desc: 'Unlocks at level 5. Kicks an enemy back 2 tiles and stuns for 1 turn.' },
+      { name: '🗡 Throw Dagger', desc: 'Hurl a dagger for ranged damage.' }
+    ],
+    passiveAbilities: [
+      { name: '👁 15% Dodge', desc: 'Evades 1 in 7 attacks with fluid repositioning.' },
+      { name: '💥 20% Crit', desc: 'Highest critical strike rate of any class.' },
+      { name: '🥷 Vanish', desc: 'Invisibility potions last longer and can be used mid-combat.' }
+    ]
   },
   {
     id: 'cleric',
@@ -652,7 +691,17 @@ const CLASS_DEFS = [
     passive: '✝ Holy Aura vs Undead · Weaken + Divine Heal',
     startItems: 'Mace · Healing Potion · Scroll of Identify',
     statBadges: [{ label: '18 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
+    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }],
+    lore: 'Carries a faith older than the dungeon itself. Every undead creature remembers what it feared in life, and you are that thing.',
+    activeAbilities: [
+      { name: '✝ Weaken', desc: 'Reduce an adjacent enemy\'s attack by 2 for 5 turns. Costs mana.' },
+      { name: '💚 Divine Heal', desc: 'Heal 30% of max HP. Has a cooldown between uses.' }
+    ],
+    passiveAbilities: [
+      { name: '☀️ Holy Aura', desc: 'Undead enemies deal 2 less damage per hit.' },
+      { name: '🔒 Curse Immune', desc: 'Cannot be afflicted by cursed items — they crumble harmlessly.' },
+      { name: '🛡 Sanctified', desc: 'Blessed status grants extra defense when active.' }
+    ]
   },
   {
     id: 'conjurer', name: 'Conjurer', icon: '🎭', img: 'images/conjurer.png',
@@ -662,7 +711,16 @@ const CLASS_DEFS = [
     passive: '📖 All items identified · ✨ Arcane Dart · 🎭 Illusion',
     startItems: 'Scroll of Mapping · Healing Potion',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }]
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }],
+    lore: 'Reads everything, trusts nothing. Every item in the dungeon is an open book — and every enemy can be made to chase a shadow.',
+    activeAbilities: [
+      { name: '✨ Arcane Dart', desc: 'Fire a ranged dart for 3 + level/2 damage. No cooldown.' },
+      { name: '🎭 Illusion', desc: 'Place a decoy that draws enemy attention for 4 turns. Enemies who reach it are confused.' }
+    ],
+    passiveAbilities: [
+      { name: '📖 Omniscient', desc: 'All items are pre-identified — no cursed surprises, no wasted scrolls.' },
+      { name: '👁 10% Dodge', desc: 'Slight evasion from practiced spatial awareness.' }
+    ]
   },
   {
     id: 'darkwizard', name: 'Dark Wizard', icon: '💀', img: 'images/dark-wizard.png',
@@ -672,7 +730,17 @@ const CLASS_DEFS = [
     passive: '✨ Arcane Affinity: scrolls ×2 · 💀 Necromance',
     startItems: 'Arcane Staff · 3 identified scrolls · Healing Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }],
+    lore: 'Studied magic until the boundary between life and death became an inconvenience rather than a law. Very frail. Extraordinarily dangerous.',
+    activeAbilities: [
+      { name: '🧪 Acid Bolt', desc: 'Ranged attack that applies acid-soaked status — 2 damage/turn for 5 turns.' },
+      { name: '💥 Arcane Blast', desc: 'High-damage arcane burst in a 1-tile radius. Short cooldown.' },
+      { name: '💀 Necromance', desc: 'On kill, 25–50% chance to raise the enemy as a skeletal ally that fights for you.' }
+    ],
+    passiveAbilities: [
+      { name: '✨ Arcane Affinity', desc: 'Scroll effects are doubled — damage scrolls hit harder, heals restore more.' },
+      { name: '📖 Omniscient', desc: 'Starts with all items identified.' }
+    ]
   },
   {
     id: 'elementalist', name: 'Elementalist', icon: '🧪', img: 'images/elementalist.png',
@@ -682,7 +750,16 @@ const CLASS_DEFS = [
     passive: '🧪 Elemental Immune · Bump = Acid-Soaked · ⚡ Thunderclap',
     startItems: 'Rusty Dagger · Healing Potion · Scroll of Mapping',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
+    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }],
+    lore: 'The dungeon is a chemistry problem. Acid dissolves armor, fire ignites gas, lightning leaps between bodies. You are merely the catalyst.',
+    activeAbilities: [
+      { name: '⚡ Thunderclap', desc: 'Stuns all adjacent enemies for 1 turn and deals 4 lightning damage each. Cooldown: 8 turns.' },
+      { name: '🟢 Elemental Vial', desc: 'Throw a vial of acid, fire, or ice at a target tile. Effect persists for 5 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '🧪 Elemental Immune', desc: 'Cannot be poisoned or burned — immune to fire and acid damage.' },
+      { name: '🔬 Acid-Soaked Bump', desc: 'Melee attacks coat enemies in acid, dealing 1 extra damage/turn for 3 turns.' }
+    ]
   },
   {
     id: 'beastmaster', name: 'Beastmaster', icon: '🐺', img: 'images/beastmaster.png',
@@ -692,7 +769,15 @@ const CLASS_DEFS = [
     passive: '🐺 Permanent Hound Companion · ♻ Rapid Regeneration · 🐾 Beast Charm',
     startItems: 'Leather Vest · Healing Potion',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
+    passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }],
+    lore: 'Raised in the wild parts beyond the city walls. Animals respond to you; enemies respond to your hound. You have never fought alone.',
+    activeAbilities: [
+      { name: '🐾 Beast Charm', desc: 'Attempt to pacify a non-boss enemy — 30% chance it becomes a temporary ally for 15 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '🐺 Loyal Hound', desc: 'A wolf companion fights alongside you permanently. If it dies, it respawns on the next floor.' },
+      { name: '♻ Rapid Regeneration', desc: 'Heals 1 HP every 15 turns passively — the only class with built-in regen.' }
+    ]
   },
   {
     id: 'monk', name: 'Monk', icon: '📿', img: 'images/monk.png',
@@ -702,7 +787,17 @@ const CLASS_DEFS = [
     passive: '🥋 ATK/DEF scale with level · 🧘 Meditate · 🌊 Walk on Water',
     startItems: 'Healing Potion · Enchanted Lute',
     statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
-    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
+    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }],
+    lore: 'Weapons are a crutch. You discarded them at the threshold and have not missed them since. The deeper the silence, the sharper the focus.',
+    activeAbilities: [
+      { name: '🧘 Meditate', desc: 'Skip a turn to fully clear status effects and gain +2 DEF for 3 turns.' },
+      { name: '🎵 Enchanted Lute', desc: 'Plays a calming melody — 25% chance to charm all adjacent enemies each use.' }
+    ],
+    passiveAbilities: [
+      { name: '🥋 Scaling Fists', desc: 'ATK and DEF both increase with level — eventually rivals fully geared fighters.' },
+      { name: '🌊 Walk on Water', desc: 'Can traverse water tiles without needing bridges or stepping stones.' },
+      { name: '🚫 No Weapons', desc: 'Cannot equip weapons. Armor and rings still apply.' }
+    ]
   },
   {
     id: 'bishop', name: 'Bishop', icon: '🔮', img: 'images/bishop.png',
@@ -712,7 +807,19 @@ const CLASS_DEFS = [
     passive: '📖 All items identified · 🔮 Spell Menu (grows with level)',
     startItems: 'Arcane Staff · Healing Potion · Scroll of Mapping',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }]
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }],
+    lore: 'Spent decades in a monastery studying both arcane texts and sacred rites. The other monks thought this contradictory. They were wrong.',
+    activeAbilities: [
+      { name: '🔮 Spell Menu', desc: 'Access a growing repertoire of spells. New spells unlock at levels 1, 3, 5, 7, 9, 11, 13, 15, 17, 19.' },
+      { name: '✨ Magic Missile (Lv 1)', desc: 'Ranged bolt, 2–4 damage, range 8. Cooldown: 4 turns.' },
+      { name: '💚 Minor Heal (Lv 1)', desc: 'Restore 15% of max HP. Cooldown: 8 turns.' },
+      { name: '😴 Sleep (Lv 3)', desc: 'Put a target to sleep for 4 turns. Cooldown: 10 turns.' },
+      { name: '⚡ Holy Smite (Lv 5)', desc: '+6 damage vs undead and demons. Cooldown: 6 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '📖 Omniscient', desc: 'All items are pre-identified from the start.' },
+      { name: '📚 Spell Mastery', desc: 'Earns access to 10 total spells through level progression.' }
+    ]
   },
   {
     id: 'earthshaker', name: 'Earthshaker', icon: '🌋', img: 'images/earthshaker.png',
@@ -722,7 +829,16 @@ const CLASS_DEFS = [
     passive: '🌋 Tectonic Slam (tiers w/ level) · 🔔 Tremorsense · 🪨 Surefooted',
     startItems: 'Mace · Ration',
     statBadges: [{ label: '15 HP', cls: 'pos' }, { label: '+3 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Surefooted', cls: 'pos' }, { label: 'Tremorsense', cls: 'pos' }, { label: '🌋 Tectonic', cls: 'pos' }]
+    passBadges: [{ label: 'Surefooted', cls: 'pos' }, { label: 'Tremorsense', cls: 'pos' }, { label: '🌋 Tectonic', cls: 'pos' }],
+    lore: 'Learned to read the dungeon\'s tremors before they could read you. Every footstep tells a story — yours is the one that ends in rubble.',
+    activeAbilities: [
+      { name: '🌋 Tectonic Slam', desc: 'Strikes the ground in a cone, dealing AOE damage and knocking back adjacent enemies. Power scales with level (T1–T4).' }
+    ],
+    passiveAbilities: [
+      { name: '🔔 Tremorsense', desc: 'Detects all enemies within 6 tiles through walls, regardless of FOV.' },
+      { name: '🪨 Surefooted', desc: 'Immune to knockback and movement penalties from terrain (mounds, rubble).' },
+      { name: '💥 Faultline Criticals', desc: 'Crits on enemies already at less than 50% HP deal bonus seismic damage.' }
+    ]
   }
 ];
 
@@ -1013,6 +1129,44 @@ function startGame() {
   showClassSelect();
 }
 
+function showClassInfoPopup(cls) {
+  const popup = $('class-info-popup');
+  if (!popup) return;
+
+  const activeHtml = (cls.activeAbilities || []).map(a =>
+    `<div class="ci-ability"><span class="ci-ability-name">${a.name}</span><span class="ci-ability-desc">${a.desc}</span></div>`
+  ).join('');
+
+  const passiveHtml = (cls.passiveAbilities || []).map(a =>
+    `<div class="ci-ability"><span class="ci-ability-name">${a.name}</span><span class="ci-ability-desc">${a.desc}</span></div>`
+  ).join('');
+
+  popup.querySelector('.ci-icon').innerHTML = cls.img
+    ? `<img src="${cls.img}" class="ci-img" alt="${cls.name}">`
+    : cls.icon;
+  popup.querySelector('.ci-name').textContent = cls.name;
+  popup.querySelector('.ci-lore').textContent = cls.lore || cls.flavor;
+  popup.querySelector('.ci-active-list').innerHTML = activeHtml || '<div class="ci-ability"><span class="ci-ability-desc" style="color:var(--text-dim)">None</span></div>';
+  popup.querySelector('.ci-passive-list').innerHTML = passiveHtml || '<div class="ci-ability"><span class="ci-ability-desc" style="color:var(--text-dim)">None</span></div>';
+
+  popup.classList.add('active');
+  inputLocked = true;
+
+  const closePopup = () => {
+    popup.classList.remove('active');
+    inputLocked = false;
+    popup.querySelector('.ci-close').removeEventListener('click', closePopup);
+    popup.querySelector('.ci-close').removeEventListener('touchend', closePopup);
+    popup.removeEventListener('click', backdropClose);
+  };
+  const backdropClose = (e) => {
+    if (e.target === popup) closePopup();
+  };
+  popup.querySelector('.ci-close').addEventListener('click', closePopup);
+  popup.querySelector('.ci-close').addEventListener('touchend', (e) => { e.preventDefault(); closePopup(); }, { passive: false });
+  popup.addEventListener('click', backdropClose);
+}
+
 function showClassSelect() {
   const track = $('class-pager-track');
   const dotsEl = $('class-dots');
@@ -1066,7 +1220,10 @@ function showClassSelect() {
         `;
       } else {
         card.innerHTML = `
-          <div class="class-icon">${cls.img ? `<img src="${cls.img}" class="class-img" alt="${cls.name}">` : cls.icon}</div>
+          <div class="class-card-header">
+            <div class="class-icon">${cls.img ? `<img src="${cls.img}" class="class-img" alt="${cls.name}">` : cls.icon}</div>
+            <button class="class-info-btn" aria-label="Class info" title="View details">ⓘ</button>
+          </div>
           <div class="class-name">${cls.name}</div>
           <div class="class-flavor">${cls.flavor}</div>
           <div class="class-badge-row">
@@ -1077,8 +1234,17 @@ function showClassSelect() {
           </div>
           <div class="class-start-items">${cls.startItems}</div>
         `;
+        // Info button shows class details popup
+        const infoBtn = card.querySelector('.class-info-btn');
+        const showInfo = (e) => {
+          e.stopPropagation();
+          if (e.type === 'touchend' && e.cancelable) e.preventDefault();
+          showClassInfoPopup(cls);
+        };
+        infoBtn.addEventListener('click', showInfo);
+        infoBtn.addEventListener('touchend', showInfo, { passive: false });
       }
-      
+
       const selectFn = () => {
         if (isLocked) return;
         selectedClass = cls.id;
@@ -1087,8 +1253,13 @@ function showClassSelect() {
         beginBtn.disabled = false;
         if (labelEl) labelEl.textContent = `${cls.icon}  ${cls.name}`;
       };
-      card.addEventListener('click', selectFn);
+      card.addEventListener('click', (e) => {
+        // Don't select when tapping the info button
+        if (e.target.classList.contains('class-info-btn')) return;
+        selectFn();
+      });
       card.addEventListener('touchend', (e) => {
+        if (e.target.classList.contains('class-info-btn')) return;
         // Only fire on genuine taps, not swipes
         if (e.cancelable) e.preventDefault();
         selectFn();
@@ -1890,7 +2061,6 @@ function generateFloor() {
   // Special terrain features
   spawnWaterfalls();
   spawnMounds();
-  spawnIcyPaths();
   spawnFirePaths();
   spawnChasms();
   spawnEnchantedWalls();
@@ -2144,27 +2314,44 @@ function bfsReachableStrict(sx, sy, tx, ty) {
 function carveWaterFeatures() {
   const p = state.player;
 
-  // 1. River: carve a winding strip of WATER from one edge to another
-  // Only convert WALL tiles — never FLOOR or CORRIDOR
+  // Find stairs proxy for connectivity checks
+  let stx = -1, sty = -1;
+  outerW: for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outerW; }
+    }
+  }
+  if (stx < 0 && state.rooms.length > 0) {
+    const far = state.rooms[state.rooms.length - 1];
+    stx = far.x + Math.floor(far.w / 2);
+    sty = far.y + Math.floor(far.h / 2);
+  }
+
+  // 1. River: carve a deliberate water channel from one map edge to the opposite.
+  //    A WATERFALL tile marks the entry point where the river emerges from the rock wall.
+  //    Only WALL tiles are converted — rooms and corridors are never overwritten.
   const startEdge = Math.floor(Math.random() * 4); // 0=top,1=bottom,2=left,3=right
   let rx, ry;
-  if (startEdge === 0)      { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = 1; }
-  else if (startEdge === 1) { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = MAP_H - 2; }
-  else if (startEdge === 2) { rx = 1; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
-  else                      { rx = MAP_W - 2; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  if (startEdge === 0)      { rx = 3 + Math.floor(Math.random() * (MAP_W - 6)); ry = 1; }
+  else if (startEdge === 1) { rx = 3 + Math.floor(Math.random() * (MAP_W - 6)); ry = MAP_H - 2; }
+  else if (startEdge === 2) { rx = 1; ry = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
+  else                      { rx = MAP_W - 2; ry = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
 
-  // Destination: opposite edge area
+  // Destination: opposite edge
   let gx, gy;
-  if (startEdge === 0)      { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = MAP_H - 2; }
-  else if (startEdge === 1) { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = 1; }
-  else if (startEdge === 2) { gx = MAP_W - 2; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
-  else                      { gx = 1; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  if (startEdge === 0)      { gx = 3 + Math.floor(Math.random() * (MAP_W - 6)); gy = MAP_H - 2; }
+  else if (startEdge === 1) { gx = 3 + Math.floor(Math.random() * (MAP_W - 6)); gy = 1; }
+  else if (startEdge === 2) { gx = MAP_W - 2; gy = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
+  else                      { gx = 1; gy = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
 
-  // Drunk-walk river, only converting WALL tiles
+  // Place WATERFALL at source if it's a wall (marks where river flows in from rock)
+  if (getTile(rx, ry) === T.WALL) setTile(rx, ry, T.WATERFALL);
+
+  // Carve river — more deliberate path (70% goal-bias vs old 60%)
   const waterTiles = new Set();
   let cx = rx, cy = ry;
-  for (let step = 0; step < 200; step++) {
-    // Convert 1x2 strip
+  for (let step = 0; step < 220; step++) {
+    // Convert a 1×2 strip perpendicular to flow direction (river width)
     for (let ow = -1; ow <= 0; ow++) {
       const wx = cx + (startEdge < 2 ? ow : 0);
       const wy = cy + (startEdge >= 2 ? ow : 0);
@@ -2176,19 +2363,18 @@ function carveWaterFeatures() {
       }
     }
     if (cx === gx && cy === gy) break;
-    // Trend toward goal with some drift
     const ddx = gx - cx, ddy = gy - cy;
     const r = Math.random();
-    if (r < 0.6) {
-      // Move toward goal
+    if (r < 0.70) {
+      // Strong trend toward goal (river has direction)
       if (Math.abs(ddx) >= Math.abs(ddy)) cx += Math.sign(ddx);
       else cy += Math.sign(ddy);
-    } else if (r < 0.8) {
-      // Perpendicular drift
+    } else if (r < 0.85) {
+      // Slight meander
       if (Math.abs(ddx) >= Math.abs(ddy)) cy += (Math.random() < 0.5 ? 1 : -1);
       else cx += (Math.random() < 0.5 ? 1 : -1);
     } else {
-      // Move toward goal on both axes
+      // Diagonal push toward goal
       if (ddx !== 0) cx += Math.sign(ddx);
       if (ddy !== 0) cy += Math.sign(ddy);
     }
@@ -2196,10 +2382,12 @@ function carveWaterFeatures() {
     cy = Math.max(1, Math.min(MAP_H - 2, cy));
   }
 
-  // 2. Bridges: where WATER crosses a CORRIDOR, place a BRIDGE
+  // Place WATERFALL at destination if it's still a wall
+  if (getTile(gx, gy) === T.WALL) setTile(gx, gy, T.WATERFALL);
+
+  // 2. Bridges where WATER is adjacent to CORRIDOR or FLOOR tiles
   for (const idx of waterTiles) {
     const bx = idx % MAP_W, by = Math.floor(idx / MAP_W);
-    // Check if removing this WATER would restore corridor connectivity
     for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       const adjTile = getTile(bx + ddx, by + ddy);
       if (adjTile === T.CORRIDOR || adjTile === T.FLOOR) {
@@ -2210,22 +2398,8 @@ function carveWaterFeatures() {
     }
   }
 
-  // 3. Validate connectivity: player must reach stairs
-  let stx = -1, sty = -1;
-  outer: for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outer; }
-    }
-  }
-  // If stairs haven't been placed yet, use farthest room center as proxy
-  if (stx < 0 && state.rooms.length > 0) {
-    const far = state.rooms[state.rooms.length - 1];
-    stx = far.x + Math.floor(far.w / 2);
-    sty = far.y + Math.floor(far.h / 2);
-  }
-
+  // 3. Validate connectivity — if river cut off access, bridge all water adjacent to walkable
   if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
-    // Connectivity broken — add bridges on all remaining WATER tiles adjacent to walkable
     for (let y = 1; y < MAP_H - 1; y++) {
       for (let x = 1; x < MAP_W - 1; x++) {
         if (getTile(x, y) !== T.WATER) continue;
@@ -2240,11 +2414,9 @@ function carveWaterFeatures() {
     }
   }
 
-  // 3b. Bridge spans: convert water tiles that bridge two walkable areas (river crossings only).
-  // Scan rows and columns for contiguous water strips flanked by walkable tiles on both ends.
-  // Max span of 6 prevents bridging across the lake (added in step 4).
+  // 3b. Bridge spans: contiguous water strips between two walkable areas become crossings.
+  //     Max span of 6 prevents bridging across the lake (step 5).
   const MAX_BRIDGE_SPAN = 6;
-  // Horizontal spans
   for (let hy = 1; hy < MAP_H - 1; hy++) {
     let hx = 1;
     while (hx < MAP_W - 1) {
@@ -2261,7 +2433,6 @@ function carveWaterFeatures() {
       }
     }
   }
-  // Vertical spans
   for (let vx = 1; vx < MAP_W - 1; vx++) {
     let vy = 1;
     while (vy < MAP_H - 1) {
@@ -2279,22 +2450,90 @@ function carveWaterFeatures() {
     }
   }
 
-  // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
-  const farthestForLake = getFarthestRoom(p.x, p.y);
-  const eligibleRooms = state.rooms.filter(r => {
-    const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
-    const isStart = (Math.abs(cx2 - p.x) + Math.abs(cy2 - p.y)) < 3;
-    const isFarthest = farthestForLake && r === farthestForLake;
-    return !isStart && !isFarthest && r.w >= 5 && r.h >= 5;
+  // 4. Pond rooms: 1-2 rooms are partially flooded (40-60% water, stepping stones dotted through).
+  //    These feel like natural underground pools rather than a random overlay.
+  const farthestRoom = getFarthestRoom(p.x, p.y);
+  const allRooms = shuffle([...state.rooms]);
+  let pondsPlaced = 0;
+  for (const pr of allRooms) {
+    if (pondsPlaced >= 2) break;
+    const pCx = pr.x + Math.floor(pr.w / 2), pCy = pr.y + Math.floor(pr.h / 2);
+    const isStart = Math.abs(pCx - p.x) + Math.abs(pCy - p.y) < 4;
+    const isFarthest = farthestRoom && pr === farthestRoom;
+    if (isStart || isFarthest || pr.w < 4 || pr.h < 4) continue;
+    // Flood part of the room interior from one edge inward
+    const floorTiles = [];
+    for (let py = pr.y + 1; py < pr.y + pr.h - 1; py++) {
+      for (let px = pr.x + 1; px < pr.x + pr.w - 1; px++) {
+        if (getTile(px, py) === T.FLOOR) floorTiles.push({ x: px, y: py });
+      }
+    }
+    if (floorTiles.length < 4) continue;
+    const targetWater = Math.floor(floorTiles.length * (0.40 + Math.random() * 0.20));
+    // Grow water from a random interior seed point
+    const seed = floorTiles[Math.floor(Math.random() * floorTiles.length)];
+    const pondFrontier = [seed];
+    const pondVisited = new Set([seed.y * MAP_W + seed.x]);
+    let pondCount = 0;
+    const pondStones = [];
+    while (pondFrontier.length > 0 && pondCount < targetWater) {
+      const fi = Math.floor(Math.random() * pondFrontier.length);
+      const cur = pondFrontier.splice(fi, 1)[0];
+      if (getTile(cur.x, cur.y) !== T.FLOOR) continue;
+      if (Math.random() < 0.15) {
+        setTile(cur.x, cur.y, T.STEPPING_STONE);
+        pondStones.push({ x: cur.x, y: cur.y });
+      } else {
+        setTile(cur.x, cur.y, T.WATER);
+      }
+      pondCount++;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        const key = ny * MAP_W + nx;
+        if (!pondVisited.has(key) && nx >= pr.x + 1 && nx < pr.x + pr.w - 1 && ny >= pr.y + 1 && ny < pr.y + pr.h - 1) {
+          pondVisited.add(key);
+          if (getTile(nx, ny) === T.FLOOR) pondFrontier.push({ x: nx, y: ny });
+        }
+      }
+    }
+    // Ensure at least 2 stepping stones for traversal
+    if (pondStones.length < 2) {
+      for (let py = pr.y + 1; py < pr.y + pr.h - 1 && pondStones.length < 2; py++) {
+        for (let px = pr.x + 1; px < pr.x + pr.w - 1 && pondStones.length < 2; px++) {
+          if (getTile(px, py) === T.WATER) {
+            setTile(px, py, T.STEPPING_STONE);
+            pondStones.push({ x: px, y: py });
+          }
+        }
+      }
+    }
+    // Connectivity check — revert entire pond if it breaks access
+    if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
+      for (const ft of floorTiles) {
+        const t = getTile(ft.x, ft.y);
+        if (t === T.WATER || t === T.STEPPING_STONE) setTile(ft.x, ft.y, T.FLOOR);
+      }
+    } else {
+      pondsPlaced++;
+    }
+  }
+
+  // 5. Lake room: one larger room is fully flooded with stepping stones threading through.
+  //    Choose a room not used as a pond, start room, or farthest room.
+  const usedPondRooms = new Set();
+  const lakeCandidates = state.rooms.filter(r => {
+    const lCx = r.x + Math.floor(r.w / 2), lCy = r.y + Math.floor(r.h / 2);
+    const isStart = Math.abs(lCx - p.x) + Math.abs(lCy - p.y) < 3;
+    const isFarthest = farthestRoom && r === farthestRoom;
+    return !isStart && !isFarthest && !usedPondRooms.has(r) && r.w >= 5 && r.h >= 5;
   });
-  if (eligibleRooms.length > 0) {
-    const lakeRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
+  if (lakeCandidates.length > 0) {
+    const lakeRoom = lakeCandidates[Math.floor(Math.random() * lakeCandidates.length)];
     const stones = [];
-    // Flood interior (exclude 1-tile border) with WATER, scatter stepping stones
     for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1; ly++) {
       for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1; lx++) {
         if (getTile(lx, ly) === T.FLOOR) {
-          if (Math.random() < 0.12) {
+          if (Math.random() < 0.14) {
             setTile(lx, ly, T.STEPPING_STONE);
             stones.push({ x: lx, y: ly });
           } else {
@@ -2303,7 +2542,7 @@ function carveWaterFeatures() {
         }
       }
     }
-    // Ensure at least 3 stepping stones
+    // Guarantee at least 3 stones so traversal is always possible
     if (stones.length < 3) {
       for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1 && stones.length < 3; ly++) {
         for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1 && stones.length < 3; lx++) {
@@ -2314,7 +2553,7 @@ function carveWaterFeatures() {
         }
       }
     }
-    // Place an item on one stepping stone
+    // Place an item reward on a stepping stone
     if (stones.length > 0) {
       const st = stones[Math.floor(Math.random() * stones.length)];
       const lakeItem = generateRandomItem(state.floor);
@@ -2322,7 +2561,7 @@ function carveWaterFeatures() {
     }
   }
 
-  // 5. Stalagmites: in 2-3 rooms, place 2-4 STALAGMITE tiles at random FLOOR positions
+  // 6. Stalagmites: geological formations in 2-3 dry rooms
   const stagRooms = shuffle([...state.rooms]).slice(0, 2 + Math.floor(Math.random() * 2));
   for (const sRoom of stagRooms) {
     const count = 2 + Math.floor(Math.random() * 3);
@@ -2332,13 +2571,11 @@ function carveWaterFeatures() {
     for (let attempt = 0; attempt < 30 && placed < count; attempt++) {
       const sx = sRoom.x + 1 + Math.floor(Math.random() * (sRoom.w - 2));
       const sy = sRoom.y + 1 + Math.floor(Math.random() * (sRoom.h - 2));
-      // Don't place at room center or on non-floor tiles
       if (sx === midX && sy === midY) continue;
       if (getTile(sx, sy) !== T.FLOOR) continue;
-      // Don't block connectivity — temporarily place and check
       setTile(sx, sy, T.STALAGMITE);
       if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
-        setTile(sx, sy, T.FLOOR); // revert
+        setTile(sx, sy, T.FLOOR);
       } else {
         placed++;
       }
@@ -3598,52 +3835,6 @@ function spawnMounds() {
   }
 }
 
-// Icy Path: clusters of 3-5 connected ICY_PATH tiles in Crypt biome (floors 5-8).
-// Player slides 1 extra tile in movement direction on entry (unless blocked).
-function spawnIcyPaths() {
-  if (state.floor < 5 || state.floor > 8 || state.floor >= MAX_FLOOR) return;
-  const clusterCount = 1 + Math.floor(Math.random() * 3);
-  for (let c = 0; c < clusterCount; c++) {
-    // Start from a random corridor or floor tile
-    let startPos = null;
-    for (let attempts = 0; attempts < 50; attempts++) {
-      const x = 2 + Math.floor(Math.random() * (MAP_W - 4));
-      const y = 2 + Math.floor(Math.random() * (MAP_H - 4));
-      const t = getTile(x, y);
-      if (t === T.CORRIDOR || t === T.FLOOR) {
-        if (Math.abs(x - state.player.x) > 3 || Math.abs(y - state.player.y) > 3) {
-          startPos = { x, y };
-          break;
-        }
-      }
-    }
-    if (!startPos) continue;
-    // Flood-fill up to 5 connected tiles
-    const tileCount = 3 + Math.floor(Math.random() * 3);
-    const frontier = [startPos];
-    const visited = new Set();
-    visited.add(startPos.y * MAP_W + startPos.x);
-    let count = 0;
-    while (frontier.length > 0 && count < tileCount) {
-      const idx = Math.floor(Math.random() * frontier.length);
-      const cur = frontier.splice(idx, 1)[0];
-      const t = getTile(cur.x, cur.y);
-      if (t !== T.CORRIDOR && t !== T.FLOOR) continue;
-      setTile(cur.x, cur.y, T.ICY_PATH);
-      count++;
-      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-        const nx = cur.x + dx, ny = cur.y + dy;
-        const key = ny * MAP_W + nx;
-        if (!visited.has(key) && nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1) {
-          visited.add(key);
-          const nt = getTile(nx, ny);
-          if (nt === T.CORRIDOR || nt === T.FLOOR) frontier.push({ x: nx, y: ny });
-        }
-      }
-    }
-  }
-}
-
 // Fire Path: clusters of T.FIRE_PATH tiles in Citadel (9-12) and Abyss (13-16) biomes.
 // Deals 1 HP/turn while standing. Extinguished by frozen/ice status.
 function spawnFirePaths() {
@@ -4724,12 +4915,16 @@ function killEnemy(enemy) {
   checkBadgesOnKill(enemy);
   unlockCodexEntry('bestiary_' + enemy.name.toLowerCase().replace(/\s+/g, '_'));
 
-  // Check level up
+  // Check level up — delay popup until enemy death animation finishes (350ms particles)
+  let didLevelUp = false;
   while (state.player.xp >= state.player.xpToNext) {
     state.player.xp -= state.player.xpToNext;
     state.player.level++;
     state.player.xpToNext = 15 + state.player.level * 10;
-    showLevelUp();
+    didLevelUp = true;
+  }
+  if (didLevelUp) {
+    setTimeout(showLevelUp, 420);
   }
 }
 
@@ -6002,17 +6197,6 @@ function playerMove(dx, dy) {
 
   // === SPECIAL TERRAIN ENTRY EFFECTS ===
 
-  // ICY PATH — slide one extra tile in the same direction (unless blocked)
-  if (getTile(nx, ny) === T.ICY_PATH) {
-    const slideX = nx + moveDx, slideY = ny + moveDy;
-    if (isWalkable(slideX, slideY) && !enemyAt(slideX, slideY)) {
-      p.x = slideX;
-      p.y = slideY;
-      Audio.step();
-      addMessage('You slip on the ice!', '');
-    }
-  }
-
   // MOUND — set pending slow flag (costs 2 turns to enter)
   if (getTile(p.x, p.y) === T.MOUND && !p.moundSlowPending) {
     p.moundSlowPending = true;
@@ -6542,8 +6726,12 @@ function playerDescend() {
       updateUI();
       const newBiome = getBiomeKey(state.floor);
       Audio.startAmbient(newBiome);
-      const briefCard = newBiome === getBiomeKey(state.floor - 1);
-      showFloorCard(state.floor, newBiome, () => { inputLocked = false; }, briefCard);
+      const prevBiome = getBiomeKey(state.floor - 1);
+      if (newBiome !== prevBiome) {
+        showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
+      } else {
+        inputLocked = false;
+      }
     } catch (err) {
       console.error('[Glyph Depths] Descend transition failed:', err);
       addMessage('The descent wavers, but you regain your footing.', 'damage');
@@ -9236,10 +9424,6 @@ function render() {
         case T.MOUND:
           tileGlyph = '^';
           tileColor = vis ? '#8a6030' : '#3a2810';
-          break;
-        case T.ICY_PATH:
-          tileGlyph = '·';
-          tileColor = vis ? '#a0e8f8' : '#304858';
           break;
         case T.FIRE_PATH:
           tileGlyph = '▒';
@@ -11958,9 +12142,6 @@ function renderMinimap() {
           break;
         case T.MOUND:
           ctx.fillStyle = vis ? '#8a6030' : '#3a2810';
-          break;
-        case T.ICY_PATH:
-          ctx.fillStyle = vis ? '#80d8f0' : '#203040';
           break;
         case T.FIRE_PATH:
           ctx.fillStyle = vis ? '#e05010' : '#501808';
