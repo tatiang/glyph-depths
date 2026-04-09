@@ -1329,7 +1329,7 @@ function createPlayer(classId = 'berserker') {
     doubleShot: false,
     // Teleport sight
     teleportSight: ['rogue', 'escapeartist'].includes(classId),
-    wallTrap: null,
+    // wallTrap removed (bolt traps disabled)
     webSlowSkip: false,
     moundSlowPending: false,
     enchantedImmunityRoomIdx: -1,
@@ -2474,7 +2474,9 @@ function createEnemy(template, x, y) {
     confused: 0,
     // Boss specific
     phase: 1,
-    teleportCooldown: 0
+    teleportCooldown: 0,
+    // Mimic disguise: random class icon
+    disguiseGlyph: template.special === 'mimic' ? CLASS_DEFS[Math.floor(Math.random() * CLASS_DEFS.length)].icon : undefined
   };
 }
 
@@ -5675,28 +5677,6 @@ function playerMove(dx, dy) {
 
   const nx = p.x + moveDx, ny = p.y + moveDy;
 
-  // === WALL TRAP RESOLUTION ===
-  // If a bolt trap was primed on the previous turn, resolve it now.
-  // Moving perpendicular to the trap axis dodges it; any other move gets hit.
-  if (p.wallTrap) {
-    const trap = p.wallTrap;
-    p.wallTrap = null;
-    const dodged = (trap.axis === 'x' && moveDx === 0 && moveDy !== 0) ||
-                   (trap.axis === 'y' && moveDy === 0 && moveDx !== 0);
-    if (dodged) {
-      addMessage('You sidestep the bolt — it sparks off the wall!', 'good');
-    } else {
-      const dmg = Math.max(1, Math.min(8, 3 + Math.floor(state.floor / 3)) - p.defense);
-      p.hp -= dmg;
-      addMessage(`⚡ A bolt strikes you from the wall! (-${dmg} HP)`, 'damage');
-      haptic(50);
-      screenShake();
-      animateEntityFlash(p.x, p.y, '#ff4040');
-      updateUI();
-      if (p.hp <= 0) { playerDeath('a wall trap', '⚡'); return; }
-    }
-  }
-
   // Webbed — skip movement
   if (hasStatusEffect(p, 'webbed')) {
     addMessage('You struggle free from the web!', '');
@@ -6016,21 +5996,6 @@ function playerMove(dx, dy) {
     }
   }
 
-  // === WALL TRAP: ROOM ENTRY CHECK ===
-  // When entering a room from a corridor, there's a chance a hidden bolt trap fires next turn.
-  // Floors 3+ only; each room can only prime once per visit (tracked by p.wallTrap being null).
-  if (state.floor >= 3 && !p.wallTrap) {
-    const wasInRoom = state.rooms.some(r =>
-      oldX >= r.x && oldX < r.x + r.w && oldY >= r.y && oldY < r.y + r.h);
-    const nowInRoom = state.rooms.some(r =>
-      p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
-    if (!wasInRoom && nowInRoom && Math.random() < 0.20) {
-      p.wallTrap = { axis: Math.abs(moveDx) > 0 ? 'x' : 'y' };
-      addMessage('⚠️ A section of wall slides open — a trap is primed!', 'damage');
-      animateEntityFlash(p.x, p.y, '#ff8000');
-    }
-  }
-
   // Check for items on ground
   autoPickup();
 
@@ -6330,6 +6295,20 @@ function pickupItem(itemEntity) {
       return;
     }
   }
+  // Stack songs of the same type
+  if (itemEntity.item.itemType === 'song') {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === 'song' && i.songId === itemEntity.item.songId
+    );
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      state.itemsFound++;
+      addMessage(`You pick up ${itemEntity.item.name}. (×${existing.count})`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
   if (state.player.inventory.length >= MAX_INVENTORY) {
     addMessage(`Inventory full! Cannot pick up ${itemEntity.item.glyph} ${itemEntity.item.name}.`, 'damage');
     showPopupNotice('Inventory Full');
@@ -6513,6 +6492,10 @@ function useItem(item, index) {
 
   switch (item.itemType) {
     case 'weapon':
+      if (p.equipped.weapon?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.weapon.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks refuse to wield weapons.', 'damage');
         return;
@@ -6535,6 +6518,10 @@ function useItem(item, index) {
       break;
 
     case 'armor':
+      if (p.equipped.armor?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.armor.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks do not wear armor.', 'damage');
         return;
@@ -6556,6 +6543,10 @@ function useItem(item, index) {
       break;
 
     case 'ring':
+      if (p.equipped.ring?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.ring.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.equipped.ring) p.inventory.push(p.equipped.ring);
       p.equipped.ring = item;
       p.inventory.splice(index, 1);
@@ -6606,6 +6597,10 @@ function useItem(item, index) {
       return;
 
     case 'ranged':
+      if (p.equipped.ranged?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.ranged.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks do not use ranged weapons.', 'damage');
         return;
@@ -6700,7 +6695,7 @@ function useItem(item, index) {
       }
       if (!p.songMastery && Math.random() < 0.5) {
         addMessage('You fumble the melody. The song is wasted.', 'damage');
-        p.inventory.splice(p.inventory.indexOf(item), 1);
+        if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(p.inventory.indexOf(item), 1); }
         updateUI();
         endTurn();
         return;
@@ -6709,7 +6704,7 @@ function useItem(item, index) {
       addMessage(`🎵 You play ${item.name}!`, 'good');
       haptic(30);
       Audio.gold();
-      p.inventory.splice(p.inventory.indexOf(item), 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(p.inventory.indexOf(item), 1); }
       updateUI();
       endTurn();
       return;
@@ -7277,6 +7272,24 @@ function renderShopItems(merchant) {
             state.player.inventory.push({ ...shopItem.item });
             addMessage(`You buy ${shopItem.item.name}.`, 'good');
             if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
+          }
+        } else if (shopItem.item.itemType === 'song' || shopItem.item.itemType === 'potion' || shopItem.item.itemType === 'scroll') {
+          // Stack songs, potions, scrolls
+          const matchKey = shopItem.item.itemType === 'song' ? 'songId' : 'effectId';
+          const existing = state.player.inventory.find(i =>
+            i.itemType === shopItem.item.itemType && i[matchKey] === shopItem.item[matchKey]
+          );
+          if (existing) {
+            existing.count = (existing.count || 1) + 1;
+            addMessage(`You buy ${shopItem.item.name}. (×${existing.count})`, 'good');
+          } else if (state.player.inventory.length >= MAX_INVENTORY) {
+            const bought = { ...shopItem.item };
+            state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: bought.glyph, item: bought });
+            addMessage(`Inventory full — ${bought.name} dropped at your feet.`, 'damage');
+          } else {
+            const bought = { ...shopItem.item, count: 1 };
+            state.player.inventory.push(bought);
+            addMessage(`You buy ${shopItem.item.name}.`, 'good');
           }
         } else if (state.player.inventory.length >= MAX_INVENTORY) {
           // Drop purchased item on the ground at player's feet
@@ -9260,7 +9273,7 @@ function render() {
             ctx.globalAlpha = 1.0;
             break; // Stop at first enemy in this direction
           }
-          if (!isWalkable(tx, ty)) break;
+          { const tt = getTile(tx, ty); if (!isWalkable(tx, ty) && tt !== T.WATER && tt !== T.WATERFALL) break; }
           // Highlight path tile
           ctx.globalAlpha = 0.12;
           ctx.fillStyle = '#ffd700';
@@ -9555,16 +9568,14 @@ function render() {
       if (dist > 3) continue; // completely invisible at distance
     }
 
-    // Mimic looks like a chest until adjacent
-    if (e.special === 'mimic' && e.alertness < 2) {
-      const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
-      if (dist > 1) {
-        const sx = (e.x - camX) * ts + ts / 2;
-        const sy = (e.y - camY) * ts + ts / 2;
-        ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-        ctx.fillText('📦', sx, sy);
-        continue;
-      }
+    // Mimic disguise: shows class icon when undamaged/unaware, box when revealed
+    if (e.special === 'mimic') {
+      const revealed = e.hp < e.maxHp || e.alertness >= 2;
+      const sx = (e.x - camX) * ts + ts / 2;
+      const sy = (e.y - camY) * ts + ts / 2;
+      ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+      ctx.fillText(revealed ? '📦' : (e.disguiseGlyph || '📦'), sx, sy);
+      if (!revealed) continue;
     }
 
     const sx = (e.x - camX) * ts + ts / 2;
@@ -10717,36 +10728,11 @@ function setupInput() {
   };
   spBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    // Hold-to-activate: hold 300ms
-    spHoldTimer = setTimeout(() => {
-      spHoldTimer = null;
-      doSpecial();
-    }, 300);
   }, { passive: false });
   spBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (state?.throwMode && state.throwItem?.item?.itemType === 'aimed_shot') {
-      if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
-      doSpecial();
-      spLastTap = 0;
-      return;
-    }
-    if (spHoldTimer) {
-      clearTimeout(spHoldTimer);
-      spHoldTimer = null;
-      // Double-tap check: two taps within 400ms
-      const now = Date.now();
-      if (now - spLastTap < 400) {
-        doSpecial();
-        spLastTap = 0;
-      } else {
-        spLastTap = now;
-      }
-    }
+    doSpecial();
   }, { passive: false });
-  spBtn.addEventListener('touchcancel', () => {
-    if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
-  });
   // Keyboard / mouse click (desktop) — works immediately
   spBtn.addEventListener('click', (e) => {
     // Ignore if touch event handled it
@@ -12724,7 +12710,16 @@ function throwProjectile(dx, dy, isSecondShot) {
       }
       break;
     }
-    if (!isWalkable(x, y)) break;
+    { const tt = getTile(x, y); if (!isWalkable(x, y) && tt !== T.WATER && tt !== T.WATERFALL) break; }
+    // Spider web catch: 40% chance to snag physical projectiles
+    if (!isAcidBolt && !isArcaneDart && !isBishopMissile && !isBishopSleep) {
+      const webHere = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === x && e.y === y);
+      if (webHere && Math.random() < 0.40) {
+        addMessage(`🕸 Your ${item.name || 'projectile'} is caught in a spider web!`, 'damage');
+        removeEntity(webHere);
+        break;
+      }
+    }
     landX = x; landY = y;
     x += dx;
     y += dy;
