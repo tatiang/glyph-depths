@@ -9098,19 +9098,10 @@ function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
 
-  // iOS Safari (non-standalone) blocks signInWithPopup due to cross-origin storage
-  // partitioning (ITP). Use signInWithRedirect instead — the page navigates to Google
-  // and back. The result is picked up by getRedirectResult() in initFirebase().
-  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
-  if (isIOS && window.navigator.standalone !== true) {
-    try { sessionStorage.setItem('glyphdepths_auth_redirect', '1'); } catch(e) {}
-    return firebase.auth().signInWithRedirect(provider).then(() => {
-      // Page is about to navigate away; return a promise that never resolves
-      // so the caller's .then() doesn't fire before navigation completes.
-      return new Promise(() => {});
-    });
-  }
-
+  // signInWithPopup works on all non-standalone platforms including iOS Safari and
+  // Chrome iOS. It uses postMessage between windows, which is NOT affected by ITP.
+  // (signInWithRedirect was previously used on iOS but its getRedirectResult() relies
+  // on a cross-origin iframe that IS blocked by ITP — causing silent sign-in failure.)
   return new Promise((resolve, reject) => {
     let settled = false;
     function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
@@ -9130,13 +9121,15 @@ function cloudSignIn() {
     // On mobile, signInWithPopup opens a new tab. If the Firebase auth
     // handler at authDomain fails, the promise above never settles. Detect
     // when the user returns to the app tab and fail gracefully.
+    // Use a generous timeout (8s) since iOS can throttle JS in background tabs,
+    // delaying postMessage delivery until the original tab regains focus.
     function onVisible() {
       if (document.visibilityState !== 'visible' || settled) return;
       setTimeout(() => {
         if (settled) return;
         settle();
         reject(new Error('Sign-in did not complete.'));
-      }, 3000);
+      }, 8000);
     }
     // Delay listener so the initial tab-switch from opening the popup doesn't trigger it
     setTimeout(() => { if (!settled) document.addEventListener('visibilitychange', onVisible); }, 1500);
