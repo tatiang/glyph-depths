@@ -9096,12 +9096,23 @@ function initFirebase() {
 
 function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
-  const provider = new firebase.auth.GoogleAuthProvider();
 
-  // signInWithPopup works on all non-standalone platforms including iOS Safari and
-  // Chrome iOS. It uses postMessage between windows, which is NOT affected by ITP.
-  // (signInWithRedirect was previously used on iOS but its getRedirectResult() relies
-  // on a cross-origin iframe that IS blocked by ITP — causing silent sign-in failure.)
+  // On non-standalone iOS, both signInWithPopup and signInWithRedirect route through
+  // Firebase's auth handler at firebaseapp.com. That handler stores its OAuth state in
+  // sessionStorage, but iOS (Safari and Chrome) clears sessionStorage during cross-origin
+  // redirects (Google → firebaseapp.com), producing "missing initial state" errors.
+  //
+  // Fix: use Google Identity Services (GIS) on iOS. GIS delivers the token via a direct
+  // postMessage from Google's popup — no Firebase auth handler, no sessionStorage needed.
+  // We fetch the OAuth client ID dynamically from Firebase's identitytoolkit API so no
+  // manual configuration is required.
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
+  if (isIOS && window.navigator.standalone !== true) {
+    return _cloudSignInGIS();
+  }
+
+  // Desktop / non-iOS: Firebase's built-in popup flow works fine.
+  const provider = new firebase.auth.GoogleAuthProvider();
   return new Promise((resolve, reject) => {
     let settled = false;
     function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
@@ -9118,11 +9129,8 @@ function cloudSignIn() {
       reject(err);
     });
 
-    // On mobile, signInWithPopup opens a new tab. If the Firebase auth
-    // handler at authDomain fails, the promise above never settles. Detect
-    // when the user returns to the app tab and fail gracefully.
-    // Use a generous timeout (8s) since iOS can throttle JS in background tabs,
-    // delaying postMessage delivery until the original tab regains focus.
+    // On mobile, signInWithPopup opens a new tab. If the Firebase auth handler fails,
+    // the promise never settles — detect return to the app tab and fail gracefully.
     function onVisible() {
       if (document.visibilityState !== 'visible' || settled) return;
       setTimeout(() => {
@@ -9131,8 +9139,64 @@ function cloudSignIn() {
         reject(new Error('Sign-in did not complete.'));
       }, 8000);
     }
-    // Delay listener so the initial tab-switch from opening the popup doesn't trigger it
     setTimeout(() => { if (!settled) document.addEventListener('visibilitychange', onVisible); }, 1500);
+  });
+}
+
+// iOS-specific sign-in via Google Identity Services (GIS).
+// GIS tokens arrive through postMessage from a Google-owned popup — the Firebase auth
+// handler at firebaseapp.com is never involved, so iOS storage partitioning can't break it.
+function _cloudSignInGIS() {
+  return new Promise((resolve, reject) => {
+    // Step 1: ask Firebase's identitytoolkit for Google's OAuth URL so we can
+    // extract the client_id without any manual configuration.
+    fetch(
+      'https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=' + FIREBASE_CONFIG.apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId: 'google.com', continueUri: location.href })
+      }
+    )
+    .then(r => r.json())
+    .then(data => {
+      if (!data.authUri) throw new Error('Could not get auth URI from Firebase');
+      const clientId = new URL(data.authUri).searchParams.get('client_id');
+      if (!clientId) throw new Error('Could not extract OAuth client_id');
+      return _loadGIS().then(() => clientId);
+    })
+    .then(clientId => new Promise((res, rej) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'email profile openid',
+        callback: tokenResponse => {
+          if (tokenResponse.error) { rej(new Error(tokenResponse.error)); return; }
+          res(firebase.auth.GoogleAuthProvider.credential(null, tokenResponse.access_token));
+        },
+        error_callback: err => rej(new Error(err.type || 'GIS sign-in error'))
+      });
+      client.requestAccessToken();
+    }))
+    .then(credential => firebase.auth().signInWithCredential(credential))
+    .then(result => {
+      firebaseUser = result.user;
+      addMessage('\u2601\uFE0F Signed in as ' + (firebaseUser.displayName || firebaseUser.email), 'good');
+      resolve(firebaseUser);
+    })
+    .catch(reject);
+  });
+}
+
+function _loadGIS() {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+      resolve(); return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+    document.head.appendChild(s);
   });
 }
 
