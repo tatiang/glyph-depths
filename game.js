@@ -720,7 +720,7 @@ const BISHOP_SPELLS = [
   { id: 'magic_missile', name: 'Magic Missile', icon: '✨', levelReq: 1, cooldown: 4,  type: 'ranged',
     desc: (p) => `${2 + Math.floor(p.level / 3)} damage, range 8` },
   { id: 'minor_heal',    name: 'Minor Heal',    icon: '💚', levelReq: 1, cooldown: 8,  type: 'self',
-    desc: () => 'Heal 15% max HP' },
+    desc: () => 'Heal 25% max HP (min 3)' },
   { id: 'identify',      name: 'Identify',      icon: '📖', levelReq: 3, cooldown: 0,  type: 'instant',
     desc: () => 'Reveal 1 unknown item type (free)' },
   { id: 'sleep',         name: 'Sleep',         icon: '😴', levelReq: 3, cooldown: 10, type: 'ranged',
@@ -734,7 +734,7 @@ const BISHOP_SPELLS = [
   { id: 'uncurse',       name: 'Uncurse',       icon: '🛡️', levelReq: 7, cooldown: 0,  type: 'instant',
     desc: () => 'Remove curse from all equipped items (free)' },
   { id: 'arcane_storm',  name: 'Arcane Storm',  icon: '⚡', levelReq: 9, cooldown: 20, type: 'room_all',
-    desc: (p) => `${4 + p.level} dmg to all visible enemies` },
+    desc: (p) => `${5 + Math.floor(p.level / 2)} dmg to all visible enemies` },
   { id: 'major_heal',    name: 'Major Heal',    icon: '💛', levelReq: 9, cooldown: 25, type: 'self',
     desc: () => 'Heal 50% max HP, cleanse poison/burn' },
 ];
@@ -1042,16 +1042,23 @@ function showClassSelect() {
     grid.className = 'class-page-grid';
 
     for (const cls of pageCls) {
-      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop') && !hasBadge('maze_master');
+      const isLocked = (
+        (cls.id === 'beastmaster' && !hasBadge('deep_diver')) ||
+        (cls.id === 'monk' && !hasBadge('maze_master')) ||
+        (cls.id === 'bishop' && !hasBadge('citadel_bound'))
+      );
       
       const card = document.createElement('div');
       card.className = 'class-card' + (isLocked ? ' locked-class' : '');
       
       if (isLocked) {
+        const unlockMsg = cls.id === 'beastmaster' ? 'Reach floor 8 to unlock.' :
+                          cls.id === 'monk'         ? 'Reach floor 13 to unlock.' :
+                                                      'Reach floor 15 to unlock.';
         card.innerHTML = `
           <div class="class-icon" style="filter: grayscale(1); opacity: 0.5;">🔒</div>
           <div class="class-name" style="color: #666;">Locked Class</div>
-          <div class="class-flavor" style="color: #555;">Reach maze floor 13 to unlock.</div>
+          <div class="class-flavor" style="color: #555;">${unlockMsg}</div>
         `;
       } else {
         card.innerHTML = `
@@ -1713,7 +1720,7 @@ const ENEMY_TIERS = {
 };
 
 const BOSS = {
-  name: 'Glyph King', glyph: '👑', hp: 100, attack: 10, defense: 6,
+  name: 'Glyph King', glyph: '👑', hp: 150, attack: 12, defense: 6,
   ai: 'boss', xp: 200, special: 'boss', detect: 50
 };
 
@@ -2572,19 +2579,14 @@ function spawnEnemies() {
 
 // Guarantee at least one enemy in every large room (area >= 72 tiles).
 // Runs after spawnEnemies() so it only fills rooms left empty by the normal pass.
-// Caps extra spawns to avoid flooding early floors.
 function guaranteeLargeRoomEnemies() {
   if (state.floor === MAX_FLOOR) return;
   const LARGE_ROOM_AREA = 72; // ~9×8 tiles — noticeably spacious
-  // Max extras: scales gently with floor so early levels stay manageable
-  const maxExtra = state.floor <= 3 ? 2 : state.floor <= 6 ? 3 : 99;
   const floorConfig = getFloorConfig(state.floor);
   const tier = floorConfig.tier;
   const templates = ENEMY_TIERS[tier] || ENEMY_TIERS[1];
-  let extraSpawned = 0;
 
   for (const room of state.rooms) {
-    if (extraSpawned >= maxExtra) break;
     if (room.w * room.h < LARGE_ROOM_AREA) continue;
 
     // Check if any enemy is already inside this room
@@ -2611,7 +2613,6 @@ function guaranteeLargeRoomEnemies() {
     const pos = candidates[Math.floor(Math.random() * candidates.length)];
     const template = templates[Math.floor(Math.random() * templates.length)];
     state.entities.push(createEnemy(template, pos.x, pos.y));
-    extraSpawned++;
   }
 }
 
@@ -3905,7 +3906,7 @@ function getFloorConfig(floor) {
     // Sanctum floors 21-23 (was 17-19)
     21: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 14, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
     22: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: Math.random() < 0.5 ? 1 : 0 },
-    23: { tier: 5, nextTier: null, minEnemies: 10, maxEnemies: 15, minItems: 1, maxItems: 2, food: 1 },
+    23: { tier: 5, nextTier: null, minEnemies: 16, maxEnemies: 22, minItems: 1, maxItems: 2, food: 1 },
     24: { tier: 5, nextTier: null, minEnemies: 0,  maxEnemies: 0,  minItems: 0, maxItems: 0, food: 0 }
   };
   return configs[floor] || configs[1];
@@ -5350,23 +5351,23 @@ function bossAI(enemy) {
   const px = state.player.x, py = state.player.y;
   const dist = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
 
-  // Phase transitions (3 phases)
-  if (enemy.hp <= 35 && enemy.phase === 1) {
+  // Phase transitions (3 phases based on % of max HP)
+  if (enemy.hp <= Math.floor(enemy.maxHp * 0.4) && enemy.phase === 1) {
     enemy.phase = 2;
-    enemy.attack += 2; // 10 → 12
+    enemy.attack += 2; // 12 → 14
     addMessage('The Glyph King roars! "You dare challenge a god?"', 'damage');
     screenShake();
     animateAoeBlast(enemy.x, enemy.y, 4, '#a040ff');
   }
-  if (enemy.hp <= 15 && enemy.phase === 2) {
+  if (enemy.hp <= Math.floor(enemy.maxHp * 0.2) && enemy.phase === 2) {
     enemy.phase = 3;
-    enemy.attack += 2; // 12 → 14
+    enemy.attack += 2; // 14 → 16
     enemy.defense += 2; // 6 → 8
     addMessage('The Glyph King shimmers with dark energy! FINAL PHASE!', 'damage');
     screenShake();
     animateAoeBlast(enemy.x, enemy.y, 5, '#ff2020');
-    // Heal slightly on phase 3 entry
-    enemy.hp = Math.min(enemy.maxHp, enemy.hp + 10);
+    // Heal on phase 3 entry
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + 20);
   }
 
   // Summon minions — tier scales with phase
@@ -5408,8 +5409,8 @@ function bossAI(enemy) {
     enemy.teleportCooldown--;
   }
 
-  // Phase 2+: dark bolt projectile
-  if (enemy.phase >= 2 && dist > 1 && Math.random() < (enemy.phase === 3 ? 0.6 : 0.4)) {
+  // Phase 1+: dark bolt projectile (phase 1 fires occasionally)
+  if (dist > 1 && Math.random() < (enemy.phase === 3 ? 0.6 : enemy.phase === 2 ? 0.4 : 0.2)) {
     const ddx = Math.sign(px - enemy.x);
     const ddy = Math.sign(py - enemy.y);
     let bx = enemy.x + ddx, by = enemy.y + ddy;
@@ -5429,9 +5430,9 @@ function bossAI(enemy) {
     }
   }
 
-  // Phase 3: AoE blast every few turns
-  if (enemy.phase === 3 && (enemy.aoeCooldown || 0) <= 0 && dist <= 4) {
-    const aoeDmg = 4;
+  // Phase 2+: AoE blast (phase 2 is weaker and less frequent than phase 3)
+  if (enemy.phase >= 2 && (enemy.aoeCooldown || 0) <= 0 && dist <= 4) {
+    const aoeDmg = enemy.phase === 3 ? 6 : 3;
     if (dist <= 3) {
       state.player.hp -= aoeDmg;
       addMessage(`The Glyph King unleashes a glyph nova! (-${aoeDmg} HP)`, 'damage');
@@ -5441,7 +5442,7 @@ function bossAI(enemy) {
       if (state.player.hp <= 0) { playerDeath('Glyph King', '👑'); return; }
     }
     animateAoeBlast(enemy.x, enemy.y, 3, '#a040ff');
-    enemy.aoeCooldown = 4;
+    enemy.aoeCooldown = enemy.phase === 3 ? 3 : 5;
   } else if (enemy.aoeCooldown > 0) {
     enemy.aoeCooldown--;
   }
@@ -13593,7 +13594,7 @@ function castBishopSpell(spell) {
   const cd = p.arcaneResonance ? Math.max(1, baseCd - 2) : baseCd;
 
   if (spell.id === 'minor_heal') {
-    const heal = Math.max(1, Math.floor(p.maxHp * 0.15));
+    const heal = Math.max(3, Math.floor(p.maxHp * 0.25));
     p.hp = Math.min(p.maxHp, p.hp + heal);
     addMessage(`💚 Minor Heal: +${heal} HP`, 'good');
     haptic(30);
@@ -13696,7 +13697,7 @@ function castBishopSpell(spell) {
     // No cooldown for Uncurse
 
   } else if (spell.id === 'arcane_storm') {
-    const dmg = Math.max(1, 4 + p.level);
+    const dmg = Math.max(1, 5 + Math.floor(p.level / 2));
     let hits = 0;
     const visibleEnemies = state.entities.filter(e =>
       e.type === 'enemy' && e.hp > 0 && !e.isAlly &&
