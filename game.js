@@ -751,6 +751,18 @@ function preloadClassImages() {
   }
 }
 
+// Preloaded Image objects for enemy sprites (keyed by img path)
+const enemyImageCache = {};
+function preloadEnemyImages() {
+  for (const path of ['images/hound.png', 'images/slime.png']) {
+    if (!enemyImageCache[path]) {
+      const img = new Image();
+      img.src = path;
+      enemyImageCache[path] = img;
+    }
+  }
+}
+
 const LEGACY_CLASS_REMAP = {
   adventurer: 'beastmaster',
   wizard: 'darkwizard',
@@ -857,7 +869,8 @@ function ensureBeastmasterHound() {
     ai: 'ally',
     xp: 0,
     special: null,
-    detect: 8
+    detect: 8,
+    img: 'images/hound.png'
   }, state.player.x, state.player.y);
   hound.isAlly = true;
   hound.ai = 'ally';
@@ -891,6 +904,7 @@ function boot() {
   canvas = $('game-canvas');
   ctxC = canvas.getContext('2d');
   preloadClassImages();
+  preloadEnemyImages();
   loadSettings();
   loadBadges();
   loadCodex();
@@ -1627,6 +1641,7 @@ const CODEX_BESTIARY_DATA = [
   { id: 'bestiary_goblin',           icon: '👺', cat: 'bestiary', title: 'Goblin',              text: 'Former scavengers who found the depths profitable and stopped leaving. Cunning, greedy, surprisingly resilient. They learned to navigate the runes. Now they enforce them.' },
   { id: 'bestiary_ghost',            icon: '👻', cat: 'bestiary', title: 'Ghost',               text: 'The restless dead who refused the Crypt\'s hospitality. Phase-shifted by unresolved purpose, they drift through walls searching for something they\'ve forgotten they lost.' },
   { id: 'bestiary_spider',           icon: '🕷️', cat: 'bestiary', title: 'Spider',              text: 'Cave spiders grew enormous in the dark and learned patience. Their webs are woven from crystallized silence — step in one and the world goes very, very quiet.' },
+  { id: 'bestiary_blackwidow',       icon: '🕷️', cat: 'bestiary', title: 'Black Widow',         text: 'A crimson hourglass marks its belly — rune-laced venom that began its work long before you noticed the bite. Patience has many forms in the dark.' },
   { id: 'bestiary_ogre',             icon: '👹', cat: 'bestiary', title: 'Ogre',                text: 'The dungeon\'s groundskeepers, kept loyal by choice glyphs. Strong enough to move rubble, too dim to ask questions. The runes gave them duty and took their doubts.' },
   { id: 'bestiary_wraith',           icon: '🌑', cat: 'bestiary', title: 'Wraith',              text: 'Creatures of pure hunger — life-draining echoes that have forgotten everything but the cold. They weep as they kill. The tears are the worst part.' },
   { id: 'bestiary_mimic',            icon: '📦', cat: 'bestiary', title: 'Mimic',               text: 'Items that absorbed too much ambient glyph energy and developed appetite. Not malice — just terrible, fundamental loneliness expressed through teeth.' },
@@ -1677,12 +1692,13 @@ const ENEMY_TIERS = {
     { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
     { name: 'Skeleton', glyph: '💀', hp: 4, attack: 2, defense: 0, ai: 'patrol', xp: 4, special: null, detect: 6 },
     { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
-    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true }
+    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true, img: 'images/slime.png' }
   ],
   2: [
     { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
     { name: 'Ghost', glyph: '👻', hp: 6, attack: 3, defense: 0, ai: 'chase', xp: 10, special: 'phase', detect: 8 },
     { name: 'Spider', glyph: '🕷️', hp: 5, attack: 2, defense: 0, ai: 'ambush', xp: 6, special: 'web', detect: 4 },
+    { name: 'Black Widow', glyph: '🕷️', hp: 7, attack: 3, defense: 0, ai: 'ambush', xp: 10, special: 'venom', detect: 5 },
     { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 },
     { name: 'Cave Lurker', glyph: '🦎', hp: 6, attack: 4, defense: 0, ai: 'ambush', xp: 9, special: 'ambush_strike', detect: 5 },
     { name: 'River Shade', glyph: '🌊', hp: 9, attack: 3, defense: 1, ai: 'patrol', xp: 10, special: 'aquatic', detect: 7 },
@@ -2465,6 +2481,7 @@ function createEnemy(template, x, y) {
     special: template.special,
     detect: template.detect,
     slowMove: template.slowMove || false,
+    img: template.img || null,
     alertness: 0, // 0=unaware, 1=suspicious, 2=hostile
     turnSkip: false, // for slow enemies
     summonCooldown: 0,
@@ -3711,11 +3728,13 @@ function spawnEnchantedWalls() {
   let placed = 0;
   for (let c = 0; c < count && placed < count; c++) {
     const room = candidates[Math.floor(Math.random() * candidates.length)];
-    // Find wall tiles on the room perimeter
+    // Find wall tiles on the room perimeter (edge only, never interior)
     const wallTiles = [];
     for (let ry = room.y - 1; ry <= room.y + room.h; ry++) {
       for (let rx = room.x - 1; rx <= room.x + room.w; rx++) {
-        if (getTile(rx, ry) === T.WALL) wallTiles.push({ x: rx, y: ry });
+        const isEdge = ry === room.y - 1 || ry === room.y + room.h ||
+                       rx === room.x - 1 || rx === room.x + room.w;
+        if (isEdge && getTile(rx, ry) === T.WALL) wallTiles.push({ x: rx, y: ry });
       }
     }
     if (wallTiles.length === 0) continue;
@@ -4425,6 +4444,12 @@ function attackEntity(attacker, defender) {
     addMessage('You are caught in a web!', 'damage');
   }
 
+  // Black Widow venom — 50% chance to poison on hit
+  if (attacker.special === 'venom' && targetIsPlayer && !state.player.poisonImmune && Math.random() < 0.5) {
+    applyStatusEffect(state.player, 'poison', 6);
+    addMessage("The Black Widow's bite is venomous!", 'damage');
+  }
+
   // Check death
   if (defender.hp <= 0) {
     if (targetIsPlayer) {
@@ -4595,7 +4620,7 @@ function killEnemy(enemy) {
     if (existingMinis < maxMinis) {
       const template = isHydra
         ? { name: 'Hatchling', glyph: '🐍', hp: 6, attack: 3, defense: 1, ai: 'chase', xp: 5, special: null, detect: 6 }
-        : { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true };
+        : { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true, img: 'images/slime.png' };
       let spawned = 0;
       for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
         if (spawned >= (isHydra ? 3 : 2)) break;
@@ -5983,11 +6008,13 @@ function playerMove(dx, dy) {
   if (nowRoom) {
     const nowRoomIdx = state.rooms.indexOf(nowRoom);
     for (const ew of state.entities.filter(e => e.type === 'enchanted_wall' && e.roomIdx === nowRoomIdx)) {
-      // Find a random wall tile in this room (different from current position)
+      // Find a random wall tile on the room edge (border only, never interior)
       const wallTiles = [];
       for (let ry = nowRoom.y - 1; ry <= nowRoom.y + nowRoom.h; ry++) {
         for (let rx = nowRoom.x - 1; rx <= nowRoom.x + nowRoom.w; rx++) {
-          if (getTile(rx, ry) === T.WALL && (rx !== ew.x || ry !== ew.y)) {
+          const isEdge = ry === nowRoom.y - 1 || ry === nowRoom.y + nowRoom.h ||
+                         rx === nowRoom.x - 1 || rx === nowRoom.x + nowRoom.w;
+          if (isEdge && getTile(rx, ry) === T.WALL && (rx !== ew.x || ry !== ew.y)) {
             wallTiles.push({ x: rx, y: ry });
           }
         }
@@ -9571,8 +9598,14 @@ function render() {
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
 
-    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
-    ctx.fillText(e.glyph, sx, sy);
+    const eImg = e.img && enemyImageCache[e.img];
+    if (eImg && eImg.complete && eImg.naturalWidth > 0) {
+      const imgSize = Math.floor(ts * 0.85);
+      ctx.drawImage(eImg, sx - imgSize / 2, sy - imgSize / 2, imgSize, imgSize);
+    } else {
+      ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+      ctx.fillText(e.glyph, sx, sy);
+    }
 
     if (settings.showIntents) {
       const intent = getEnemyIntent(e);
