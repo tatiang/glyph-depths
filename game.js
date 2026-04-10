@@ -790,7 +790,8 @@ const CLASS_DEFS = [
     passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }],
     lore: 'Weapons are a crutch. You discarded them at the threshold and have not missed them since. The deeper the silence, the sharper the focus.',
     activeAbilities: [
-      { name: '🧘 Meditate', desc: 'Skip a turn to fully clear status effects and gain +2 DEF for 3 turns.' },
+      { name: '🧘 Meditate', desc: 'Cleanse status effects and heal 20% HP. Requires a quiet room. Cooldown: 20 turns.' },
+      { name: '💫 Ki Bolt', desc: 'Ranged chi blast — single target, range 8, scales with level. Cooldown: 10 turns.' },
       { name: '🎵 Enchanted Lute', desc: 'Plays a calming melody — 25% chance to charm all adjacent enemies each use.' }
     ],
     passiveAbilities: [
@@ -924,6 +925,7 @@ function normalizeLoadedPlayer(player) {
   player.infiniteArrows = false;
   player.songMastery = player.classId === 'monk' ? true : !!player.songMastery;
   player.meditateCooldown = Math.max(0, player.meditateCooldown || 0);
+  player.kiBoltCooldown = Math.max(0, player.kiBoltCooldown || 0);
   player.arcaneDartCooldown = Math.max(0, player.arcaneDartCooldown || 0);
   player.weakenCooldown = Math.max(0, player.weakenCooldown || 0);
   player.roundhouseKick = player.classId === 'rogue';
@@ -1520,6 +1522,9 @@ function createPlayer(classId = 'berserker') {
     encore: false,
     songMastery: classId === 'monk',
     meditateCooldown: 0,
+    kiBoltCooldown: 0,
+    ironFocus: false,
+    resonantPalm: false,
     masterSmith: false,
     roundhouseKick: classId === 'rogue',
     // Dark Wizard
@@ -5138,6 +5143,8 @@ function showLevelUp() {
     { name: 'Aftershock', desc: 'Tectonic Slam cooldown reduced by 3 turns', apply: () => { state.player.aftershock = true; }, rare: false, unique: true, flag: 'aftershock', classOnly: 'earthshaker' },
     { name: 'Seismic Resonance', desc: 'Tectonic Slam applies 2-turn poison to surviving enemies', apply: () => { state.player.seismicResonance = true; }, rare: true, unique: true, flag: 'seismicResonance', classOnly: 'earthshaker' },
     { name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles (from 3)', apply: () => { state.player.tremorMastery = true; }, rare: false, unique: true, flag: 'tremorMastery', classOnly: 'earthshaker' },
+    { name: 'Iron Focus', desc: 'Ki Bolt pierces through all enemies in its path', apply: () => { state.player.ironFocus = true; }, rare: false, unique: true, flag: 'ironFocus', classOnly: 'monk' },
+    { name: 'Resonant Palm', desc: '25% chance on melee hits to stun all enemies adjacent to the target for 1 turn', apply: () => { state.player.resonantPalm = true; }, rare: true, unique: true, flag: 'resonantPalm', classOnly: 'monk' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -6025,6 +6032,17 @@ function playerMove(dx, dy) {
         attackEntity(p, roundhouseTargets[0].enemy);
         addMessage('🦶 Roundhouse Kick!', 'good');
       }
+    }
+    if (p.resonantPalm && enemy.hp > 0 && Math.random() < 0.25) {
+      let stunned = false;
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const adj = enemyAt(enemy.x + ddx, enemy.y + ddy);
+        if (adj && adj.hp > 0 && !adj.isAlly && adj !== enemy) {
+          addStatusEffect(adj, 'frozen', 1);
+          stunned = true;
+        }
+      }
+      if (stunned) { addMessage('🥋 Resonant Palm! Nearby enemies stunned.', 'good'); haptic(30); }
     }
     // Daredevil ricochet: chain to adjacent enemies at 50% then 25%
     if (p.ricochetMelee) {
@@ -7811,6 +7829,7 @@ function endTurn() {
   if (state.player.arcaneDartCooldown > 0) state.player.arcaneDartCooldown--;
   if (state.player.weakenCooldown > 0) state.player.weakenCooldown--;
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
+  if (state.player.kiBoltCooldown > 0) state.player.kiBoltCooldown--;
   if (state.player.vialOfSlimeCooldown > 0) state.player.vialOfSlimeCooldown--;
   if (state.player.thunderclapCooldown > 0) state.player.thunderclapCooldown--;
   if (state.player.tectonicSlamCooldown > 0) state.player.tectonicSlamCooldown--;
@@ -10169,12 +10188,19 @@ function updateUI() {
       }
     } else if (cls === 'monk') {
       spRow.style.display = '';
-      if (p.meditateCooldown > 0) {
-        setBtn(`🧘 MEDITATE ${p.meditateCooldown}t`, false, '#60c0a0');
-        setBar(((20 - p.meditateCooldown) / 20) * 100, '#60c0a0');
-      } else {
-        setBtn('🧘 MEDITATE', true, '#60c0a0');
+      const monkBothReady = p.meditateCooldown <= 0 && p.kiBoltCooldown <= 0;
+      const monkEitherReady = p.meditateCooldown <= 0 || p.kiBoltCooldown <= 0;
+      const monkMaxCD = Math.max(p.meditateCooldown, p.kiBoltCooldown);
+      const monkMinCD = Math.min(p.meditateCooldown, p.kiBoltCooldown);
+      if (monkBothReady) {
+        setBtn('💫 ABILITIES', true, '#60c0a0');
         setBar(100, '#60c0a0');
+      } else if (monkEitherReady) {
+        setBtn(`💫 ABILITIES ${monkMaxCD}t`, true, '#60c0a0');
+        setBar(100, '#60c0a0');
+      } else {
+        setBtn(`💫 ABILITIES ${monkMinCD}t`, false, '#60c0a0');
+        setBar(((10 - p.kiBoltCooldown) / 10) * 100, '#60c0a0');
       }
     } else if (cls === 'elementalist') {
       spRow.style.display = '';
@@ -11007,7 +11033,7 @@ function setupInput() {
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
     else if (state.player.classId === 'conjurer') activateConjurerMenu();
     else if (state.player.classId === 'elementalist') activateElementalistMenu();
-    else if (state.player.classId === 'monk') activateMeditate();
+    else if (state.player.classId === 'monk') activateMonkMenu();
     else if (state.player.classId === 'bishop') activateBishopMenu();
     else if (state.player.classId === 'earthshaker') activateTectonicSlam();
     spArmed = false;
@@ -11439,7 +11465,8 @@ function showSettings() {
           break;
         case 'monk':
           abilities.push({ icon: '🥋', name: 'Disciplined Body', desc: `ATK ${getDisplayedPlayerAttack(p)} and DEF ${getDisplayedPlayerDefense(p)} scale with level` });
-          abilities.push({ icon: '🧘', name: 'Meditate', desc: `Cleanse + heal in an empty room (${p.meditateCooldown > 0 ? p.meditateCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🧘', name: 'Meditate', desc: `Cleanse status effects and heal 20% HP (${p.meditateCooldown > 0 ? p.meditateCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '💫', name: 'Ki Bolt', desc: `Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8 (${p.kiBoltCooldown > 0 ? p.kiBoltCooldown + 't CD' : 'Ready'})` });
           abilities.push({ icon: '🌊', name: 'Water Walker', desc: 'Cross deep water without a potion' });
           abilities.push({ icon: '🎶', name: 'Song Mastery', desc: 'Can play song items reliably with an instrument' });
           break;
@@ -11478,6 +11505,8 @@ function showSettings() {
         { flag: 'aftershock', icon: '🌋', name: 'Aftershock', desc: 'Tectonic Slam cooldown -3 turns' },
         { flag: 'seismicResonance', icon: '☠️', name: 'Seismic Resonance', desc: 'Tectonic Slam poisons survivors (2t)' },
         { flag: 'tremorMastery', icon: '🔔', name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles' },
+        { flag: 'ironFocus', icon: '💫', name: 'Iron Focus', desc: 'Ki Bolt pierces through all enemies in its path' },
+        { flag: 'resonantPalm', icon: '🥋', name: 'Resonant Palm', desc: '25% melee stun to enemies adjacent to target' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -12938,9 +12967,10 @@ function throwProjectile(dx, dy, isSecondShot) {
   const isRangedShot = item.itemType === 'ranged_shot';
   const isAcidBolt = item.itemType === 'acid_bolt';
   const isArcaneDart = item.itemType === 'arcane_dart';
+  const isKiBolt = item.itemType === 'ki_bolt';
   const isBishopMissile = item.itemType === 'bishop_missile';
   const isBishopSleep = item.itemType === 'bishop_sleep';
-  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart || isBishopMissile || isBishopSleep ? (item.range || 8) : 8);
+  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart || isKiBolt || isBishopMissile || isBishopSleep ? (item.range || 8) : 8);
   const p = state.player;
 
   let x = p.x + dx;
@@ -12976,6 +13006,8 @@ function throwProjectile(dx, dy, isSecondShot) {
         addMessage(`☣️ Acid Bolt hits ${target.name} for ${dmg}!`, 'good');
       } else if (isArcaneDart) {
         addMessage(`✨ Arcane Dart hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isKiBolt) {
+        addMessage(`💫 Ki Bolt hits ${target.name} for ${dmg}!`, 'good');
       } else if (isBishopMissile) {
         addMessage(`✨ Magic Missile hits ${target.name} for ${dmg}!`, 'good');
       } else if (isBishopSleep) {
@@ -13018,11 +13050,12 @@ function throwProjectile(dx, dy, isSecondShot) {
           if (state.runStats.thrownKills >= 3) unlockBadge('sharpshooter');
         }
       }
-      break;
+      // Ki Bolt with Iron Focus pierces through enemies
+      if (!isKiBolt || !p.ironFocus) break;
     }
     { const tt = getTile(x, y); if (!isWalkable(x, y) && tt !== T.WATER && tt !== T.WATERFALL) break; }
     // Spider web catch: 40% chance to snag physical projectiles
-    if (!isAcidBolt && !isArcaneDart && !isBishopMissile && !isBishopSleep) {
+    if (!isAcidBolt && !isArcaneDart && !isKiBolt && !isBishopMissile && !isBishopSleep) {
       const webHere = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === x && e.y === y);
       if (webHere && Math.random() < 0.40) {
         addMessage(`🕸 Your ${item.name || 'projectile'} is caught in a spider web!`, 'damage');
@@ -13066,7 +13099,7 @@ function throwProjectile(dx, dy, isSecondShot) {
 
   // Animation — delay endTurn until projectile animation finishes so enemies
   // don't move while the projectile is still visually in flight
-  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : isBishopMissile ? '✨' : isBishopSleep ? '😴' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
+  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : isKiBolt ? '✦' : isBishopMissile ? '✨' : isBishopSleep ? '😴' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
   // Check if double shot will fire after this — if so, don't attach endTurn callback to this animation
   const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && p.arrows > 0;
   const deferEndTurn = true; // always defer endTurn until animation completes
@@ -13098,6 +13131,12 @@ function throwProjectile(dx, dy, isSecondShot) {
   if (isArcaneDart) {
     if (!hit) addMessage('The dart flickers into the dark.', '');
     state.player.arcaneDartCooldown = 5;
+  }
+
+  if (isKiBolt) {
+    if (!hit) addMessage('💫 The ki bolt dissipates into the dark.', '');
+    else animateAoeBlast(landX, landY, 1.5, '#f0d060');
+    state.player.kiBoltCooldown = 10;
   }
 
   if (isBishopMissile) {
@@ -13159,6 +13198,8 @@ function throwProjectile(dx, dy, isSecondShot) {
     if (throwIndex >= 0 && throwIndex < p.inventory.length) p.inventory.splice(throwIndex, 1);
     if (!hit) addMessage(`Your ${item.name} clatters harmlessly away.`, '');
     else addMessage(`Your ${item.name} is destroyed in the throw!`, '');
+  } else if (isKiBolt || isArcaneDart || isAcidBolt || isBishopMissile || isBishopSleep) {
+    // Spell projectiles — handled above, no ammo/inventory logic
   } else {
     // Throwing daggers
     if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
@@ -13435,6 +13476,85 @@ function activateMeditate() {
   animateAoeBlast(p.x, p.y, 1.5, '#60c0a0');
   updateUI();
   endTurn();
+}
+
+function activateKiBolt() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.kiBoltCooldown > 0) {
+    addMessage(`Ki Bolt recharging (${p.kiBoltCooldown} turns).`, '');
+    return;
+  }
+  state.throwMode = true;
+  state.throwItem = {
+    item: { name: 'Ki Bolt', damage: 2 + Math.floor(p.level * 0.75), ammo: Infinity, itemType: 'ki_bolt', range: 8 },
+    index: -1
+  };
+  addMessage('💫 Ki Bolt — choose direction!', 'good');
+  updateUI();
+  render();
+}
+
+function activateMonkMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  const meditateReady = p.meditateCooldown <= 0;
+  const kiBoltReady = p.kiBoltCooldown <= 0;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🥋 MONK';
+  $('levelup-label').textContent = 'Choose an action:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+
+  const meditateBtn = document.createElement('button');
+  meditateBtn.className = 'perk-btn';
+  const inRoom = !!state.rooms.find(r => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
+  const tooHungry = p.hunger < 30;
+  const meditateNote = !meditateReady ? ` (${p.meditateCooldown}t)` : tooHungry ? ' (too hungry)' : !inRoom ? ' (need quiet room)' : '';
+  meditateBtn.innerHTML = `<div class="perk-name">🧘 Meditate</div><div class="perk-desc">Cleanse status effects and heal 20% HP${meditateNote}</div>`;
+  if (!meditateReady || tooHungry || !inRoom) meditateBtn.style.opacity = '0.5';
+  const meditateHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    activateMeditate();
+  };
+  meditateBtn.addEventListener('click', meditateHandler);
+  meditateBtn.addEventListener('touchend', (e) => { e.preventDefault(); meditateHandler(); }, { passive: false });
+  container.appendChild(meditateBtn);
+
+  const kiBoltBtn = document.createElement('button');
+  kiBoltBtn.className = 'perk-btn';
+  const kiBoltNote = !kiBoltReady ? ` (${p.kiBoltCooldown}t)` : '';
+  kiBoltBtn.innerHTML = `<div class="perk-name">💫 Ki Bolt</div><div class="perk-desc">Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8${kiBoltNote}</div>`;
+  if (!kiBoltReady) kiBoltBtn.style.opacity = '0.5';
+  const kiBoltHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    activateKiBolt();
+  };
+  kiBoltBtn.addEventListener('click', kiBoltHandler);
+  kiBoltBtn.addEventListener('touchend', (e) => { e.preventDefault(); kiBoltHandler(); }, { passive: false });
+  container.appendChild(kiBoltBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+
+  overlay.classList.add('active');
+  render();
 }
 
 function activateAimedShot() {
