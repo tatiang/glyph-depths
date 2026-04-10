@@ -754,7 +754,7 @@ function preloadClassImages() {
 // Preloaded Image objects for enemy sprites (keyed by img path)
 const enemyImageCache = {};
 function preloadEnemyImages() {
-  for (const path of ['images/hound.png', 'images/slime.png']) {
+  for (const path of ['images/hound.png', 'images/slime.png', 'images/black-widow.png']) {
     if (!enemyImageCache[path]) {
       const img = new Image();
       img.src = path;
@@ -1698,7 +1698,7 @@ const ENEMY_TIERS = {
     { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
     { name: 'Ghost', glyph: '👻', hp: 6, attack: 3, defense: 0, ai: 'chase', xp: 10, special: 'phase', detect: 8 },
     { name: 'Spider', glyph: '🕷️', hp: 5, attack: 2, defense: 0, ai: 'ambush', xp: 6, special: 'web', detect: 4 },
-    { name: 'Black Widow', glyph: '🕷️', hp: 7, attack: 3, defense: 0, ai: 'ambush', xp: 10, special: 'venom', detect: 5 },
+    { name: 'Black Widow', glyph: '🕷️', hp: 7, attack: 3, defense: 0, ai: 'ambush', xp: 10, special: 'venom', detect: 5, img: 'images/black-widow.png' },
     { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 },
     { name: 'Cave Lurker', glyph: '🦎', hp: 6, attack: 4, defense: 0, ai: 'ambush', xp: 9, special: 'ambush_strike', detect: 5 },
     { name: 'River Shade', glyph: '🌊', hp: 9, attack: 3, defense: 1, ai: 'patrol', xp: 10, special: 'aquatic', detect: 7 },
