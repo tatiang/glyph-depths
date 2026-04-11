@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 11, 2026 — 2:53 PM PT — Resolved PR #44 merge conflicts against current mainline
+- Merged latest `main` changes into PR branch `claude/wizardly-northcutt` to make PR #44 mergeable again.
+- Kept current class/audio/input behavior from `main` while preserving existing Bishop class feature content.
+- Verified newly tracked class image assets match the local image files in this repo.
+
 Apr 3, 2026 — 11:48 PM PT — Made Rogues and Detection Ring users immune to enchanted wall effects
 - Rogues and characters wearing the Ring of Detection no longer get woozy or direction-distortion from enchanted walls.
 - Added the immunity feedback message: "The enchanted walls glow but seem to have no effect on you."
