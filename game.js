@@ -1713,7 +1713,7 @@ const POTION_EFFECTS = [
   { id: 'strength', name: 'Potion of Strength', desc: '+2 Attack for 30 turns' },
   { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
   { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
-  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
+  { id: 'experience', name: 'Potion of Experience', desc: 'Gain XP scaled to floor depth (up to 50)' },
   { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' },
   { id: 'walk_on_water', name: 'Potion of Walk on Water', desc: 'Walk on water for 30 turns' }
 ];
@@ -2136,8 +2136,9 @@ function generateBSP() {
       const r = validRooms[Math.floor(Math.random() * validRooms.length)];
       if (r !== state.rooms[0]) {
         r.isEnchanted = true;
-        for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
-          for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
+        for (let y = r.y; y < r.y + r.h; y++) {
+          for (let x = r.x; x < r.x + r.w; x++) {
+            if (y !== r.y && y !== r.y + r.h - 1 && x !== r.x && x !== r.x + r.w - 1) continue;
             if (Math.random() < 0.15) setTile(x, y, T.ENCHANTED_WALL);
           }
         }
@@ -7044,9 +7045,10 @@ function applyPotionEffect(potion) {
       addStatusEffect(p, 'poison', 5);
       addMessage('That tasted terrible! You feel sick!', 'damage');
       break;
-    case 'experience':
-      p.xp += 20;
-      addMessage('Wisdom floods your mind! (+20 XP)', 'good');
+    case 'experience': {
+      const xpGain = Math.min(50, state.floor * 5 + 10);
+      p.xp += xpGain;
+      addMessage(`Wisdom floods your mind! (+${xpGain} XP)`, 'good');
       while (p.xp >= p.xpToNext) {
         p.xp -= p.xpToNext;
         p.level++;
@@ -7054,12 +7056,14 @@ function applyPotionEffect(potion) {
         showLevelUp();
       }
       break;
-    case 'teleport':
+    }
+    case 'teleport': {
       const pos = randomFloorTile();
       if (pos) { p.x = pos.x; p.y = pos.y; }
       addMessage('The world blurs around you!', '');
       computeFOV();
       break;
+    }
     case 'walk_on_water':
     case 'waterwalk':
       addStatusEffect(p, 'walk_on_water', 30);
@@ -7596,6 +7600,8 @@ function renderShopItems(merchant) {
         }
         Audio.gold();
         recordLocalPurchase(merchant, shopItem.item.name);
+        const soldIdx = merchant.shopItems.indexOf(shopItem);
+        if (soldIdx !== -1) merchant.shopItems.splice(soldIdx, 1);
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
         div.style.opacity = '0.3';
         div.style.pointerEvents = 'none';
@@ -7732,7 +7738,8 @@ function tickEnchantedWalls() {
       const valid = dirs.filter(d => {
         const nx = w.x + d.dx;
         const ny = w.y + d.dy;
-        if (nx <= w.room.x || nx >= w.room.x + w.room.w - 1 || ny <= w.room.y || ny >= w.room.y + w.room.h - 1) return false;
+        const isBorder = nx === w.room.x || nx === w.room.x + w.room.w - 1 || ny === w.room.y || ny === w.room.y + w.room.h - 1;
+        if (!isBorder) return false;
         if (getTile(nx, ny) !== T.FLOOR) return false;
         if (enemyAt(nx, ny)) return false;
         if (state.player.x === nx && state.player.y === ny) return false;
@@ -10862,7 +10869,7 @@ function setupInput() {
       case 'e': showQuickEquip(); break;
       case 't': showQuickThrow(); break;
       case 'f': fireRangedWeapon(); break;
-      case 'c': closeDoor(); break;
+      case 'c': showSettings(); break;
       case 'b': if (state && !state.gameOver) showBadgeOverlay(); break;
       case 'h': case '?': showHelp(); break;
       case 'q': doSpecial(); break;
