@@ -226,6 +226,15 @@ const Audio = (() => {
     }, 220);
   }
 
+  function floorReveal() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Short ascending tonal chime — signals floor card entry
+    osc('triangle', 330, 0.25, [0.01, 0.04, 0.45, 0.15]);
+    setTimeout(() => osc('triangle', 440, 0.22, [0.01, 0.04, 0.4, 0.14]), 130);
+    setTimeout(() => osc('sine', 550, 0.18, [0.01, 0.03, 0.35, 0.12]), 260);
+  }
+
   // Title / intro music — mysterious descending melody with reverb-like echoes
   function titleMusic() {
     if (!ctx || !enabled) return;
@@ -493,11 +502,25 @@ const Audio = (() => {
     setTimeout(() => osc('triangle', 1047, 0.15, [0.01, 0.03, 0.3, 0.15]), 160);
   }
 
+  function earthshake() {
+    if (!ctx || !enabled) return;
+    resume();
+    // Deep rumble: low-frequency sine + noise burst
+    osc('sine', 45, 0.5, [0.01, 0.08, 0.6, 0.25]);
+    osc('sine', 60, 0.4, [0.02, 0.1, 0.5, 0.3], -8);
+    noise(0.35, [0.01, 0.05, 0.55, 0.2]);
+    setTimeout(() => {
+      osc('sine', 50, 0.4, [0.01, 0.06, 0.5, 0.2]);
+      noise(0.25, [0.01, 0.03, 0.4, 0.15]);
+    }, 200);
+    setTimeout(() => osc('sine', 38, 0.3, [0.01, 0.1, 0.4, 0.3]), 400);
+  }
+
   return {
     init, resume, setEnabled, isEnabled,
     step, hit, playerHit, kill, pickup, gold,
     levelUp, descend, death, victory, useItem,
-    door, keyUnlock, miss, crit, merchant, boss, danger, titleMusic,
-    startAmbient, stopAmbient, setAmbientMuted, bishopSpell
+    door, keyUnlock, miss, crit, merchant, boss, danger, floorReveal, titleMusic,
+    startAmbient, stopAmbient, setAmbientMuted, bishopSpell, earthshake
   };
 })();

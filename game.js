@@ -349,6 +349,7 @@ const MASTERY_DEFS = [
   { id: 'bm_mastery',   trigger: 'win_beastmaster',name: 'Beastmaster Mastery', desc: 'All Beastmasters start with +3 max HP',   classReq: 'beastmaster',bonus: { maxHp: 3 } },
   { id: 'elem_mastery', trigger: 'win_elementalist', name: 'Elementalist Mastery', desc: 'Vial of Slime cooldown 8 instead of 10', classReq: 'elementalist', bonus: { fastVial: true } },
   { id: 'bsh_mastery',  trigger: 'win_bishop',      name: 'Bishop Mastery',       desc: 'Minor Heal cooldown halved (8→4)',       classReq: 'bishop',       bonus: { fastHeal: true } },
+  { id: 'es_mastery',   trigger: 'win_earthshaker', name: 'Earthshaker Mastery',  desc: 'Tectonic Slam base cooldown 8 instead of 10', classReq: 'earthshaker', bonus: { fastSlam: true } },
   { id: 'veteran',      trigger: 'ascendant',      name: 'Veteran',             desc: 'All classes start with +1 max HP',        classReq: null,         bonus: { maxHp: 1 } },
   { id: 'slayer',       trigger: 'exterminator',   name: 'Seasoned Slayer',     desc: 'All classes start with +1 ATK',           classReq: null,         bonus: { attack: 1 } },
   { id: 'rune_adept',   trigger: 'rune_collector', name: 'Rune Adept',          desc: '1st floor rune is always revealed on map', classReq: null,        bonus: { revealRune: true } },
@@ -605,17 +606,36 @@ const CLASS_DEFS = [
     passive: '⚡ Rage: +3 ATK below 40% HP · 🍖 1.5× hunger',
     startItems: 'Short Sword · 2× Strength Potions',
     statBadges: [{ label: '22 HP', cls: 'pos' }, { label: '+4 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }]
+    passBadges: [{ label: '1.5× Hungry', cls: 'neg' }, { label: 'Rage Mode', cls: 'pos' }, { label: '⚡ Enrage/floor', cls: 'pos' }],
+    lore: 'An exile who learned that pain is just noise. The deeper you go, the sharper the instincts — and the hungrier the rage.',
+    activeAbilities: [
+      { name: '⚡ Enrage (once/floor)', desc: 'Manually trigger Rage mode for 5 turns — +3 ATK regardless of HP.' }
+    ],
+    passiveAbilities: [
+      { name: '🔥 Rage', desc: 'When below 40% HP, gain +3 ATK automatically.' },
+      { name: '🍖 Voracious', desc: 'Burns hunger 1.5× faster than other classes.' },
+      { name: '💥 10% Crit', desc: 'Each attack has a 10% chance to deal double damage.' }
+    ]
   },
   {
-    id: 'escapeartist', name: 'Escape Artist', icon: '💨',
-    flavor: 'Leave nothing behind but ice and regrets. Acrobatic and evasive.',
+    id: 'escapeartist', name: 'Escape Artist', icon: '💨', img: 'images/escape-artist.png',
+    flavor: 'Leave nothing behind but traps and regrets. Acrobatic and evasive.',
     hp: 12, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0.20, critChance: 0.15,
     passive: '❄️ Ice Traps on retreat · 💥 Ricochet · 💨 Escape Route',
     startItems: 'Leather Vest · Invis Potion · 6 Throwing Daggers',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }]
+    passBadges: [{ label: '20% Dodge', cls: 'pos' }, { label: 'Ricochet', cls: 'pos' }, { label: '💨 Escape', cls: 'pos' }],
+    lore: 'Spent years learning that the best fight is the one you walked away from. Every doorway is an exit; every enemy a reason to move faster.',
+    activeAbilities: [
+      { name: '💨 Escape Route', desc: 'Teleport to a random safe tile when surrounded. Costs 1 HP.' },
+      { name: '💥 Ricochet', desc: 'Thrown daggers bounce to hit a second adjacent target.' }
+    ],
+    passiveAbilities: [
+      { name: '❄️ Ice Traps', desc: 'Retreating from an adjacent enemy leaves a trap that stuns on contact (up to 3 active).' },
+      { name: '👁 20% Dodge', desc: 'Evades 1 in 5 incoming attacks entirely.' },
+      { name: '🗡 15% Crit', desc: 'Higher critical strike chance than most classes.' }
+    ]
   },
   {
     id: 'ranger',
@@ -627,31 +647,61 @@ const CLASS_DEFS = [
     passive: '👁 +2 FOV · Forager',
     startItems: 'Short Bow · 50 Arrows · 4 Throwing Daggers · Ration',
     statBadges: [{ label: '13 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }]
+    passBadges: [{ label: '+2 FOV', cls: 'pos' }, { label: 'Forager', cls: 'pos' }, { label: '🏹 Aimed Shot', cls: 'pos' }],
+    lore: 'Grew up mapping territory no one else would enter. Knows which roots to eat and exactly how far a bodkin point will travel before it stops.',
+    activeAbilities: [
+      { name: '🏹 Aimed Shot', desc: 'Charges for 1 turn then fires a guaranteed-hit arrow dealing +4 bonus damage.' },
+      { name: '🗡 Throw Dagger', desc: 'Hurl a dagger for ranged damage. Daggers are consumed.' }
+    ],
+    passiveAbilities: [
+      { name: '👁 +2 FOV', desc: 'Sees 2 tiles further than other classes.' },
+      { name: '🌿 Forager', desc: 'Finds food more frequently; rations restore more hunger.' },
+      { name: '🎯 15% Crit', desc: 'Arrows and daggers have an elevated critical hit rate.' }
+    ]
   },
   {
     id: 'rogue',
     name: 'Rogue',
-    icon: '🥷',
+    icon: '🥷', img: 'images/rogue.png',
     flavor: 'Fragile but precise. Evades blows and lands deadly strikes.',
     hp: 10, attack: 3, defense: 1,
     hungerRate: 1, dodgeBonus: 0.15, critChance: 0.20,
     passive: '👁 15% Dodge · 20% Crit · 🦶 Roundhouse Kick (Lv 5)',
     startItems: '6 Throwing Daggers · Invis Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+3 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }]
+    passBadges: [{ label: '15% Dodge', cls: 'pos' }, { label: '20% Crit', cls: 'pos' }, { label: '🦶 Lv 5 Kick', cls: 'pos' }],
+    lore: 'Never relied on armor — too slow, too loud. A single precise strike outweighs a hundred swings that land on nothing.',
+    activeAbilities: [
+      { name: '🦶 Roundhouse Kick (Lv 5)', desc: 'Unlocks at level 5. Kicks an enemy back 2 tiles and stuns for 1 turn.' },
+      { name: '🗡 Throw Dagger', desc: 'Hurl a dagger for ranged damage.' }
+    ],
+    passiveAbilities: [
+      { name: '👁 15% Dodge', desc: 'Evades 1 in 7 attacks with fluid repositioning.' },
+      { name: '💥 20% Crit', desc: 'Highest critical strike rate of any class.' },
+      { name: '🥷 Vanish', desc: 'Invisibility potions last longer and can be used mid-combat.' }
+    ]
   },
   {
     id: 'cleric',
     name: 'Cleric',
-    icon: '⛪',
+    icon: '⛪', img: 'images/cleric.png',
     flavor: 'Holy warrior. Undead fear the faithful. Heals through devotion.',
     hp: 18, attack: 2, defense: 1,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
     passive: '✝ Holy Aura vs Undead · Weaken + Divine Heal',
     startItems: 'Mace · Healing Potion · Scroll of Identify',
     statBadges: [{ label: '18 HP', cls: 'pos' }, { label: '+2 ATK', cls: '' }, { label: '+1 DEF', cls: 'pos' }],
-    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }]
+    passBadges: [{ label: 'Holy Aura', cls: 'pos' }, { label: 'No Curse', cls: 'pos' }, { label: '✝ Weaken', cls: 'pos' }],
+    lore: 'Carries a faith older than the dungeon itself. Every undead creature remembers what it feared in life, and you are that thing.',
+    activeAbilities: [
+      { name: '✝ Weaken', desc: 'Reduce an adjacent enemy\'s attack by 2 for 5 turns. Costs mana.' },
+      { name: '💚 Divine Heal', desc: 'Heal 30% of max HP. Has a cooldown between uses.' }
+    ],
+    passiveAbilities: [
+      { name: '☀️ Holy Aura', desc: 'Undead enemies deal 2 less damage per hit.' },
+      { name: '🔒 Curse Immune', desc: 'Cannot be afflicted by cursed items — they crumble harmlessly.' },
+      { name: '🛡 Sanctified', desc: 'Blessed status grants extra defense when active.' }
+    ]
   },
   {
     id: 'conjurer', name: 'Conjurer', icon: '🎭', img: 'images/conjurer.png',
@@ -661,7 +711,16 @@ const CLASS_DEFS = [
     passive: '📖 All items identified · ✨ Arcane Dart · 🎭 Illusion',
     startItems: 'Scroll of Mapping · Healing Potion',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+2 ATK', cls: '' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }]
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Dart', cls: 'pos' }, { label: '🎭 Illusion', cls: 'pos' }],
+    lore: 'Reads everything, trusts nothing. Every item in the dungeon is an open book — and every enemy can be made to chase a shadow.',
+    activeAbilities: [
+      { name: '✨ Arcane Dart', desc: 'Fire a ranged dart for 3 + level/2 damage. No cooldown.' },
+      { name: '🎭 Illusion', desc: 'Place a decoy that draws enemy attention for 4 turns. Enemies who reach it are confused.' }
+    ],
+    passiveAbilities: [
+      { name: '📖 Omniscient', desc: 'All items are pre-identified — no cursed surprises, no wasted scrolls.' },
+      { name: '👁 10% Dodge', desc: 'Slight evasion from practiced spatial awareness.' }
+    ]
   },
   {
     id: 'darkwizard', name: 'Dark Wizard', icon: '💀', img: 'images/dark-wizard.png',
@@ -671,7 +730,17 @@ const CLASS_DEFS = [
     passive: '✨ Arcane Affinity: scrolls ×2 · 💀 Necromance',
     startItems: 'Arcane Staff · 3 identified scrolls · Healing Potion',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }]
+    passBadges: [{ label: 'Arcane ×2', cls: 'pos' }, { label: 'Necromance', cls: 'pos' }, { label: '💀 Acid/Blast', cls: 'pos' }],
+    lore: 'Studied magic until the boundary between life and death became an inconvenience rather than a law. Very frail. Extraordinarily dangerous.',
+    activeAbilities: [
+      { name: '🧪 Acid Bolt', desc: 'Ranged attack that applies acid-soaked status — 2 damage/turn for 5 turns.' },
+      { name: '💥 Arcane Blast', desc: 'High-damage arcane burst in a 1-tile radius. Short cooldown.' },
+      { name: '💀 Necromance', desc: 'On kill, 25–50% chance to raise the enemy as a skeletal ally that fights for you.' }
+    ],
+    passiveAbilities: [
+      { name: '✨ Arcane Affinity', desc: 'Scroll effects are doubled — damage scrolls hit harder, heals restore more.' },
+      { name: '📖 Omniscient', desc: 'Starts with all items identified.' }
+    ]
   },
   {
     id: 'elementalist', name: 'Elementalist', icon: '🧪', img: 'images/elementalist.png',
@@ -681,37 +750,96 @@ const CLASS_DEFS = [
     passive: '🧪 Elemental Immune · Bump = Acid-Soaked · ⚡ Thunderclap',
     startItems: 'Rusty Dagger · Healing Potion · Scroll of Mapping',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }]
+    passBadges: [{ label: 'Elem. Immune', cls: 'pos' }, { label: '🟢 Vial', cls: 'pos' }, { label: '⚡ Thunderclap', cls: 'pos' }],
+    lore: 'The dungeon is a chemistry problem. Acid dissolves armor, fire ignites gas, lightning leaps between bodies. You are merely the catalyst.',
+    activeAbilities: [
+      { name: '⚡ Thunderclap', desc: 'Stuns all adjacent enemies for 1 turn and deals 4 lightning damage each. Cooldown: 8 turns.' },
+      { name: '🟢 Elemental Vial', desc: 'Throw a vial of acid, fire, or ice at a target tile. Effect persists for 5 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '🧪 Elemental Immune', desc: 'Cannot be poisoned or burned — immune to fire and acid damage.' },
+      { name: '🔬 Acid-Soaked Bump', desc: 'Melee attacks coat enemies in acid, dealing 1 extra damage/turn for 3 turns.' }
+    ]
   },
   {
-    id: 'beastmaster', name: 'Beastmaster', icon: '🐺',
+    id: 'beastmaster', name: 'Beastmaster', icon: '🐺', img: 'images/beastmaster.png',
     flavor: 'Never hunts alone. A loyal hound fights continuously by your side.',
     hp: 12, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.10,
     passive: '🐺 Permanent Hound Companion · ♻ Rapid Regeneration · 🐾 Beast Charm',
     startItems: 'Leather Vest · Healing Potion',
     statBadges: [{ label: '12 HP', cls: '' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }]
+    passBadges: [{ label: 'Loyal Pet', cls: 'pos' }, { label: 'Regen', cls: 'pos' }, { label: '🐾 Beast Charm', cls: 'pos' }],
+    lore: 'Raised in the wild parts beyond the city walls. Animals respond to you; enemies respond to your hound. You have never fought alone.',
+    activeAbilities: [
+      { name: '🐾 Beast Charm', desc: 'Attempt to pacify a non-boss enemy — 30% chance it becomes a temporary ally for 15 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '🐺 Loyal Hound', desc: 'A wolf companion fights alongside you permanently. If it dies, it respawns on the next floor.' },
+      { name: '♻ Rapid Regeneration', desc: 'Heals 1 HP every 15 turns passively — the only class with built-in regen.' }
+    ]
   },
   {
-    id: 'monk', name: 'Monk', icon: '📿',
+    id: 'monk', name: 'Monk', icon: '📿', img: 'images/monk.png',
     flavor: 'Requires no steel. Fists, focus, and inner stillness replace all gear.',
     hp: 12, attack: 0, defense: 0,
     hungerRate: 1, dodgeBonus: 0.10, critChance: 0.15,
     passive: '🥋 ATK/DEF scale with level · 🧘 Meditate · 🌊 Walk on Water',
     startItems: 'Healing Potion · Enchanted Lute',
     statBadges: [{ label: '12 HP', cls: '' }, { label: 'Scales', cls: 'pos' }, { label: 'Scales', cls: 'pos' }],
-    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }]
+    passBadges: [{ label: 'Unarmed', cls: 'pos' }, { label: '25% Charm', cls: 'pos' }, { label: '🌊 Water Walk', cls: 'pos' }],
+    lore: 'Weapons are a crutch. You discarded them at the threshold and have not missed them since. The deeper the silence, the sharper the focus.',
+    activeAbilities: [
+      { name: '🧘 Meditate', desc: 'Cleanse status effects and heal 20% HP. Requires a quiet room. Cooldown: 20 turns.' },
+      { name: '💫 Ki Bolt', desc: 'Ranged chi blast — single target, range 8, scales with level. Cooldown: 10 turns.' },
+      { name: '🎵 Enchanted Lute', desc: 'Plays a calming melody — 25% chance to charm all adjacent enemies each use.' }
+    ],
+    passiveAbilities: [
+      { name: '🥋 Scaling Fists', desc: 'ATK and DEF both increase with level — eventually rivals fully geared fighters.' },
+      { name: '🌊 Walk on Water', desc: 'Can traverse water tiles without needing bridges or stepping stones.' },
+      { name: '🚫 No Weapons', desc: 'Cannot equip weapons. Armor and rings still apply.' }
+    ]
   },
   {
-    id: 'bishop', name: 'Bishop', icon: '🔮',
+    id: 'bishop', name: 'Bishop', icon: '🔮', img: 'images/bishop.png',
     flavor: 'Fragile but formidable. A hybrid mage-cleric with a deep spell repertoire that grows with each level.',
     hp: 10, attack: 1, defense: 0,
     hungerRate: 1, dodgeBonus: 0, critChance: 0.05,
     passive: '📖 All items identified · 🔮 Spell Menu (grows with level)',
     startItems: 'Arcane Staff · Healing Potion · Scroll of Mapping',
     statBadges: [{ label: '10 HP', cls: 'neg' }, { label: '+1 ATK', cls: 'neg' }, { label: '0 DEF', cls: '' }],
-    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }]
+    passBadges: [{ label: 'Omniscient', cls: 'pos' }, { label: '✨ Magic Missile', cls: 'pos' }, { label: '🔮 10 Spells', cls: 'pos' }],
+    lore: 'Spent decades in a monastery studying both arcane texts and sacred rites. The other monks thought this contradictory. They were wrong.',
+    activeAbilities: [
+      { name: '🔮 Spell Menu', desc: 'Access a growing repertoire of spells. New spells unlock at levels 1, 3, 5, 7, 9, 11, 13, 15, 17, 19.' },
+      { name: '✨ Magic Missile (Lv 1)', desc: 'Ranged bolt, 2–4 damage, range 8. Cooldown: 4 turns.' },
+      { name: '💚 Minor Heal (Lv 1)', desc: 'Restore 15% of max HP. Cooldown: 8 turns.' },
+      { name: '😴 Sleep (Lv 3)', desc: 'Put a target to sleep for 4 turns. Cooldown: 10 turns.' },
+      { name: '⚡ Holy Smite (Lv 5)', desc: '+6 damage vs undead and demons. Cooldown: 6 turns.' }
+    ],
+    passiveAbilities: [
+      { name: '📖 Omniscient', desc: 'All items are pre-identified from the start.' },
+      { name: '📚 Spell Mastery', desc: 'Earns access to 10 total spells through level progression.' }
+    ]
+  },
+  {
+    id: 'earthshaker', name: 'Earthshaker', icon: '🌋', img: 'images/earthshaker.png',
+    flavor: 'Tuned to the deep frequencies of the dungeon, the Earthshaker uses the maze\'s very foundations as a weapon.',
+    hp: 15, attack: 3, defense: 0,
+    hungerRate: 1.0, dodgeBonus: 0, critChance: 0.10,
+    passive: '🌋 Tectonic Slam (tiers w/ level) · 🔔 Tremorsense · 🪨 Surefooted',
+    startItems: 'Mace · Ration',
+    statBadges: [{ label: '15 HP', cls: 'pos' }, { label: '+3 ATK', cls: 'pos' }, { label: '0 DEF', cls: '' }],
+    passBadges: [{ label: 'Surefooted', cls: 'pos' }, { label: 'Tremorsense', cls: 'pos' }, { label: '🌋 Tectonic', cls: 'pos' }],
+    lore: 'Learned to read the dungeon\'s tremors before they could read you. Every footstep tells a story — yours is the one that ends in rubble.',
+    activeAbilities: [
+      { name: '🌋 Tectonic Slam', desc: 'Strikes the ground in a cone, dealing AOE damage and knocking back adjacent enemies. Power scales with level (T1–T4).' }
+    ],
+    passiveAbilities: [
+      { name: '🔔 Tremorsense', desc: 'Detects all enemies within 6 tiles through walls, regardless of FOV.' },
+      { name: '🪨 Surefooted', desc: 'Immune to knockback and movement penalties from terrain (mounds, rubble).' },
+      { name: '💥 Faultline Criticals', desc: 'Crits on enemies already at less than 50% HP deal bonus seismic damage.' }
+    ]
   }
 ];
 
@@ -751,6 +879,18 @@ function preloadClassImages() {
   }
 }
 
+// Preloaded Image objects for enemy sprites (keyed by img path)
+const enemyImageCache = {};
+function preloadEnemyImages() {
+  for (const path of ['images/hound.png', 'images/slime.png', 'images/black-widow.png']) {
+    if (!enemyImageCache[path]) {
+      const img = new Image();
+      img.src = path;
+      enemyImageCache[path] = img;
+    }
+  }
+}
+
 const LEGACY_CLASS_REMAP = {
   adventurer: 'beastmaster',
   wizard: 'darkwizard',
@@ -785,6 +925,7 @@ function normalizeLoadedPlayer(player) {
   player.infiniteArrows = false;
   player.songMastery = player.classId === 'monk' ? true : !!player.songMastery;
   player.meditateCooldown = Math.max(0, player.meditateCooldown || 0);
+  player.kiBoltCooldown = Math.max(0, player.kiBoltCooldown || 0);
   player.arcaneDartCooldown = Math.max(0, player.arcaneDartCooldown || 0);
   player.weakenCooldown = Math.max(0, player.weakenCooldown || 0);
   player.roundhouseKick = player.classId === 'rogue';
@@ -857,7 +998,8 @@ function ensureBeastmasterHound() {
     ai: 'ally',
     xp: 0,
     special: null,
-    detect: 8
+    detect: 8,
+    img: 'images/hound.png'
   }, state.player.x, state.player.y);
   hound.isAlly = true;
   hound.ai = 'ally';
@@ -891,6 +1033,7 @@ function boot() {
   canvas = $('game-canvas');
   ctxC = canvas.getContext('2d');
   preloadClassImages();
+  preloadEnemyImages();
   loadSettings();
   loadBadges();
   loadCodex();
@@ -900,6 +1043,20 @@ function boot() {
   setupUI();
   showTitle();
   window.addEventListener('resize', () => { setupCanvas(); if (state) render(); });
+
+  // After a signInWithRedirect (iOS Safari), the page reloads at the title screen.
+  // Detect the pending redirect, load Firebase to process getRedirectResult(), and
+  // automatically reopen the saves overlay so the user lands where they left off.
+  try {
+    if (sessionStorage.getItem('glyphdepths_auth_redirect') && isFirebaseConfigured()) {
+      sessionStorage.removeItem('glyphdepths_auth_redirect');
+      loadFirebaseSDK().then(() => initFirebase()).then(() => {
+        if (firebaseUser) {
+          showSavesOverlay(true);
+        }
+      }).catch(() => {});
+    }
+  } catch(e) {}
 }
 
 function setupCanvas() {
@@ -1002,6 +1159,44 @@ function startGame() {
   showClassSelect();
 }
 
+function showClassInfoPopup(cls) {
+  const popup = $('class-info-popup');
+  if (!popup) return;
+
+  const activeHtml = (cls.activeAbilities || []).map(a =>
+    `<div class="ci-ability"><span class="ci-ability-name">${a.name}</span><span class="ci-ability-desc">${a.desc}</span></div>`
+  ).join('');
+
+  const passiveHtml = (cls.passiveAbilities || []).map(a =>
+    `<div class="ci-ability"><span class="ci-ability-name">${a.name}</span><span class="ci-ability-desc">${a.desc}</span></div>`
+  ).join('');
+
+  popup.querySelector('.ci-icon').innerHTML = cls.img
+    ? `<img src="${cls.img}" class="ci-img" alt="${cls.name}">`
+    : cls.icon;
+  popup.querySelector('.ci-name').textContent = cls.name;
+  popup.querySelector('.ci-lore').textContent = cls.lore || cls.flavor;
+  popup.querySelector('.ci-active-list').innerHTML = activeHtml || '<div class="ci-ability"><span class="ci-ability-desc" style="color:var(--text-dim)">None</span></div>';
+  popup.querySelector('.ci-passive-list').innerHTML = passiveHtml || '<div class="ci-ability"><span class="ci-ability-desc" style="color:var(--text-dim)">None</span></div>';
+
+  popup.classList.add('active');
+  inputLocked = true;
+
+  const closePopup = () => {
+    popup.classList.remove('active');
+    inputLocked = false;
+    popup.querySelector('.ci-close').removeEventListener('click', closePopup);
+    popup.querySelector('.ci-close').removeEventListener('touchend', closePopup);
+    popup.removeEventListener('click', backdropClose);
+  };
+  const backdropClose = (e) => {
+    if (e.target === popup) closePopup();
+  };
+  popup.querySelector('.ci-close').addEventListener('click', closePopup);
+  popup.querySelector('.ci-close').addEventListener('touchend', (e) => { e.preventDefault(); closePopup(); }, { passive: false });
+  popup.addEventListener('click', backdropClose);
+}
+
 function showClassSelect() {
   const track = $('class-pager-track');
   const dotsEl = $('class-dots');
@@ -1042,7 +1237,7 @@ function showClassSelect() {
     grid.className = 'class-page-grid';
 
     for (const cls of pageCls) {
-      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop') && !hasBadge('maze_master');
+      const isLocked = (cls.id === 'monk' || cls.id === 'beastmaster' || cls.id === 'bishop' || cls.id === 'earthshaker') && !hasBadge('maze_master');
       
       const card = document.createElement('div');
       card.className = 'class-card' + (isLocked ? ' locked-class' : '');
@@ -1055,7 +1250,10 @@ function showClassSelect() {
         `;
       } else {
         card.innerHTML = `
-          <div class="class-icon">${cls.img ? `<img src="${cls.img}" class="class-img" alt="${cls.name}">` : cls.icon}</div>
+          <div class="class-card-header">
+            <div class="class-icon">${cls.img ? `<img src="${cls.img}" class="class-img" alt="${cls.name}">` : cls.icon}</div>
+            <button class="class-info-btn" aria-label="Class info" title="View details">ⓘ</button>
+          </div>
           <div class="class-name">${cls.name}</div>
           <div class="class-flavor">${cls.flavor}</div>
           <div class="class-badge-row">
@@ -1066,8 +1264,17 @@ function showClassSelect() {
           </div>
           <div class="class-start-items">${cls.startItems}</div>
         `;
+        // Info button shows class details popup
+        const infoBtn = card.querySelector('.class-info-btn');
+        const showInfo = (e) => {
+          e.stopPropagation();
+          if (e.type === 'touchend' && e.cancelable) e.preventDefault();
+          showClassInfoPopup(cls);
+        };
+        infoBtn.addEventListener('click', showInfo);
+        infoBtn.addEventListener('touchend', showInfo, { passive: false });
       }
-      
+
       const selectFn = () => {
         if (isLocked) return;
         selectedClass = cls.id;
@@ -1076,8 +1283,13 @@ function showClassSelect() {
         beginBtn.disabled = false;
         if (labelEl) labelEl.textContent = `${cls.icon}  ${cls.name}`;
       };
-      card.addEventListener('click', selectFn);
+      card.addEventListener('click', (e) => {
+        // Don't select when tapping the info button
+        if (e.target.classList.contains('class-info-btn')) return;
+        selectFn();
+      });
       card.addEventListener('touchend', (e) => {
+        if (e.target.classList.contains('class-info-btn')) return;
         // Only fire on genuine taps, not swipes
         if (e.cancelable) e.preventDefault();
         selectFn();
@@ -1310,6 +1522,9 @@ function createPlayer(classId = 'berserker') {
     encore: false,
     songMastery: classId === 'monk',
     meditateCooldown: 0,
+    kiBoltCooldown: 0,
+    ironFocus: false,
+    resonantPalm: false,
     masterSmith: false,
     roundhouseKick: classId === 'rogue',
     // Dark Wizard
@@ -1329,7 +1544,7 @@ function createPlayer(classId = 'berserker') {
     doubleShot: false,
     // Teleport sight
     teleportSight: ['rogue', 'escapeartist'].includes(classId),
-    wallTrap: null,
+    // wallTrap removed (bolt traps disabled)
     webSlowSkip: false,
     moundSlowPending: false,
     enchantedImmunityRoomIdx: -1,
@@ -1342,6 +1557,14 @@ function createPlayer(classId = 'berserker') {
     arcaneResonance: false,
     twinCast: false,
     divineAegis: false,
+    // Earthshaker
+    tectonicSlamCooldown: 0,
+    tremorsense: classId === 'earthshaker',
+    surefooted: classId === 'earthshaker',
+    faultlineCriticals: classId === 'earthshaker',
+    aftershock: false,
+    seismicResonance: false,
+    tremorMastery: false,
     // Elementalist
     poisonImmune: classId === 'elementalist',
     acidImmune: classId === 'elementalist',
@@ -1462,6 +1685,9 @@ function applyClassStartingItems(classId) {
     if (healPotion) { p.inventory.push(makePotion(healPotion)); }
     const mapScroll = scrollNames.find(n => n.id === 'mapping');
     if (mapScroll) { p.inventory.push(makeScroll(mapScroll)); }
+  } else if (classId === 'earthshaker') {
+    p.equipped.weapon = { name: 'Mace', glyph: '🔨', itemType: 'weapon', attack: 2, tier: 1, special: null };
+    p.inventory.push({ ...FOOD, stack: 1 });
   }
 }
 
@@ -1487,7 +1713,7 @@ const POTION_EFFECTS = [
   { id: 'strength', name: 'Potion of Strength', desc: '+2 Attack for 30 turns' },
   { id: 'invisibility', name: 'Potion of Invisibility', desc: 'Invisible for 15 turns' },
   { id: 'poison', name: 'Potion of Poison', desc: 'Lose 3 HP/turn for 5 turns' },
-  { id: 'experience', name: 'Potion of Experience', desc: 'Gain 20 XP' },
+  { id: 'experience', name: 'Potion of Experience', desc: 'Gain XP scaled to floor depth (up to 50)' },
   { id: 'teleport', name: 'Potion of Teleportation', desc: 'Random relocation' },
   { id: 'walk_on_water', name: 'Potion of Walk on Water', desc: 'Walk on water for 30 turns' }
 ];
@@ -1598,6 +1824,26 @@ const GLYPH_RUNES = [
   { id: 'fortune',   name: 'Glyph of Fortune',    symbol: '🍀', desc: '+5% crit chance', effect: 'fortune' },
 ];
 
+const SPECIAL_DESC = {
+  cleave:     'Splash damage to an adjacent enemy on hit',
+  burn:       'Sets enemies on fire for 3 turns',
+  freeze:     'Chance to freeze enemies for 1 turn',
+  vampiric:   'Heal 1 HP when you kill an enemy',
+  chaos:      'Random bonus damage, but -1 DEF while equipped',
+  arcane:     'Enhanced magical attacks',
+  heavy:      'Reduces enemy ATK by 1',
+  stealth:    '+2 stealth detection, +15% dodge chance',
+  thorns:     'Reflects 1 damage to melee attackers',
+  sight:      'Expands your field of vision',
+  haste:      'Move and act faster',
+  protection: '+3 DEF while equipped',
+  hunger:     'Hunger increases more slowly',
+  detection:  'Reveals secret walls and hidden objects',
+  lantern:    '+3 FOV while fueled (1 fuel per turn)',
+  soul:       'Collect soul fragments from kills, spend 5 to heal 10 HP',
+  pierce:     'Ignores 1 point of enemy DEF',
+};
+
 // === CODEX DATA ===
 const CODEX_BESTIARY_DATA = [
   { id: 'bestiary_rat',              icon: '🐀', cat: 'bestiary', title: 'Sewer Rat',          text: 'Once pets of Erathis\'s inhabitants, warped by ambient rune energy into lean scavengers. They flee when wounded — a rare show of wisdom in these depths.' },
@@ -1607,6 +1853,7 @@ const CODEX_BESTIARY_DATA = [
   { id: 'bestiary_goblin',           icon: '👺', cat: 'bestiary', title: 'Goblin',              text: 'Former scavengers who found the depths profitable and stopped leaving. Cunning, greedy, surprisingly resilient. They learned to navigate the runes. Now they enforce them.' },
   { id: 'bestiary_ghost',            icon: '👻', cat: 'bestiary', title: 'Ghost',               text: 'The restless dead who refused the Crypt\'s hospitality. Phase-shifted by unresolved purpose, they drift through walls searching for something they\'ve forgotten they lost.' },
   { id: 'bestiary_spider',           icon: '🕷️', cat: 'bestiary', title: 'Spider',              text: 'Cave spiders grew enormous in the dark and learned patience. Their webs are woven from crystallized silence — step in one and the world goes very, very quiet.' },
+  { id: 'bestiary_blackwidow',       icon: '🕷️', cat: 'bestiary', title: 'Black Widow',         text: 'A crimson hourglass marks its belly — rune-laced venom that began its work long before you noticed the bite. Patience has many forms in the dark.' },
   { id: 'bestiary_ogre',             icon: '👹', cat: 'bestiary', title: 'Ogre',                text: 'The dungeon\'s groundskeepers, kept loyal by choice glyphs. Strong enough to move rubble, too dim to ask questions. The runes gave them duty and took their doubts.' },
   { id: 'bestiary_wraith',           icon: '🌑', cat: 'bestiary', title: 'Wraith',              text: 'Creatures of pure hunger — life-draining echoes that have forgotten everything but the cold. They weep as they kill. The tears are the worst part.' },
   { id: 'bestiary_mimic',            icon: '📦', cat: 'bestiary', title: 'Mimic',               text: 'Items that absorbed too much ambient glyph energy and developed appetite. Not malice — just terrible, fundamental loneliness expressed through teeth.' },
@@ -1657,12 +1904,13 @@ const ENEMY_TIERS = {
     { name: 'Rat', glyph: '🐀', hp: 3, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'flee', detect: 5 },
     { name: 'Skeleton', glyph: '💀', hp: 4, attack: 2, defense: 0, ai: 'patrol', xp: 4, special: null, detect: 6 },
     { name: 'Bat', glyph: '🦇', hp: 2, attack: 1, defense: 0, ai: 'wander', xp: 2, special: 'erratic', detect: 4 },
-    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true }
+    { name: 'Slime', glyph: '🟢', hp: 8, attack: 1, defense: 2, ai: 'chase', xp: 4, special: 'split', detect: 5, slowMove: true, img: 'images/slime.png' }
   ],
   2: [
     { name: 'Goblin', glyph: '👺', hp: 8, attack: 3, defense: 1, ai: 'chase', xp: 8, special: null, detect: 7 },
     { name: 'Ghost', glyph: '👻', hp: 6, attack: 3, defense: 0, ai: 'chase', xp: 10, special: 'phase', detect: 8 },
     { name: 'Spider', glyph: '🕷️', hp: 5, attack: 2, defense: 0, ai: 'ambush', xp: 6, special: 'web', detect: 4 },
+    { name: 'Black Widow', glyph: '🕷️', hp: 7, attack: 3, defense: 0, ai: 'ambush', xp: 10, special: 'venom', detect: 5, img: 'images/black-widow.png' },
     { name: 'Ogre', glyph: '👹', hp: 15, attack: 4, defense: 2, ai: 'chase', xp: 12, special: 'slow', detect: 6 },
     { name: 'Cave Lurker', glyph: '🦎', hp: 6, attack: 4, defense: 0, ai: 'ambush', xp: 9, special: 'ambush_strike', detect: 5 },
     { name: 'River Shade', glyph: '🌊', hp: 9, attack: 3, defense: 1, ai: 'patrol', xp: 10, special: 'aquatic', detect: 7 },
@@ -1848,7 +2096,6 @@ function generateFloor() {
   // Special terrain features
   spawnWaterfalls();
   spawnMounds();
-  spawnIcyPaths();
   spawnFirePaths();
   spawnChasms();
   spawnEnchantedWalls();
@@ -1889,8 +2136,9 @@ function generateBSP() {
       const r = validRooms[Math.floor(Math.random() * validRooms.length)];
       if (r !== state.rooms[0]) {
         r.isEnchanted = true;
-        for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
-          for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
+        for (let y = r.y; y < r.y + r.h; y++) {
+          for (let x = r.x; x < r.x + r.w; x++) {
+            if (y !== r.y && y !== r.y + r.h - 1 && x !== r.x && x !== r.x + r.w - 1) continue;
             if (Math.random() < 0.15) setTile(x, y, T.ENCHANTED_WALL);
           }
         }
@@ -2102,27 +2350,44 @@ function bfsReachableStrict(sx, sy, tx, ty) {
 function carveWaterFeatures() {
   const p = state.player;
 
-  // 1. River: carve a winding strip of WATER from one edge to another
-  // Only convert WALL tiles — never FLOOR or CORRIDOR
+  // Find stairs proxy for connectivity checks
+  let stx = -1, sty = -1;
+  outerW: for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outerW; }
+    }
+  }
+  if (stx < 0 && state.rooms.length > 0) {
+    const far = state.rooms[state.rooms.length - 1];
+    stx = far.x + Math.floor(far.w / 2);
+    sty = far.y + Math.floor(far.h / 2);
+  }
+
+  // 1. River: carve a deliberate water channel from one map edge to the opposite.
+  //    A WATERFALL tile marks the entry point where the river emerges from the rock wall.
+  //    Only WALL tiles are converted — rooms and corridors are never overwritten.
   const startEdge = Math.floor(Math.random() * 4); // 0=top,1=bottom,2=left,3=right
   let rx, ry;
-  if (startEdge === 0)      { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = 1; }
-  else if (startEdge === 1) { rx = 2 + Math.floor(Math.random() * (MAP_W - 4)); ry = MAP_H - 2; }
-  else if (startEdge === 2) { rx = 1; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
-  else                      { rx = MAP_W - 2; ry = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  if (startEdge === 0)      { rx = 3 + Math.floor(Math.random() * (MAP_W - 6)); ry = 1; }
+  else if (startEdge === 1) { rx = 3 + Math.floor(Math.random() * (MAP_W - 6)); ry = MAP_H - 2; }
+  else if (startEdge === 2) { rx = 1; ry = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
+  else                      { rx = MAP_W - 2; ry = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
 
-  // Destination: opposite edge area
+  // Destination: opposite edge
   let gx, gy;
-  if (startEdge === 0)      { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = MAP_H - 2; }
-  else if (startEdge === 1) { gx = 2 + Math.floor(Math.random() * (MAP_W - 4)); gy = 1; }
-  else if (startEdge === 2) { gx = MAP_W - 2; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
-  else                      { gx = 1; gy = 2 + Math.floor(Math.random() * (MAP_H - 4)); }
+  if (startEdge === 0)      { gx = 3 + Math.floor(Math.random() * (MAP_W - 6)); gy = MAP_H - 2; }
+  else if (startEdge === 1) { gx = 3 + Math.floor(Math.random() * (MAP_W - 6)); gy = 1; }
+  else if (startEdge === 2) { gx = MAP_W - 2; gy = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
+  else                      { gx = 1; gy = 3 + Math.floor(Math.random() * (MAP_H - 6)); }
 
-  // Drunk-walk river, only converting WALL tiles
+  // Place WATERFALL at source if it's a wall (marks where river flows in from rock)
+  if (getTile(rx, ry) === T.WALL) setTile(rx, ry, T.WATERFALL);
+
+  // Carve river — more deliberate path (70% goal-bias vs old 60%)
   const waterTiles = new Set();
   let cx = rx, cy = ry;
-  for (let step = 0; step < 200; step++) {
-    // Convert 1x2 strip
+  for (let step = 0; step < 220; step++) {
+    // Convert a 1×2 strip perpendicular to flow direction (river width)
     for (let ow = -1; ow <= 0; ow++) {
       const wx = cx + (startEdge < 2 ? ow : 0);
       const wy = cy + (startEdge >= 2 ? ow : 0);
@@ -2134,19 +2399,18 @@ function carveWaterFeatures() {
       }
     }
     if (cx === gx && cy === gy) break;
-    // Trend toward goal with some drift
     const ddx = gx - cx, ddy = gy - cy;
     const r = Math.random();
-    if (r < 0.6) {
-      // Move toward goal
+    if (r < 0.70) {
+      // Strong trend toward goal (river has direction)
       if (Math.abs(ddx) >= Math.abs(ddy)) cx += Math.sign(ddx);
       else cy += Math.sign(ddy);
-    } else if (r < 0.8) {
-      // Perpendicular drift
+    } else if (r < 0.85) {
+      // Slight meander
       if (Math.abs(ddx) >= Math.abs(ddy)) cy += (Math.random() < 0.5 ? 1 : -1);
       else cx += (Math.random() < 0.5 ? 1 : -1);
     } else {
-      // Move toward goal on both axes
+      // Diagonal push toward goal
       if (ddx !== 0) cx += Math.sign(ddx);
       if (ddy !== 0) cy += Math.sign(ddy);
     }
@@ -2154,10 +2418,12 @@ function carveWaterFeatures() {
     cy = Math.max(1, Math.min(MAP_H - 2, cy));
   }
 
-  // 2. Bridges: where WATER crosses a CORRIDOR, place a BRIDGE
+  // Place WATERFALL at destination if it's still a wall
+  if (getTile(gx, gy) === T.WALL) setTile(gx, gy, T.WATERFALL);
+
+  // 2. Bridges where WATER is adjacent to CORRIDOR or FLOOR tiles
   for (const idx of waterTiles) {
     const bx = idx % MAP_W, by = Math.floor(idx / MAP_W);
-    // Check if removing this WATER would restore corridor connectivity
     for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       const adjTile = getTile(bx + ddx, by + ddy);
       if (adjTile === T.CORRIDOR || adjTile === T.FLOOR) {
@@ -2168,22 +2434,8 @@ function carveWaterFeatures() {
     }
   }
 
-  // 3. Validate connectivity: player must reach stairs
-  let stx = -1, sty = -1;
-  outer: for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      if (getTile(x, y) === T.STAIRS_DOWN) { stx = x; sty = y; break outer; }
-    }
-  }
-  // If stairs haven't been placed yet, use farthest room center as proxy
-  if (stx < 0 && state.rooms.length > 0) {
-    const far = state.rooms[state.rooms.length - 1];
-    stx = far.x + Math.floor(far.w / 2);
-    sty = far.y + Math.floor(far.h / 2);
-  }
-
+  // 3. Validate connectivity — if river cut off access, bridge all water adjacent to walkable
   if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
-    // Connectivity broken — add bridges on all remaining WATER tiles adjacent to walkable
     for (let y = 1; y < MAP_H - 1; y++) {
       for (let x = 1; x < MAP_W - 1; x++) {
         if (getTile(x, y) !== T.WATER) continue;
@@ -2198,11 +2450,9 @@ function carveWaterFeatures() {
     }
   }
 
-  // 3b. Bridge spans: convert water tiles that bridge two walkable areas (river crossings only).
-  // Scan rows and columns for contiguous water strips flanked by walkable tiles on both ends.
-  // Max span of 6 prevents bridging across the lake (added in step 4).
+  // 3b. Bridge spans: contiguous water strips between two walkable areas become crossings.
+  //     Max span of 6 prevents bridging across the lake (step 5).
   const MAX_BRIDGE_SPAN = 6;
-  // Horizontal spans
   for (let hy = 1; hy < MAP_H - 1; hy++) {
     let hx = 1;
     while (hx < MAP_W - 1) {
@@ -2219,7 +2469,6 @@ function carveWaterFeatures() {
       }
     }
   }
-  // Vertical spans
   for (let vx = 1; vx < MAP_W - 1; vx++) {
     let vy = 1;
     while (vy < MAP_H - 1) {
@@ -2237,22 +2486,90 @@ function carveWaterFeatures() {
     }
   }
 
-  // 4. Lake room: pick one room (not the player's starting room, not the farthest room)
-  const farthestForLake = getFarthestRoom(p.x, p.y);
-  const eligibleRooms = state.rooms.filter(r => {
-    const cx2 = r.x + Math.floor(r.w / 2), cy2 = r.y + Math.floor(r.h / 2);
-    const isStart = (Math.abs(cx2 - p.x) + Math.abs(cy2 - p.y)) < 3;
-    const isFarthest = farthestForLake && r === farthestForLake;
-    return !isStart && !isFarthest && r.w >= 5 && r.h >= 5;
+  // 4. Pond rooms: 1-2 rooms are partially flooded (40-60% water, stepping stones dotted through).
+  //    These feel like natural underground pools rather than a random overlay.
+  const farthestRoom = getFarthestRoom(p.x, p.y);
+  const allRooms = shuffle([...state.rooms]);
+  let pondsPlaced = 0;
+  for (const pr of allRooms) {
+    if (pondsPlaced >= 2) break;
+    const pCx = pr.x + Math.floor(pr.w / 2), pCy = pr.y + Math.floor(pr.h / 2);
+    const isStart = Math.abs(pCx - p.x) + Math.abs(pCy - p.y) < 4;
+    const isFarthest = farthestRoom && pr === farthestRoom;
+    if (isStart || isFarthest || pr.w < 4 || pr.h < 4) continue;
+    // Flood part of the room interior from one edge inward
+    const floorTiles = [];
+    for (let py = pr.y + 1; py < pr.y + pr.h - 1; py++) {
+      for (let px = pr.x + 1; px < pr.x + pr.w - 1; px++) {
+        if (getTile(px, py) === T.FLOOR) floorTiles.push({ x: px, y: py });
+      }
+    }
+    if (floorTiles.length < 4) continue;
+    const targetWater = Math.floor(floorTiles.length * (0.40 + Math.random() * 0.20));
+    // Grow water from a random interior seed point
+    const seed = floorTiles[Math.floor(Math.random() * floorTiles.length)];
+    const pondFrontier = [seed];
+    const pondVisited = new Set([seed.y * MAP_W + seed.x]);
+    let pondCount = 0;
+    const pondStones = [];
+    while (pondFrontier.length > 0 && pondCount < targetWater) {
+      const fi = Math.floor(Math.random() * pondFrontier.length);
+      const cur = pondFrontier.splice(fi, 1)[0];
+      if (getTile(cur.x, cur.y) !== T.FLOOR) continue;
+      if (Math.random() < 0.15) {
+        setTile(cur.x, cur.y, T.STEPPING_STONE);
+        pondStones.push({ x: cur.x, y: cur.y });
+      } else {
+        setTile(cur.x, cur.y, T.WATER);
+      }
+      pondCount++;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        const key = ny * MAP_W + nx;
+        if (!pondVisited.has(key) && nx >= pr.x + 1 && nx < pr.x + pr.w - 1 && ny >= pr.y + 1 && ny < pr.y + pr.h - 1) {
+          pondVisited.add(key);
+          if (getTile(nx, ny) === T.FLOOR) pondFrontier.push({ x: nx, y: ny });
+        }
+      }
+    }
+    // Ensure at least 2 stepping stones for traversal
+    if (pondStones.length < 2) {
+      for (let py = pr.y + 1; py < pr.y + pr.h - 1 && pondStones.length < 2; py++) {
+        for (let px = pr.x + 1; px < pr.x + pr.w - 1 && pondStones.length < 2; px++) {
+          if (getTile(px, py) === T.WATER) {
+            setTile(px, py, T.STEPPING_STONE);
+            pondStones.push({ x: px, y: py });
+          }
+        }
+      }
+    }
+    // Connectivity check — revert entire pond if it breaks access
+    if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
+      for (const ft of floorTiles) {
+        const t = getTile(ft.x, ft.y);
+        if (t === T.WATER || t === T.STEPPING_STONE) setTile(ft.x, ft.y, T.FLOOR);
+      }
+    } else {
+      pondsPlaced++;
+    }
+  }
+
+  // 5. Lake room: one larger room is fully flooded with stepping stones threading through.
+  //    Choose a room not used as a pond, start room, or farthest room.
+  const usedPondRooms = new Set();
+  const lakeCandidates = state.rooms.filter(r => {
+    const lCx = r.x + Math.floor(r.w / 2), lCy = r.y + Math.floor(r.h / 2);
+    const isStart = Math.abs(lCx - p.x) + Math.abs(lCy - p.y) < 3;
+    const isFarthest = farthestRoom && r === farthestRoom;
+    return !isStart && !isFarthest && !usedPondRooms.has(r) && r.w >= 5 && r.h >= 5;
   });
-  if (eligibleRooms.length > 0) {
-    const lakeRoom = eligibleRooms[Math.floor(Math.random() * eligibleRooms.length)];
+  if (lakeCandidates.length > 0) {
+    const lakeRoom = lakeCandidates[Math.floor(Math.random() * lakeCandidates.length)];
     const stones = [];
-    // Flood interior (exclude 1-tile border) with WATER, scatter stepping stones
     for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1; ly++) {
       for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1; lx++) {
         if (getTile(lx, ly) === T.FLOOR) {
-          if (Math.random() < 0.12) {
+          if (Math.random() < 0.14) {
             setTile(lx, ly, T.STEPPING_STONE);
             stones.push({ x: lx, y: ly });
           } else {
@@ -2261,7 +2578,7 @@ function carveWaterFeatures() {
         }
       }
     }
-    // Ensure at least 3 stepping stones
+    // Guarantee at least 3 stones so traversal is always possible
     if (stones.length < 3) {
       for (let ly = lakeRoom.y + 1; ly < lakeRoom.y + lakeRoom.h - 1 && stones.length < 3; ly++) {
         for (let lx = lakeRoom.x + 1; lx < lakeRoom.x + lakeRoom.w - 1 && stones.length < 3; lx++) {
@@ -2272,7 +2589,7 @@ function carveWaterFeatures() {
         }
       }
     }
-    // Place an item on one stepping stone
+    // Place an item reward on a stepping stone
     if (stones.length > 0) {
       const st = stones[Math.floor(Math.random() * stones.length)];
       const lakeItem = generateRandomItem(state.floor);
@@ -2280,7 +2597,7 @@ function carveWaterFeatures() {
     }
   }
 
-  // 5. Stalagmites: in 2-3 rooms, place 2-4 STALAGMITE tiles at random FLOOR positions
+  // 6. Stalagmites: geological formations in 2-3 dry rooms
   const stagRooms = shuffle([...state.rooms]).slice(0, 2 + Math.floor(Math.random() * 2));
   for (const sRoom of stagRooms) {
     const count = 2 + Math.floor(Math.random() * 3);
@@ -2290,13 +2607,11 @@ function carveWaterFeatures() {
     for (let attempt = 0; attempt < 30 && placed < count; attempt++) {
       const sx = sRoom.x + 1 + Math.floor(Math.random() * (sRoom.w - 2));
       const sy = sRoom.y + 1 + Math.floor(Math.random() * (sRoom.h - 2));
-      // Don't place at room center or on non-floor tiles
       if (sx === midX && sy === midY) continue;
       if (getTile(sx, sy) !== T.FLOOR) continue;
-      // Don't block connectivity — temporarily place and check
       setTile(sx, sy, T.STALAGMITE);
       if (stx >= 0 && !bfsReachable(p.x, p.y, stx, sty)) {
-        setTile(sx, sy, T.FLOOR); // revert
+        setTile(sx, sy, T.FLOOR);
       } else {
         placed++;
       }
@@ -2404,6 +2719,7 @@ function isWalkable(x, y) {
     // Chasm is passable only if a bridge entity spans it
     return state.entities.some(e => e.type === 'bridge' && e.x === x && e.y === y && e.hp > 0);
   }
+  if (t === T.RUBBLE && state && state.player && state.player.surefooted) return true;
   return t !== T.WALL && t !== T.RUBBLE && t !== T.DOOR_CLOSED && t !== T.DOOR_ONEWAY && t !== T.DOOR_SEALED && t !== T.WALL_SECRET && t !== T.DOOR_LOCKED && t !== T.WATER && t !== T.STALAGMITE && t !== T.WATERFALL;
   // TELEPORT, TELEPORT_VIS, BRIDGE, STEPPING_STONE, MOUND, ICY_PATH, FIRE_PATH are walkable (floor-like)
 }
@@ -2445,6 +2761,7 @@ function createEnemy(template, x, y) {
     special: template.special,
     detect: template.detect,
     slowMove: template.slowMove || false,
+    img: template.img || null,
     alertness: 0, // 0=unaware, 1=suspicious, 2=hostile
     turnSkip: false, // for slow enemies
     summonCooldown: 0,
@@ -2454,7 +2771,9 @@ function createEnemy(template, x, y) {
     confused: 0,
     // Boss specific
     phase: 1,
-    teleportCooldown: 0
+    teleportCooldown: 0,
+    // Mimic disguise: random class icon
+    disguiseGlyph: template.special === 'mimic' ? CLASS_DEFS[Math.floor(Math.random() * CLASS_DEFS.length)].icon : undefined
   };
 }
 
@@ -2816,6 +3135,7 @@ function showSage(sage) {
 function renderSageServices(sage) {
   const p = state.player;
   $('sage-gold').textContent = `Your gold: ${p.gold}`;
+  renderEquippedStrip('sage-equipped');
   const container = $('sage-services');
   container.innerHTML = '';
 
@@ -3554,52 +3874,6 @@ function spawnMounds() {
   }
 }
 
-// Icy Path: clusters of 3-5 connected ICY_PATH tiles in Crypt biome (floors 5-8).
-// Player slides 1 extra tile in movement direction on entry (unless blocked).
-function spawnIcyPaths() {
-  if (state.floor < 5 || state.floor > 8 || state.floor >= MAX_FLOOR) return;
-  const clusterCount = 1 + Math.floor(Math.random() * 3);
-  for (let c = 0; c < clusterCount; c++) {
-    // Start from a random corridor or floor tile
-    let startPos = null;
-    for (let attempts = 0; attempts < 50; attempts++) {
-      const x = 2 + Math.floor(Math.random() * (MAP_W - 4));
-      const y = 2 + Math.floor(Math.random() * (MAP_H - 4));
-      const t = getTile(x, y);
-      if (t === T.CORRIDOR || t === T.FLOOR) {
-        if (Math.abs(x - state.player.x) > 3 || Math.abs(y - state.player.y) > 3) {
-          startPos = { x, y };
-          break;
-        }
-      }
-    }
-    if (!startPos) continue;
-    // Flood-fill up to 5 connected tiles
-    const tileCount = 3 + Math.floor(Math.random() * 3);
-    const frontier = [startPos];
-    const visited = new Set();
-    visited.add(startPos.y * MAP_W + startPos.x);
-    let count = 0;
-    while (frontier.length > 0 && count < tileCount) {
-      const idx = Math.floor(Math.random() * frontier.length);
-      const cur = frontier.splice(idx, 1)[0];
-      const t = getTile(cur.x, cur.y);
-      if (t !== T.CORRIDOR && t !== T.FLOOR) continue;
-      setTile(cur.x, cur.y, T.ICY_PATH);
-      count++;
-      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-        const nx = cur.x + dx, ny = cur.y + dy;
-        const key = ny * MAP_W + nx;
-        if (!visited.has(key) && nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1) {
-          visited.add(key);
-          const nt = getTile(nx, ny);
-          if (nt === T.CORRIDOR || nt === T.FLOOR) frontier.push({ x: nx, y: ny });
-        }
-      }
-    }
-  }
-}
-
 // Fire Path: clusters of T.FIRE_PATH tiles in Citadel (9-12) and Abyss (13-16) biomes.
 // Deals 1 HP/turn while standing. Extinguished by frozen/ice status.
 function spawnFirePaths() {
@@ -3690,11 +3964,13 @@ function spawnEnchantedWalls() {
   let placed = 0;
   for (let c = 0; c < count && placed < count; c++) {
     const room = candidates[Math.floor(Math.random() * candidates.length)];
-    // Find wall tiles on the room perimeter
+    // Find wall tiles on the room perimeter (edge only, never interior)
     const wallTiles = [];
     for (let ry = room.y - 1; ry <= room.y + room.h; ry++) {
       for (let rx = room.x - 1; rx <= room.x + room.w; rx++) {
-        if (getTile(rx, ry) === T.WALL) wallTiles.push({ x: rx, y: ry });
+        const isEdge = ry === room.y - 1 || ry === room.y + room.h ||
+                       rx === room.x - 1 || rx === room.x + room.w;
+        if (isEdge && getTile(rx, ry) === T.WALL) wallTiles.push({ x: rx, y: ry });
       }
     }
     if (wallTiles.length === 0) continue;
@@ -3766,6 +4042,11 @@ function triggerAvalanche() {
     addMessage('The earth rumbles! Rocks collapse in a nearby chamber.', 'damage');
     haptic(60);
     Audio.hit();
+    // Adrenaline Surge (Earthshaker passive)
+    if (state.player.classId === 'earthshaker') {
+      addStatusEffect(state.player, 'strength', 5);
+      addMessage('The tremor empowers you! (+2 ATK, 5 turns)', 'good');
+    }
   }
 }
 
@@ -4232,7 +4513,22 @@ function attackEntity(attacker, defender) {
     ? (state.player.critChance || 0.10)
     : (state.floor <= 2 ? 0.04 : 0.10); // enemies crit less on early floors
   if (attacker === state.player && hasRune('fortune')) critChance += hasSynergy('deadly_precision') ? 0.15 : 0.05;
-  const isCrit = Math.random() < critChance;
+  // Faultline Criticals (Earthshaker): auto-crit frozen foes or foes pinned against walls
+  let forceCrit = false;
+  if (attacker === state.player && state.player.faultlineCriticals && defender !== state.player) {
+    if (hasStatusEffect(defender, 'frozen')) {
+      forceCrit = true;
+    } else {
+      const dx = Math.sign(defender.x - attacker.x);
+      const dy = Math.sign(defender.y - attacker.y);
+      const bx = defender.x + dx, by = defender.y + dy;
+      const bt = getTile(bx, by);
+      if (bx < 0 || bx >= MAP_W || by < 0 || by >= MAP_H || bt === T.WALL || bt === T.RUBBLE || bt === T.DOOR_SEALED || bt === T.ENCHANTED_WALL) {
+        forceCrit = true;
+      }
+    }
+  }
+  const isCrit = forceCrit || Math.random() < critChance;
   let damage = Math.max(1, atk - def + Math.floor(Math.random() * 5) - 2);
   if (isCrit) damage *= 2;
   if (ambushBonus > 1) damage *= ambushBonus;
@@ -4404,6 +4700,12 @@ function attackEntity(attacker, defender) {
     addMessage('You are caught in a web!', 'damage');
   }
 
+  // Black Widow venom — 50% chance to poison on hit
+  if (attacker.special === 'venom' && targetIsPlayer && !state.player.poisonImmune && Math.random() < 0.5) {
+    applyStatusEffect(state.player, 'poison', 6);
+    addMessage("The Black Widow's bite is venomous!", 'damage');
+  }
+
   // Check death
   if (defender.hp <= 0) {
     if (targetIsPlayer) {
@@ -4551,6 +4853,8 @@ function killEnemy(enemy) {
   state.floorData[Math.min(state.floor, MAX_FLOOR)].kills++;
   state.score += enemy.xp * 10;
   Audio.kill();
+  haptic(30);
+  animateEnemyDeath(enemy.x, enemy.y, enemy.ai === 'boss');
 
   // Soul Amulet: collect fragment on kill
   if (hasRingEffect('soul')) {
@@ -4572,7 +4876,7 @@ function killEnemy(enemy) {
     if (existingMinis < maxMinis) {
       const template = isHydra
         ? { name: 'Hatchling', glyph: '🐍', hp: 6, attack: 3, defense: 1, ai: 'chase', xp: 5, special: null, detect: 6 }
-        : { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true };
+        : { name: 'Mini Slime', glyph: '🟢', hp: 3, attack: 1, defense: 0, ai: 'chase', xp: 2, special: null, detect: 5, slowMove: true, img: 'images/slime.png' };
       let spawned = 0;
       for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
         if (spawned >= (isHydra ? 3 : 2)) break;
@@ -4658,12 +4962,16 @@ function killEnemy(enemy) {
   checkBadgesOnKill(enemy);
   unlockCodexEntry('bestiary_' + enemy.name.toLowerCase().replace(/\s+/g, '_'));
 
-  // Check level up
+  // Check level up — delay popup until enemy death animation finishes (350ms particles)
+  let didLevelUp = false;
   while (state.player.xp >= state.player.xpToNext) {
     state.player.xp -= state.player.xpToNext;
     state.player.level++;
     state.player.xpToNext = 15 + state.player.level * 10;
-    showLevelUp();
+    didLevelUp = true;
+  }
+  if (didLevelUp) {
+    setTimeout(showLevelUp, 420);
   }
 }
 
@@ -4673,6 +4981,7 @@ function playerDeath(killerName, killerGlyph) {
   Audio.stopAmbient();
   Audio.death();
   haptic(100);
+  animateDeathVignette();
 
   // Auto-delete save slot if this run was loaded from a save
   if (state._loadedFromSlot != null) {
@@ -4758,7 +5067,7 @@ function playerDeath(killerName, killerGlyph) {
 
   setTimeout(() => {
     $('death-overlay').classList.add('active');
-  }, 300);
+  }, 700);
 }
 
 function showVictory() {
@@ -4832,6 +5141,11 @@ function showLevelUp() {
     { name: 'Arcane Resonance', desc: 'All spell cooldowns reduced by 2 turns', apply: () => { state.player.arcaneResonance = true; }, rare: false, unique: true, flag: 'arcaneResonance', classOnly: 'bishop' },
     { name: 'Twin Cast', desc: 'Magic Missile fires 2 bolts', apply: () => { state.player.twinCast = true; }, rare: true, unique: true, flag: 'twinCast', classOnly: 'bishop' },
     { name: 'Divine Aegis', desc: 'Healing spells also grant +1 DEF (blessed) for 5 turns', apply: () => { state.player.divineAegis = true; }, rare: false, unique: true, flag: 'divineAegis', classOnly: 'bishop' },
+    { name: 'Aftershock', desc: 'Tectonic Slam cooldown reduced by 3 turns', apply: () => { state.player.aftershock = true; }, rare: false, unique: true, flag: 'aftershock', classOnly: 'earthshaker' },
+    { name: 'Seismic Resonance', desc: 'Tectonic Slam applies 2-turn poison to surviving enemies', apply: () => { state.player.seismicResonance = true; }, rare: true, unique: true, flag: 'seismicResonance', classOnly: 'earthshaker' },
+    { name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles (from 3)', apply: () => { state.player.tremorMastery = true; }, rare: false, unique: true, flag: 'tremorMastery', classOnly: 'earthshaker' },
+    { name: 'Iron Focus', desc: 'Ki Bolt pierces through all enemies in its path', apply: () => { state.player.ironFocus = true; }, rare: false, unique: true, flag: 'ironFocus', classOnly: 'monk' },
+    { name: 'Resonant Palm', desc: '25% chance on melee hits to stun all enemies adjacent to the target for 1 turn', apply: () => { state.player.resonantPalm = true; }, rare: true, unique: true, flag: 'resonantPalm', classOnly: 'monk' },
   ];
 
   // Filter out already-owned unique perks and class-restricted perks
@@ -5651,28 +5965,6 @@ function playerMove(dx, dy) {
 
   const nx = p.x + moveDx, ny = p.y + moveDy;
 
-  // === WALL TRAP RESOLUTION ===
-  // If a bolt trap was primed on the previous turn, resolve it now.
-  // Moving perpendicular to the trap axis dodges it; any other move gets hit.
-  if (p.wallTrap) {
-    const trap = p.wallTrap;
-    p.wallTrap = null;
-    const dodged = (trap.axis === 'x' && moveDx === 0 && moveDy !== 0) ||
-                   (trap.axis === 'y' && moveDy === 0 && moveDx !== 0);
-    if (dodged) {
-      addMessage('You sidestep the bolt — it sparks off the wall!', 'good');
-    } else {
-      const dmg = Math.max(1, Math.min(8, 3 + Math.floor(state.floor / 3)) - p.defense);
-      p.hp -= dmg;
-      addMessage(`⚡ A bolt strikes you from the wall! (-${dmg} HP)`, 'damage');
-      haptic(50);
-      screenShake();
-      animateEntityFlash(p.x, p.y, '#ff4040');
-      updateUI();
-      if (p.hp <= 0) { playerDeath('a wall trap', '⚡'); return; }
-    }
-  }
-
   // Webbed — skip movement
   if (hasStatusEffect(p, 'webbed')) {
     addMessage('You struggle free from the web!', '');
@@ -5741,6 +6033,17 @@ function playerMove(dx, dy) {
         attackEntity(p, roundhouseTargets[0].enemy);
         addMessage('🦶 Roundhouse Kick!', 'good');
       }
+    }
+    if (p.resonantPalm && enemy.hp > 0 && Math.random() < 0.25) {
+      let stunned = false;
+      for (const [ddx, ddy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const adj = enemyAt(enemy.x + ddx, enemy.y + ddy);
+        if (adj && adj.hp > 0 && !adj.isAlly && adj !== enemy) {
+          addStatusEffect(adj, 'frozen', 1);
+          stunned = true;
+        }
+      }
+      if (stunned) { addMessage('🥋 Resonant Palm! Nearby enemies stunned.', 'good'); haptic(30); }
     }
     // Daredevil ricochet: chain to adjacent enemies at 50% then 25%
     if (p.ricochetMelee) {
@@ -5932,17 +6235,6 @@ function playerMove(dx, dy) {
 
   // === SPECIAL TERRAIN ENTRY EFFECTS ===
 
-  // ICY PATH — slide one extra tile in the same direction (unless blocked)
-  if (getTile(nx, ny) === T.ICY_PATH) {
-    const slideX = nx + moveDx, slideY = ny + moveDy;
-    if (isWalkable(slideX, slideY) && !enemyAt(slideX, slideY)) {
-      p.x = slideX;
-      p.y = slideY;
-      Audio.step();
-      addMessage('You slip on the ice!', '');
-    }
-  }
-
   // MOUND — set pending slow flag (costs 2 turns to enter)
   if (getTile(p.x, p.y) === T.MOUND && !p.moundSlowPending) {
     p.moundSlowPending = true;
@@ -5959,11 +6251,13 @@ function playerMove(dx, dy) {
   if (nowRoom) {
     const nowRoomIdx = state.rooms.indexOf(nowRoom);
     for (const ew of state.entities.filter(e => e.type === 'enchanted_wall' && e.roomIdx === nowRoomIdx)) {
-      // Find a random wall tile in this room (different from current position)
+      // Find a random wall tile on the room edge (border only, never interior)
       const wallTiles = [];
       for (let ry = nowRoom.y - 1; ry <= nowRoom.y + nowRoom.h; ry++) {
         for (let rx = nowRoom.x - 1; rx <= nowRoom.x + nowRoom.w; rx++) {
-          if (getTile(rx, ry) === T.WALL && (rx !== ew.x || ry !== ew.y)) {
+          const isEdge = ry === nowRoom.y - 1 || ry === nowRoom.y + nowRoom.h ||
+                         rx === nowRoom.x - 1 || rx === nowRoom.x + nowRoom.w;
+          if (isEdge && getTile(rx, ry) === T.WALL && (rx !== ew.x || ry !== ew.y)) {
             wallTiles.push({ x: rx, y: ry });
           }
         }
@@ -5989,21 +6283,6 @@ function playerMove(dx, dy) {
       }
       state.entities.push({ type: 'hazard', x: oldX, y: oldY, glyph: '❄️', name: 'Ice Trap', hazardType: 'ice', turns: 8 });
       addMessage('❄️ Ice trap placed!', '');
-    }
-  }
-
-  // === WALL TRAP: ROOM ENTRY CHECK ===
-  // When entering a room from a corridor, there's a chance a hidden bolt trap fires next turn.
-  // Floors 3+ only; each room can only prime once per visit (tracked by p.wallTrap being null).
-  if (state.floor >= 3 && !p.wallTrap) {
-    const wasInRoom = state.rooms.some(r =>
-      oldX >= r.x && oldX < r.x + r.w && oldY >= r.y && oldY < r.y + r.h);
-    const nowInRoom = state.rooms.some(r =>
-      p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
-    if (!wasInRoom && nowInRoom && Math.random() < 0.20) {
-      p.wallTrap = { axis: Math.abs(moveDx) > 0 ? 'x' : 'y' };
-      addMessage('⚠️ A section of wall slides open — a trap is primed!', 'damage');
-      animateEntityFlash(p.x, p.y, '#ff8000');
     }
   }
 
@@ -6122,36 +6401,21 @@ function playerMove(dx, dy) {
   // Check for merchant
   const merchant = state.entities.find(e => e.type === 'merchant' && e.x === nx && e.y === ny);
   if (merchant) {
-    if (merchant.visited) {
-      addMessage('The merchant shrugs. "Nothing more to offer this level."', '');
-      endTurn();
-    } else {
-      showMerchant(merchant);
-    }
+    showMerchant(merchant);
     return;
   }
 
   // Check for sage
   const sage = state.entities.find(e => e.type === 'sage' && e.x === nx && e.y === ny);
   if (sage) {
-    if (sage.visited) {
-      addMessage('The sage nods quietly. "I have done all I can for now."', '');
-      endTurn();
-    } else {
-      showSage(sage);
-    }
+    showSage(sage);
     return;
   }
 
   // Check for tavern
   const tavern = state.entities.find(e => e.type === 'tavern' && e.x === nx && e.y === ny);
   if (tavern) {
-    if (tavern.visited) {
-      addMessage('The barkeep waves. "Come back next floor!"', '');
-      endTurn();
-    } else {
-      showTavern(tavern);
-    }
+    showTavern(tavern);
     return;
   }
 
@@ -6311,6 +6575,20 @@ function pickupItem(itemEntity) {
     const existing = state.player.inventory.find(i =>
       i.itemType === itemEntity.item.itemType &&
       i.effectId === itemEntity.item.effectId
+    );
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      state.itemsFound++;
+      addMessage(`You pick up ${itemEntity.item.name}. (×${existing.count})`, 'good');
+      Audio.pickup();
+      removeEntity(itemEntity);
+      return;
+    }
+  }
+  // Stack songs of the same type
+  if (itemEntity.item.itemType === 'song') {
+    const existing = state.player.inventory.find(i =>
+      i.itemType === 'song' && i.songId === itemEntity.item.songId
     );
     if (existing) {
       existing.count = (existing.count || 1) + 1;
@@ -6487,7 +6765,8 @@ function playerDescend() {
       updateUI();
       const newBiome = getBiomeKey(state.floor);
       Audio.startAmbient(newBiome);
-      if (newBiome !== getBiomeKey(state.floor - 1)) {
+      const prevBiome = getBiomeKey(state.floor - 1);
+      if (newBiome !== prevBiome) {
         showFloorCard(state.floor, newBiome, () => { inputLocked = false; });
       } else {
         inputLocked = false;
@@ -6507,6 +6786,10 @@ function useItem(item, index) {
 
   switch (item.itemType) {
     case 'weapon':
+      if (p.equipped.weapon?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.weapon.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks refuse to wield weapons.', 'damage');
         return;
@@ -6529,6 +6812,10 @@ function useItem(item, index) {
       break;
 
     case 'armor':
+      if (p.equipped.armor?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.armor.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks do not wear armor.', 'damage');
         return;
@@ -6550,6 +6837,10 @@ function useItem(item, index) {
       break;
 
     case 'ring':
+      if (p.equipped.ring?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.ring.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.equipped.ring) p.inventory.push(p.equipped.ring);
       p.equipped.ring = item;
       p.inventory.splice(index, 1);
@@ -6600,6 +6891,10 @@ function useItem(item, index) {
       return;
 
     case 'ranged':
+      if (p.equipped.ranged?.cursed && !p.curseImmune) {
+        addMessage(`The ${p.equipped.ranged.name} won't let go!`, 'damage');
+        return;
+      }
       if (p.classId === 'monk') {
         addMessage('Monks do not use ranged weapons.', 'damage');
         return;
@@ -6694,7 +6989,7 @@ function useItem(item, index) {
       }
       if (!p.songMastery && Math.random() < 0.5) {
         addMessage('You fumble the melody. The song is wasted.', 'damage');
-        p.inventory.splice(p.inventory.indexOf(item), 1);
+        if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(p.inventory.indexOf(item), 1); }
         updateUI();
         endTurn();
         return;
@@ -6703,7 +6998,7 @@ function useItem(item, index) {
       addMessage(`🎵 You play ${item.name}!`, 'good');
       haptic(30);
       Audio.gold();
-      p.inventory.splice(p.inventory.indexOf(item), 1);
+      if ((item.count || 1) > 1) { item.count--; } else { p.inventory.splice(p.inventory.indexOf(item), 1); }
       updateUI();
       endTurn();
       return;
@@ -6750,9 +7045,10 @@ function applyPotionEffect(potion) {
       addStatusEffect(p, 'poison', 5);
       addMessage('That tasted terrible! You feel sick!', 'damage');
       break;
-    case 'experience':
-      p.xp += 20;
-      addMessage('Wisdom floods your mind! (+20 XP)', 'good');
+    case 'experience': {
+      const xpGain = Math.min(50, state.floor * 5 + 10);
+      p.xp += xpGain;
+      addMessage(`Wisdom floods your mind! (+${xpGain} XP)`, 'good');
       while (p.xp >= p.xpToNext) {
         p.xp -= p.xpToNext;
         p.level++;
@@ -6760,12 +7056,14 @@ function applyPotionEffect(potion) {
         showLevelUp();
       }
       break;
-    case 'teleport':
+    }
+    case 'teleport': {
       const pos = randomFloorTile();
       if (pos) { p.x = pos.x; p.y = pos.y; }
       addMessage('The world blurs around you!', '');
       computeFOV();
       break;
+    }
     case 'walk_on_water':
     case 'waterwalk':
       addStatusEffect(p, 'walk_on_water', 30);
@@ -7096,6 +7394,86 @@ function recordLocalPurchase(entity, key) {
 }
 
 // === MERCHANT ===
+function renderEquippedStrip(containerId) {
+  const strip = $(containerId);
+  if (!strip) return;
+  const p = state.player;
+  const slots = [
+    { key: 'weapon', label: '⚔️' },
+    { key: 'ranged', label: '🏹' },
+    { key: 'armor',  label: '🛡️' },
+    { key: 'ring',   label: '💍' },
+  ];
+  strip.innerHTML = '';
+  let activeDetail = null;
+
+  for (const { key, label } of slots) {
+    const item = p.equipped[key];
+    const chip = document.createElement('div');
+    chip.className = 'shop-equip-chip' + (item ? '' : ' is-empty');
+    if (item && item.cursed && item.curseRevealed) chip.classList.add('is-cursed');
+
+    let statText = '';
+    if (item) {
+      if (item.itemType === 'weapon')      statText = `+${item.attack}A`;
+      else if (item.itemType === 'ranged') statText = `${item.damage}D`;
+      else if (item.itemType === 'armor')  statText = `+${item.defense}D`;
+      else if (item.itemType === 'ring' && item.special) statText = item.special.slice(0, 5);
+    }
+
+    chip.innerHTML = item
+      ? `<span class="shop-equip-chip__glyph">${item.glyph}</span>` +
+        `<span style="font-size:10px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;">${item.name.split(' ')[0]}</span>` +
+        (statText ? `<span class="shop-equip-chip__stat">${statText}</span>` : '')
+      : `<span class="shop-equip-chip__glyph">${label}</span>` +
+        `<span style="font-size:10px;color:var(--text-dim);">—</span>`;
+
+    if (item) {
+      const toggleDetail = (e) => {
+        e.stopPropagation();
+        if (activeDetail) {
+          activeDetail.remove();
+          const prev = strip.querySelector('.detail-open');
+          if (prev) prev.classList.remove('detail-open');
+          if (activeDetail._ownerChip === chip) { activeDetail = null; return; }
+          activeDetail = null;
+        }
+        let desc = (item.desc && item.desc !== '???') ? item.desc
+          : item.itemType === 'weapon' ? `+${item.attack} ATK melee weapon.`
+          : item.itemType === 'ranged' ? `${item.damage} DMG, range ${item.range}.`
+          : item.itemType === 'armor'  ? `+${item.defense} DEF armor.`
+          : item.special || '';
+        if (item.cursed && item.curseRevealed) desc += ' ⚠ CURSED';
+        const detail = document.createElement('div');
+        detail.className = 'shop-equip-detail';
+        detail._ownerChip = chip;
+        detail.innerHTML =
+          `<div class="shop-equip-detail__name">${item.glyph} ${item.name}</div>` +
+          `<div class="shop-equip-detail__desc">${desc}</div>`;
+        chip.classList.add('detail-open');
+        chip.appendChild(detail);
+        activeDetail = detail;
+      };
+      chip.addEventListener('click', toggleDetail);
+      chip.addEventListener('touchend', (e) => { e.preventDefault(); toggleDetail(e); }, { passive: false });
+    }
+    strip.appendChild(chip);
+  }
+
+  // Dismiss detail on tap elsewhere in the overlay
+  const overlay = strip.closest('.overlay');
+  if (overlay) {
+    overlay.addEventListener('click', () => {
+      if (activeDetail) {
+        activeDetail.remove();
+        const open = strip.querySelector('.detail-open');
+        if (open) open.classList.remove('detail-open');
+        activeDetail = null;
+      }
+    }, { once: true });
+  }
+}
+
 function showMerchant(merchant) {
   merchant.visited = true;
   inputLocked = true;
@@ -7134,6 +7512,7 @@ function renderDropSection(container, refreshCallback) {
 
 function renderShopItems(merchant) {
   $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
+  renderEquippedStrip('merchant-equipped');
   const discountEl = $('merchant-discount');
   if (discountEl) discountEl.style.display = 'none';
   const container = $('shop-items');
@@ -7191,6 +7570,24 @@ function renderShopItems(merchant) {
             addMessage(`You buy ${shopItem.item.name}.`, 'good');
             if (settings.autoEquip) tryAutoEquip(state.player.inventory[state.player.inventory.length - 1]);
           }
+        } else if (shopItem.item.itemType === 'song' || shopItem.item.itemType === 'potion' || shopItem.item.itemType === 'scroll') {
+          // Stack songs, potions, scrolls
+          const matchKey = shopItem.item.itemType === 'song' ? 'songId' : 'effectId';
+          const existing = state.player.inventory.find(i =>
+            i.itemType === shopItem.item.itemType && i[matchKey] === shopItem.item[matchKey]
+          );
+          if (existing) {
+            existing.count = (existing.count || 1) + 1;
+            addMessage(`You buy ${shopItem.item.name}. (×${existing.count})`, 'good');
+          } else if (state.player.inventory.length >= MAX_INVENTORY) {
+            const bought = { ...shopItem.item };
+            state.entities.push({ type: 'item', x: state.player.x, y: state.player.y, glyph: bought.glyph, item: bought });
+            addMessage(`Inventory full — ${bought.name} dropped at your feet.`, 'damage');
+          } else {
+            const bought = { ...shopItem.item, count: 1 };
+            state.player.inventory.push(bought);
+            addMessage(`You buy ${shopItem.item.name}.`, 'good');
+          }
         } else if (state.player.inventory.length >= MAX_INVENTORY) {
           // Drop purchased item on the ground at player's feet
           const bought = { ...shopItem.item };
@@ -7203,6 +7600,8 @@ function renderShopItems(merchant) {
         }
         Audio.gold();
         recordLocalPurchase(merchant, shopItem.item.name);
+        const soldIdx = merchant.shopItems.indexOf(shopItem);
+        if (soldIdx !== -1) merchant.shopItems.splice(soldIdx, 1);
         $('merchant-gold').textContent = `Your gold: ${state.player.gold}`;
         div.style.opacity = '0.3';
         div.style.pointerEvents = 'none';
@@ -7339,7 +7738,8 @@ function tickEnchantedWalls() {
       const valid = dirs.filter(d => {
         const nx = w.x + d.dx;
         const ny = w.y + d.dy;
-        if (nx <= w.room.x || nx >= w.room.x + w.room.w - 1 || ny <= w.room.y || ny >= w.room.y + w.room.h - 1) return false;
+        const isBorder = nx === w.room.x || nx === w.room.x + w.room.w - 1 || ny === w.room.y || ny === w.room.y + w.room.h - 1;
+        if (!isBorder) return false;
         if (getTile(nx, ny) !== T.FLOOR) return false;
         if (enemyAt(nx, ny)) return false;
         if (state.player.x === nx && state.player.y === ny) return false;
@@ -7436,8 +7836,10 @@ function endTurn() {
   if (state.player.arcaneDartCooldown > 0) state.player.arcaneDartCooldown--;
   if (state.player.weakenCooldown > 0) state.player.weakenCooldown--;
   if (state.player.meditateCooldown > 0) state.player.meditateCooldown--;
+  if (state.player.kiBoltCooldown > 0) state.player.kiBoltCooldown--;
   if (state.player.vialOfSlimeCooldown > 0) state.player.vialOfSlimeCooldown--;
   if (state.player.thunderclapCooldown > 0) state.player.thunderclapCooldown--;
+  if (state.player.tectonicSlamCooldown > 0) state.player.tectonicSlamCooldown--;
   if (state.player.bishopSpellCooldowns) {
     for (const id of Object.keys(state.player.bishopSpellCooldowns)) {
       if (state.player.bishopSpellCooldowns[id] > 0) state.player.bishopSpellCooldowns[id]--;
@@ -7655,6 +8057,12 @@ function screenShake() {
   setTimeout(() => $('canvas-wrap').classList.remove('shake'), 150);
 }
 
+function screenShakeLight() {
+  const wrap = $('canvas-wrap');
+  wrap.classList.add('shake-light');
+  setTimeout(() => wrap.classList.remove('shake-light'), 100);
+}
+
 function haptic(ms) {
   if (settings.haptics && navigator.vibrate) navigator.vibrate(ms);
 }
@@ -7727,6 +8135,62 @@ function animateDamageNumber(mapX, mapY, amount, isCrit, targetIsPlayer) {
   requestAnimationFrame(tickAnimations);
 }
 
+function animateEnemyDeath(mapX, mapY, isBoss) {
+  const p = state.player;
+  const ts = tileSize;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const cx = (mapX - camX) * ts + ts / 2;
+  const cy = (mapY - camY) * ts + ts / 2;
+
+  screenShakeLight();
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const count = isBoss ? 12 : (5 + Math.floor(Math.random() * 2));
+    const color = isBoss ? '#ffd700' : '#ff4444';
+    const minSpeed = isBoss ? 0.08 : 0.05;
+    const maxSpeed = isBoss ? 0.16 : 0.12;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+      activeAnimations.push({
+        type: 'deathParticle',
+        cx, cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        color, t: 0, dur: 350
+      });
+    }
+    requestAnimationFrame(tickAnimations);
+  }
+}
+
+function animateDeathVignette() {
+  const p = state.player;
+  const ts = tileSize;
+  const camX = Math.max(0, Math.min(MAP_W - VIEW_COLS, p.x - Math.floor(VIEW_COLS / 2)));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW_ROWS, p.y - Math.floor(VIEW_ROWS / 2)));
+  const cx = (p.x - camX) * ts + ts / 2;
+  const cy = (p.y - camY) * ts + ts / 2;
+
+  activeAnimations.push({ type: 'deathVignette', t: 0, dur: 700 });
+
+  const wrap = $('canvas-wrap');
+  wrap.classList.add('death-flash');
+  setTimeout(() => wrap.classList.remove('death-flash'), 200);
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const speed = 0.06 + Math.random() * 0.06;
+      activeAnimations.push({
+        type: 'deathParticle',
+        cx, cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        color: '#ff2222', t: 0, dur: 500
+      });
+    }
+  }
+  requestAnimationFrame(tickAnimations);
+}
+
 let lastAnimTime = 0;
 function tickAnimations(now) {
   if (!lastAnimTime) lastAnimTime = now;
@@ -7788,6 +8252,27 @@ function tickAnimations(now) {
       ctx.fillText(a.text, a.cx, yDraw);
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1.0;
+    } else if (a.type === 'deathParticle') {
+      const px = a.cx + a.vx * a.t;
+      const py = a.cy + a.vy * a.t;
+      const alpha = 1 - progress;
+      const radius = Math.max(0.5, 2.5 * (1 - progress * 0.5));
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    } else if (a.type === 'deathVignette') {
+      const alpha = Math.min(progress * 1.5, 1.0) * 0.65;
+      const grad = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, canvas.width * 0.15,
+        canvas.width / 2, canvas.height / 2, canvas.width * 0.75
+      );
+      grad.addColorStop(0, 'rgba(100, 0, 0, 0)');
+      grad.addColorStop(1, `rgba(180, 0, 0, ${alpha})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     if (progress >= 1) {
@@ -8065,6 +8550,58 @@ function deleteSaveSlot(slot) {
   localStorage.removeItem(SAVE_PREFIX + slot);
 }
 
+function downloadSaveFile(slotKey) {
+  const raw = localStorage.getItem(SAVE_PREFIX + slotKey);
+  if (!raw) return;
+  let fileName = 'glyph-depths-save.json';
+  try {
+    const data = JSON.parse(raw);
+    const name = (data.state.playerName || 'save').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const floor = data.state.floor || '?';
+    fileName = 'glyph-depths-' + name + '-floor' + floor + '.json';
+  } catch (e) {}
+  const blob = new Blob([raw], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importSaveFile(listEl, cloudSaves, fromTitle) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const raw = e.target.result;
+        const data = JSON.parse(raw);
+        if (!data || !data.state) { addMessage('Invalid save file.', 'damage'); return; }
+        // Find the next empty slot, or fall back to slot 1
+        let slot = null;
+        for (let i = 1; i <= SAVE_SLOTS; i++) {
+          if (!localStorage.getItem(SAVE_PREFIX + i)) { slot = i; break; }
+        }
+        if (!slot) slot = 1;
+        localStorage.setItem(SAVE_PREFIX + slot, raw);
+        _renderSavesList(listEl, _getLocalSaves(), Array.isArray(cloudSaves) ? cloudSaves : [], fromTitle, false);
+        addMessage('Save imported!', 'good');
+      } catch (err) {
+        addMessage('Failed to import save.', 'damage');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 function getSaveSlotInfo(slot) {
   try {
     const raw = localStorage.getItem(SAVE_PREFIX + slot);
@@ -8209,6 +8746,7 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
       // which point Firebase reads the auth state from IndexedDB.
       if (window.navigator.standalone === true) {
         if (signInBtn.dataset.step === 'waiting') {
+          try { sessionStorage.setItem('glyphdepths_auth_redirect', '1'); } catch(e) {}
           location.reload();
           return;
         }
@@ -8237,7 +8775,7 @@ function _renderSavesAuthBar(barEl, listEl, fromTitle) {
         const errText = document.createElement('div');
         errText.className = 'saves-auth-bar-text';
         errText.style.color = '#f64';
-        errText.textContent = 'Sign-in failed. Try again or use a different browser on iOS.';
+        errText.textContent = 'Sign-in failed. Try again.';
         const retryBtn = document.createElement('button');
         retryBtn.className = 'saves-auth-btn';
         retryBtn.textContent = 'Retry';
@@ -8441,6 +8979,17 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     loadBtn.addEventListener('touchend', (e) => { e.preventDefault(); loadFn(); }, { passive: false });
     btnRow.appendChild(loadBtn);
 
+    if (save.storage === 'local') {
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'save-action-btn';
+      dlBtn.textContent = '\u2B07 Export';
+      dlBtn.title = 'Download save as a file';
+      const dlFn = () => downloadSaveFile(save.slotKey);
+      dlBtn.addEventListener('click', dlFn);
+      dlBtn.addEventListener('touchend', (e) => { e.preventDefault(); dlFn(); }, { passive: false });
+      btnRow.appendChild(dlBtn);
+    }
+
     const delBtn = document.createElement('button');
     delBtn.className = 'save-action-btn save-delete';
     delBtn.textContent = '\uD83D\uDDD1';
@@ -8509,6 +9058,16 @@ function _renderSavesList(listEl, localSaves, cloudSaves, fromTitle, loadingClou
     errEl.textContent = 'Could not load cloud saves. Check your connection and try again.';
     listEl.appendChild(errEl);
   }
+
+  // Import button — always visible so user can load a save from a downloaded file
+  const importBtn = document.createElement('button');
+  importBtn.className = 'saves-auth-btn';
+  importBtn.style.cssText = 'width:100%;margin-top:10px;min-height:44px;font-size:13px;';
+  importBtn.textContent = '\u2B06 Import Save from File';
+  const importFn = () => importSaveFile(listEl, cloudSaves, fromTitle);
+  importBtn.addEventListener('click', importFn);
+  importBtn.addEventListener('touchend', (e) => { e.preventDefault(); importFn(); }, { passive: false });
+  listEl.appendChild(importBtn);
 }
 
 
@@ -8587,7 +9146,16 @@ function initFirebase() {
     const unsub = firebase.auth().onAuthStateChanged(user => {
       unsub();
       if (user) firebaseUser = user;
-      resolve();
+      // Handle result from signInWithRedirect (iOS non-standalone flow).
+      // getRedirectResult() only returns a user the first time after a redirect;
+      // subsequent calls return { user: null } so the message won't repeat.
+      firebase.auth().getRedirectResult().then(result => {
+        if (result && result.user) {
+          firebaseUser = result.user;
+          addMessage(`\u2601\uFE0F Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+        }
+        resolve();
+      }).catch(() => resolve());
     });
   });
 }
@@ -8596,6 +9164,10 @@ function cloudSignIn() {
   if (!window.firebase) return Promise.reject('Firebase not loaded');
   const provider = new firebase.auth.GoogleAuthProvider();
 
+  // signInWithPopup works on all non-standalone platforms including iOS Safari and
+  // Chrome iOS. It uses postMessage between windows, which is NOT affected by ITP.
+  // (signInWithRedirect was previously used on iOS but its getRedirectResult() relies
+  // on a cross-origin iframe that IS blocked by ITP — causing silent sign-in failure.)
   return new Promise((resolve, reject) => {
     let settled = false;
     function settle() { settled = true; document.removeEventListener('visibilitychange', onVisible); }
@@ -8604,7 +9176,7 @@ function cloudSignIn() {
       if (settled) return;
       settle();
       firebaseUser = result.user;
-      addMessage(`☁️ Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
+      addMessage(`\u2601\uFE0F Signed in as ${firebaseUser.displayName || firebaseUser.email}`, 'good');
       resolve(firebaseUser);
     }).catch(err => {
       if (settled) return;
@@ -8612,17 +9184,18 @@ function cloudSignIn() {
       reject(err);
     });
 
-    // On iOS/mobile, signInWithPopup opens a new tab. If the Firebase auth
-    // handler at authDomain fails (cross-origin storage partitioning), the
-    // promise above never settles. Detect when the user returns to the app
-    // tab and fail gracefully after a brief grace period.
+    // On mobile, signInWithPopup opens a new tab. If the Firebase auth
+    // handler at authDomain fails, the promise above never settles. Detect
+    // when the user returns to the app tab and fail gracefully.
+    // Use a generous timeout (8s) since iOS can throttle JS in background tabs,
+    // delaying postMessage delivery until the original tab regains focus.
     function onVisible() {
       if (document.visibilityState !== 'visible' || settled) return;
       setTimeout(() => {
         if (settled) return;
         settle();
-        reject(new Error('Sign-in did not complete. On iOS Safari, try Chrome or Firefox.'));
-      }, 3000);
+        reject(new Error('Sign-in did not complete.'));
+      }, 8000);
     }
     // Delay listener so the initial tab-switch from opening the popup doesn't trigger it
     setTimeout(() => { if (!settled) document.addEventListener('visibilitychange', onVisible); }, 1500);
@@ -8659,6 +9232,7 @@ function cloudSaveGame(slotName) {
     state: serializeState(),
     potionNames, scrollNames, potionIdentified, scrollIdentified,
     badgesEarnedThisRun,
+    badgeState, badgeCounts,
     uid: firebaseUser.uid,
     displayName: firebaseUser.displayName || '',
     slotName: slotName || 'Cloud Save',
@@ -8685,6 +9259,20 @@ function cloudLoadGame(slotName) {
   return firestoreTimeout(firebaseDb.collection('saves').doc(docId).get()).then(doc => {
     if (!doc.exists) { addMessage('No cloud save found.', 'damage'); return false; }
     const data = doc.data();
+    // Merge saved badgeState into local badgeState (union — never remove earned badges)
+    if (data.badgeState && typeof data.badgeState === 'object') {
+      for (const [id, val] of Object.entries(data.badgeState)) {
+        if (val?.unlocked && !badgeState[id]?.unlocked) {
+          badgeState[id] = val;
+        }
+      }
+    }
+    if (data.badgeCounts && typeof data.badgeCounts === 'object') {
+      for (const [key, val] of Object.entries(data.badgeCounts)) {
+        badgeCounts[key] = Math.max(badgeCounts[key] || 0, val || 0);
+      }
+    }
+    saveBadges();
     // Reuse local load logic
     const raw = JSON.stringify({ version: data.version, timestamp: data.timestamp, state: data.state, potionNames: data.potionNames, scrollNames: data.scrollNames, potionIdentified: data.potionIdentified, scrollIdentified: data.scrollIdentified, badgesEarnedThisRun: data.badgesEarnedThisRun });
     localStorage.setItem('_cloud_load_tmp', raw);
@@ -8912,10 +9500,6 @@ function render() {
           tileGlyph = '^';
           tileColor = vis ? '#8a6030' : '#3a2810';
           break;
-        case T.ICY_PATH:
-          tileGlyph = '·';
-          tileColor = vis ? '#a0e8f8' : '#304858';
-          break;
         case T.FIRE_PATH:
           tileGlyph = '▒';
           tileColor = vis ? '#e05010' : '#501808';
@@ -8982,7 +9566,7 @@ function render() {
             ctx.globalAlpha = 1.0;
             break; // Stop at first enemy in this direction
           }
-          if (!isWalkable(tx, ty)) break;
+          { const tt = getTile(tx, ty); if (!isWalkable(tx, ty) && tt !== T.WATER && tt !== T.WATERFALL) break; }
           // Highlight path tile
           ctx.globalAlpha = 0.12;
           ctx.fillStyle = '#ffd700';
@@ -9277,24 +9861,28 @@ function render() {
       if (dist > 3) continue; // completely invisible at distance
     }
 
-    // Mimic looks like a chest until adjacent
-    if (e.special === 'mimic' && e.alertness < 2) {
-      const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
-      if (dist > 1) {
-        const sx = (e.x - camX) * ts + ts / 2;
-        const sy = (e.y - camY) * ts + ts / 2;
-        ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-        ctx.fillText('📦', sx, sy);
-        continue;
-      }
+    // Mimic disguise: shows class icon when undamaged/unaware, box when revealed
+    if (e.special === 'mimic') {
+      const revealed = e.hp < e.maxHp || e.alertness >= 2;
+      const sx = (e.x - camX) * ts + ts / 2;
+      const sy = (e.y - camY) * ts + ts / 2;
+      ctx.font = `${Math.floor(ts * 0.65)}px serif`;
+      ctx.fillText(revealed ? '📦' : (e.disguiseGlyph || '📦'), sx, sy);
+      if (!revealed) continue;
     }
 
     const sx = (e.x - camX) * ts + ts / 2;
     const sy = (e.y - camY) * ts + ts / 2;
     if (sx < -ts || sx > canvas.width + ts || sy < -ts || sy > canvas.height + ts) continue;
 
-    ctx.font = `${Math.floor(ts * 0.7)}px serif`;
-    ctx.fillText(e.glyph, sx, sy);
+    const eImg = e.img && enemyImageCache[e.img];
+    if (eImg && eImg.complete && eImg.naturalWidth > 0) {
+      const imgSize = Math.floor(ts * 0.85);
+      ctx.drawImage(eImg, sx - imgSize / 2, sy - imgSize / 2, imgSize, imgSize);
+    } else {
+      ctx.font = `${Math.floor(ts * 0.7)}px serif`;
+      ctx.fillText(e.glyph, sx, sy);
+    }
 
     if (settings.showIntents) {
       const intent = getEnemyIntent(e);
@@ -9607,12 +10195,19 @@ function updateUI() {
       }
     } else if (cls === 'monk') {
       spRow.style.display = '';
-      if (p.meditateCooldown > 0) {
-        setBtn(`🧘 MEDITATE ${p.meditateCooldown}t`, false, '#60c0a0');
-        setBar(((20 - p.meditateCooldown) / 20) * 100, '#60c0a0');
-      } else {
-        setBtn('🧘 MEDITATE', true, '#60c0a0');
+      const monkBothReady = p.meditateCooldown <= 0 && p.kiBoltCooldown <= 0;
+      const monkEitherReady = p.meditateCooldown <= 0 || p.kiBoltCooldown <= 0;
+      const monkMaxCD = Math.max(p.meditateCooldown, p.kiBoltCooldown);
+      const monkMinCD = Math.min(p.meditateCooldown, p.kiBoltCooldown);
+      if (monkBothReady) {
+        setBtn('💫 ABILITIES', true, '#60c0a0');
         setBar(100, '#60c0a0');
+      } else if (monkEitherReady) {
+        setBtn(`💫 ABILITIES ${monkMaxCD}t`, true, '#60c0a0');
+        setBar(100, '#60c0a0');
+      } else {
+        setBtn(`💫 ABILITIES ${monkMinCD}t`, false, '#60c0a0');
+        setBar(((10 - p.kiBoltCooldown) / 10) * 100, '#60c0a0');
       }
     } else if (cls === 'elementalist') {
       spRow.style.display = '';
@@ -9642,6 +10237,18 @@ function updateUI() {
       } else {
         setBtn(`🔮 SPELLS ${minCD}t`, false, '#cc88ff');
         setBar(0, '#cc88ff');
+      }
+    } else if (cls === 'earthshaker') {
+      spRow.style.display = '';
+      const slamMax = getMasteryBonuses(cls).fastSlam ? 8 : 10;
+      const slamCD = p.aftershock ? Math.max(1, slamMax - 3) : slamMax;
+      const tier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+      if (p.tectonicSlamCooldown > 0) {
+        setBtn(`🌋 SLAM ${p.tectonicSlamCooldown}t (T${tier})`, false, '#c06020');
+        setBar(((slamCD - p.tectonicSlamCooldown) / slamCD) * 100, '#c06020');
+      } else {
+        setBtn(`🌋 TECTONIC SLAM (T${tier})`, true, '#c06020');
+        setBar(100, '#c06020');
       }
     } else {
       spRow.style.display = '';
@@ -9680,24 +10287,7 @@ function renderInventory() {
 
   function showSlotInfo(item, el) {
     if (!item) return;
-    let desc = '';
-    if (item.desc && item.desc !== '???') desc = item.desc;
-    else if (item.itemType === 'ranged') desc = `${item.damage || 0} DMG, ${item.range || 0} range`;
-    else if (item.attack) desc = `+${item.attack} Attack`;
-    else if (item.defense) desc = `+${item.defense} Defense`;
-    else if (item.itemType === 'ring' && item.special) desc = `Ring effect: ${item.special}`;
-    else desc = 'No additional details.';
-    $('tip-name').textContent = `${item.glyph} ${item.name}`;
-    $('tip-desc').textContent = desc;
-    const tip = $('inspect-tip');
-    const rect = el.getBoundingClientRect();
-    const cx = Math.max(8, Math.min(rect.left + rect.width / 2 - 100, window.innerWidth - 208));
-    const cy = Math.max(8, rect.top - 68);
-    tip.style.left = `${cx}px`;
-    tip.style.top = `${cy}px`;
-    tip.classList.add('active');
-    setTimeout(() => tip.classList.remove('active'), 2200);
-    haptic(20);
+    showGearDetail(item);
   }
 
   // Helper: slot tap for menu, long-press for inspect tooltip
@@ -9916,6 +10506,9 @@ function showItemMenu(item, index, event) {
   } else if (item.itemType === 'song') {
     actions.push({ label: 'Play', fn: () => { useItem(item, index); closeItemMenu(); }});
   }
+  if (['weapon', 'armor', 'ring', 'ranged'].includes(item.itemType)) {
+    actions.push({ label: 'Info', fn: () => { closeItemMenu(); showGearDetail(item); } });
+  }
   actions.push({ label: 'Drop', fn: () => { dropItem(index); closeItemMenu(); }});
   actions.push({ label: 'Destroy', fn: () => {
     // Replace menu content with an inline confirmation — stop outside-close from firing during transition
@@ -10036,6 +10629,13 @@ function showEquippedMenu(eq, event) {
     menu.appendChild(fuelDiv);
   }
 
+  const infoBtn = document.createElement('button');
+  infoBtn.textContent = 'Info';
+  const infoFn = () => { closeItemMenu(); showGearDetail(item); };
+  infoBtn.addEventListener('click', (e) => { e.stopPropagation(); infoFn(); });
+  infoBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); infoFn(); }, { passive: false });
+  menu.appendChild(infoBtn);
+
   const unequipBtn = document.createElement('button');
   unequipBtn.textContent = 'Unequip';
   unequipBtn.addEventListener('click', (e) => { e.stopPropagation(); unequipFn(); });
@@ -10065,6 +10665,95 @@ function showEquippedMenu(eq, event) {
 
 function closeItemMenu() {
   $('item-menu').classList.remove('active');
+}
+
+function closeGearDetail() {
+  $('gear-detail').classList.remove('active');
+}
+
+function showGearDetail(item) {
+  if (!item || inputLocked) return;
+  closeGearDetail();
+
+  // Header: glyph + name + rarity tag
+  const header = $('gd-header');
+  header.innerHTML = '';
+  const glyphSpan = document.createElement('span');
+  glyphSpan.className = 'gd-glyph';
+  glyphSpan.textContent = item.glyph;
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'gd-name';
+  nameSpan.textContent = item.name;
+  const raritySpan = document.createElement('span');
+  raritySpan.className = 'gd-rarity';
+  if (item.tier >= 3 && item.special) {
+    raritySpan.textContent = '[Epic]';
+    raritySpan.style.color = '#ffcc00';
+  } else if (item.tier === 3) {
+    raritySpan.textContent = '[Rare]';
+    raritySpan.style.color = '#aa44ff';
+  } else if (item.tier === 2) {
+    raritySpan.textContent = '[Uncommon]';
+    raritySpan.style.color = '#44aaff';
+  }
+  header.appendChild(glyphSpan);
+  header.appendChild(nameSpan);
+  if (raritySpan.textContent) header.appendChild(raritySpan);
+
+  // Stats
+  const stats = $('gd-stats');
+  stats.innerHTML = '';
+  if (item.itemType === 'weapon') {
+    if (item.attack) { const d = document.createElement('div'); d.textContent = `ATK +${item.attack}`; stats.appendChild(d); }
+  } else if (item.itemType === 'armor') {
+    if (item.defense) { const d = document.createElement('div'); d.textContent = `DEF +${item.defense}`; stats.appendChild(d); }
+  } else if (item.itemType === 'ranged') {
+    const d = document.createElement('div'); d.textContent = `DMG ${item.damage || 0}, Range ${item.range || 0}`; stats.appendChild(d);
+  } else if (item.itemType === 'ring') {
+    if (item.attack) { const d = document.createElement('div'); d.textContent = `ATK +${item.attack}`; stats.appendChild(d); }
+    if (item.defense) { const d = document.createElement('div'); d.textContent = `DEF +${item.defense}`; stats.appendChild(d); }
+  }
+  if (item.value) { const d = document.createElement('div'); d.textContent = `Value: ${item.value}g`; stats.appendChild(d); }
+
+  // Special effect
+  const special = $('gd-special');
+  special.innerHTML = '';
+  special.classList.remove('has-content');
+  if (item.special && SPECIAL_DESC[item.special]) {
+    special.textContent = `\u2728 ${item.special}: ${SPECIAL_DESC[item.special]}`;
+    special.classList.add('has-content');
+  } else if (item.special) {
+    special.textContent = `\u2728 ${item.special}`;
+    special.classList.add('has-content');
+  }
+
+  // Extra info
+  const extra = $('gd-extra');
+  extra.innerHTML = '';
+  extra.classList.remove('has-content');
+  const extraLines = [];
+  if (item.cursed && item.curseRevealed) extraLines.push('\u26a0 CURSED — cannot unequip without Remove Curse');
+  if (item.special === 'lantern' && state.player) extraLines.push(`Fuel: ${state.player.lanternFuel} turns remaining`);
+  if (item.special === 'soul' && state.player) extraLines.push(`Soul fragments: ${state.player.soulFragments}`);
+  if (item.loadedArrow) extraLines.push(`Loaded: ${item.loadedArrow.name}`);
+  if (item.desc && item.desc !== '???') extraLines.push(item.desc);
+  for (const line of extraLines) {
+    const d = document.createElement('div');
+    d.textContent = line;
+    extra.appendChild(d);
+  }
+  if (extraLines.length) extra.classList.add('has-content');
+
+  $('gear-detail').classList.add('active');
+  haptic(20);
+
+  setTimeout(() => {
+    const closer = (e) => {
+      if (!$('gear-detail').contains(e.target)) closeGearDetail();
+    };
+    document.addEventListener('click', closer, { once: true });
+    document.addEventListener('touchend', closer, { once: true });
+  }, 200);
 }
 
 function closeMenuOnOutside(e) {
@@ -10180,7 +10869,7 @@ function setupInput() {
       case 'e': showQuickEquip(); break;
       case 't': showQuickThrow(); break;
       case 'f': fireRangedWeapon(); break;
-      case 'c': closeDoor(); break;
+      case 'c': showSettings(); break;
       case 'b': if (state && !state.gameOver) showBadgeOverlay(); break;
       case 'h': case '?': showHelp(); break;
       case 'q': doSpecial(); break;
@@ -10351,42 +11040,18 @@ function setupInput() {
     else if (state.player.classId === 'escapeartist') activateTeleportStairs();
     else if (state.player.classId === 'conjurer') activateConjurerMenu();
     else if (state.player.classId === 'elementalist') activateElementalistMenu();
-    else if (state.player.classId === 'monk') activateMeditate();
+    else if (state.player.classId === 'monk') activateMonkMenu();
     else if (state.player.classId === 'bishop') activateBishopMenu();
+    else if (state.player.classId === 'earthshaker') activateTectonicSlam();
     spArmed = false;
   };
   spBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    // Hold-to-activate: hold 300ms
-    spHoldTimer = setTimeout(() => {
-      spHoldTimer = null;
-      doSpecial();
-    }, 300);
   }, { passive: false });
   spBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (state?.throwMode && state.throwItem?.item?.itemType === 'aimed_shot') {
-      if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
-      doSpecial();
-      spLastTap = 0;
-      return;
-    }
-    if (spHoldTimer) {
-      clearTimeout(spHoldTimer);
-      spHoldTimer = null;
-      // Double-tap check: two taps within 400ms
-      const now = Date.now();
-      if (now - spLastTap < 400) {
-        doSpecial();
-        spLastTap = 0;
-      } else {
-        spLastTap = now;
-      }
-    }
+    doSpecial();
   }, { passive: false });
-  spBtn.addEventListener('touchcancel', () => {
-    if (spHoldTimer) { clearTimeout(spHoldTimer); spHoldTimer = null; }
-  });
   // Keyboard / mouse click (desktop) — works immediately
   spBtn.addEventListener('click', (e) => {
     // Ignore if touch event handled it
@@ -10807,7 +11472,8 @@ function showSettings() {
           break;
         case 'monk':
           abilities.push({ icon: '🥋', name: 'Disciplined Body', desc: `ATK ${getDisplayedPlayerAttack(p)} and DEF ${getDisplayedPlayerDefense(p)} scale with level` });
-          abilities.push({ icon: '🧘', name: 'Meditate', desc: `Cleanse + heal in an empty room (${p.meditateCooldown > 0 ? p.meditateCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '🧘', name: 'Meditate', desc: `Cleanse status effects and heal 20% HP (${p.meditateCooldown > 0 ? p.meditateCooldown + 't CD' : 'Ready'})` });
+          abilities.push({ icon: '💫', name: 'Ki Bolt', desc: `Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8 (${p.kiBoltCooldown > 0 ? p.kiBoltCooldown + 't CD' : 'Ready'})` });
           abilities.push({ icon: '🌊', name: 'Water Walker', desc: 'Cross deep water without a potion' });
           abilities.push({ icon: '🎶', name: 'Song Mastery', desc: 'Can play song items reliably with an instrument' });
           break;
@@ -10821,6 +11487,16 @@ function showSettings() {
           abilities.push({ icon: '🟢', name: 'Vial of Slime', desc: `3×3 acid pool, 5 turns (${p.vialOfSlimeCooldown > 0 ? p.vialOfSlimeCooldown + 't CD' : 'Ready'})` });
           abilities.push({ icon: '⚡', name: 'Thunderclap', desc: `AoE lightning, stuns acid-soaked foes (${p.thunderclapCooldown > 0 ? p.thunderclapCooldown + 't CD' : 'Ready'})` });
           break;
+        case 'earthshaker': {
+          const esTier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+          const esTierDescs = ['', 'radius 1, no stun', 'radius 2, stun, breaks secret walls', 'radius 3, stun, breaks doors', 'entire room, stun, clears rubble'];
+          abilities.push({ icon: '🌋', name: 'Tectonic Slam', desc: `Tier ${esTier} — AoE seismic blast (${p.tectonicSlamCooldown > 0 ? p.tectonicSlamCooldown + 't CD' : 'Ready'}) [${esTierDescs[esTier]}]` });
+          abilities.push({ icon: '🔔', name: 'Tremorsense', desc: `Sense enemies within ${p.tremorMastery ? 5 : 3} tiles through walls (minimap)` });
+          abilities.push({ icon: '🪨', name: 'Surefooted', desc: 'Walk through rubble tiles freely' });
+          abilities.push({ icon: '⚡', name: 'Faultline Criticals', desc: 'Auto-crit stunned foes or foes pinned against walls' });
+          abilities.push({ icon: '🌿', name: 'Adrenaline Surge', desc: '+2 ATK for 5 turns when an avalanche strikes' });
+          break;
+        }
       }
       // Add unlocked class-specific perks
       const classPerkFlags = [
@@ -10833,6 +11509,11 @@ function showSettings() {
         { flag: 'necroticSurge', icon: '☣️', name: 'Necrotic Surge', desc: 'Acid bolt splashes poison nearby' },
         { flag: 'smokeScreen', icon: '💨', name: 'Smoke Screen', desc: 'Teleport leaves smoke at origin' },
         { flag: 'chainLightning', icon: '⚡', name: 'Chain Lightning', desc: 'Thunderclap chains to nearby enemies' },
+        { flag: 'aftershock', icon: '🌋', name: 'Aftershock', desc: 'Tectonic Slam cooldown -3 turns' },
+        { flag: 'seismicResonance', icon: '☠️', name: 'Seismic Resonance', desc: 'Tectonic Slam poisons survivors (2t)' },
+        { flag: 'tremorMastery', icon: '🔔', name: 'Tremor Mastery', desc: 'Tremorsense range increased to 5 tiles' },
+        { flag: 'ironFocus', icon: '💫', name: 'Iron Focus', desc: 'Ki Bolt pierces through all enemies in its path' },
+        { flag: 'resonantPalm', icon: '🥋', name: 'Resonant Palm', desc: '25% melee stun to enemies adjacent to target' },
       ];
       for (const cp of classPerkFlags) {
         if (p[cp.flag]) abilities.push({ icon: cp.icon, name: `★ ${cp.name}`, desc: cp.desc });
@@ -11526,9 +12207,6 @@ function renderMinimap() {
         case T.MOUND:
           ctx.fillStyle = vis ? '#8a6030' : '#3a2810';
           break;
-        case T.ICY_PATH:
-          ctx.fillStyle = vis ? '#80d8f0' : '#203040';
-          break;
         case T.FIRE_PATH:
           ctx.fillStyle = vis ? '#e05010' : '#501808';
           break;
@@ -11619,6 +12297,20 @@ function renderMinimap() {
     if (!state.visible[idx]) continue;
     ctx.fillStyle = '#cc44ff';
     ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+  }
+
+  // Tremorsense (Earthshaker): draw amber dots for nearby non-visible enemies
+  if (state.player.tremorsense) {
+    const tRange = state.player.tremorMastery ? 5 : 3;
+    for (const e of state.entities) {
+      if (e.type !== 'enemy' || e.hp <= 0 || e.isAlly) continue;
+      const dist = Math.abs(e.x - state.player.x) + Math.abs(e.y - state.player.y);
+      if (dist > tRange) continue;
+      const idx = e.y * MAP_W + e.x;
+      if (state.visible[idx]) continue; // already shown below
+      ctx.fillStyle = '#c06020';
+      ctx.fillRect(e.x * scale, e.y * scale, scale, scale);
+    }
   }
 
   // Draw visible enemies
@@ -11980,7 +12672,7 @@ const FLOOR_CARD_DATA = {
   }
 };
 
-function showFloorCard(floor, biomeKey, onDone) {
+function showFloorCard(floor, biomeKey, onDone, brief) {
   const card = $('floor-card');
   const biome = getFloorBiome(floor);
   const data  = FLOOR_CARD_DATA[biomeKey] || FLOOR_CARD_DATA.sewers;
@@ -11988,6 +12680,12 @@ function showFloorCard(floor, biomeKey, onDone) {
   $('floor-card-floor').textContent = 'Floor ' + floor;
   $('floor-card-name').textContent  = biome.name;
   $('floor-card-atmo').textContent  = data.atmo;
+
+  // Show/hide tap hint based on mode
+  const tapHint = card.querySelector('.floor-card-tap');
+  if (tapHint) tapHint.style.opacity = brief ? '0' : '';
+
+  Audio.floorReveal();
 
   const EXIT_MS   =  350;
   const SAFETY_MS = EXIT_MS + 400;
@@ -12022,11 +12720,16 @@ function showFloorCard(floor, biomeKey, onDone) {
     dismiss();
   }
 
-  // Accept tap after minimum display time
-  setTimeout(function() {
-    card.addEventListener('click', onTap);
-    card.addEventListener('touchend', onTap, { passive: false });
-  }, MIN_MS);
+  if (brief) {
+    // Brief mode: auto-dismiss after 1.2s, no tap needed
+    setTimeout(dismiss, 1200);
+  } else {
+    // Accept tap after minimum display time
+    setTimeout(function() {
+      card.addEventListener('click', onTap);
+      card.addEventListener('touchend', onTap, { passive: false });
+    }, MIN_MS);
+  }
 }
 
 function getBiomeKey(floor) {
@@ -12271,9 +12974,10 @@ function throwProjectile(dx, dy, isSecondShot) {
   const isRangedShot = item.itemType === 'ranged_shot';
   const isAcidBolt = item.itemType === 'acid_bolt';
   const isArcaneDart = item.itemType === 'arcane_dart';
+  const isKiBolt = item.itemType === 'ki_bolt';
   const isBishopMissile = item.itemType === 'bishop_missile';
   const isBishopSleep = item.itemType === 'bishop_sleep';
-  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart || isBishopMissile || isBishopSleep ? (item.range || 8) : 8);
+  const maxRange = isAimedShot ? 50 : (isRangedShot || isAcidBolt || isArcaneDart || isKiBolt || isBishopMissile || isBishopSleep ? (item.range || 8) : 8);
   const p = state.player;
 
   let x = p.x + dx;
@@ -12309,6 +13013,8 @@ function throwProjectile(dx, dy, isSecondShot) {
         addMessage(`☣️ Acid Bolt hits ${target.name} for ${dmg}!`, 'good');
       } else if (isArcaneDart) {
         addMessage(`✨ Arcane Dart hits ${target.name} for ${dmg}!`, 'good');
+      } else if (isKiBolt) {
+        addMessage(`💫 Ki Bolt hits ${target.name} for ${dmg}!`, 'good');
       } else if (isBishopMissile) {
         addMessage(`✨ Magic Missile hits ${target.name} for ${dmg}!`, 'good');
       } else if (isBishopSleep) {
@@ -12351,9 +13057,19 @@ function throwProjectile(dx, dy, isSecondShot) {
           if (state.runStats.thrownKills >= 3) unlockBadge('sharpshooter');
         }
       }
-      break;
+      // Ki Bolt with Iron Focus pierces through enemies
+      if (!isKiBolt || !p.ironFocus) break;
     }
-    if (!isWalkable(x, y)) break;
+    { const tt = getTile(x, y); if (!isWalkable(x, y) && tt !== T.WATER && tt !== T.WATERFALL) break; }
+    // Spider web catch: 40% chance to snag physical projectiles
+    if (!isAcidBolt && !isArcaneDart && !isKiBolt && !isBishopMissile && !isBishopSleep) {
+      const webHere = state.entities.find(e => e.type === 'hazard' && e.hazardType === 'web' && e.x === x && e.y === y);
+      if (webHere && Math.random() < 0.40) {
+        addMessage(`🕸 Your ${item.name || 'projectile'} is caught in a spider web!`, 'damage');
+        removeEntity(webHere);
+        break;
+      }
+    }
     landX = x; landY = y;
     x += dx;
     y += dy;
@@ -12390,7 +13106,7 @@ function throwProjectile(dx, dy, isSecondShot) {
 
   // Animation — delay endTurn until projectile animation finishes so enemies
   // don't move while the projectile is still visually in flight
-  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : isBishopMissile ? '✨' : isBishopSleep ? '😴' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
+  const projGlyph = isAcidBolt ? '☣️' : isArcaneDart ? '✨' : isKiBolt ? '✦' : isBishopMissile ? '✨' : isBishopSleep ? '😴' : (isAimedShot || isRangedShot) ? '➤' : '🗡️';
   // Check if double shot will fire after this — if so, don't attach endTurn callback to this animation
   const willDoubleShot = isRangedShot && !isSecondShot && p.doubleShot && p.arrows > 0;
   const deferEndTurn = true; // always defer endTurn until animation completes
@@ -12422,6 +13138,12 @@ function throwProjectile(dx, dy, isSecondShot) {
   if (isArcaneDart) {
     if (!hit) addMessage('The dart flickers into the dark.', '');
     state.player.arcaneDartCooldown = 5;
+  }
+
+  if (isKiBolt) {
+    if (!hit) addMessage('💫 The ki bolt dissipates into the dark.', '');
+    else animateAoeBlast(landX, landY, 1.5, '#f0d060');
+    state.player.kiBoltCooldown = 10;
   }
 
   if (isBishopMissile) {
@@ -12483,6 +13205,8 @@ function throwProjectile(dx, dy, isSecondShot) {
     if (throwIndex >= 0 && throwIndex < p.inventory.length) p.inventory.splice(throwIndex, 1);
     if (!hit) addMessage(`Your ${item.name} clatters harmlessly away.`, '');
     else addMessage(`Your ${item.name} is destroyed in the throw!`, '');
+  } else if (isKiBolt || isArcaneDart || isAcidBolt || isBishopMissile || isBishopSleep) {
+    // Spell projectiles — handled above, no ammo/inventory logic
   } else {
     // Throwing daggers
     if (!hit) addMessage('Your dagger clatters harmlessly away.', '');
@@ -12759,6 +13483,85 @@ function activateMeditate() {
   animateAoeBlast(p.x, p.y, 1.5, '#60c0a0');
   updateUI();
   endTurn();
+}
+
+function activateKiBolt() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.kiBoltCooldown > 0) {
+    addMessage(`Ki Bolt recharging (${p.kiBoltCooldown} turns).`, '');
+    return;
+  }
+  state.throwMode = true;
+  state.throwItem = {
+    item: { name: 'Ki Bolt', damage: 2 + Math.floor(p.level * 0.75), ammo: Infinity, itemType: 'ki_bolt', range: 8 },
+    index: -1
+  };
+  addMessage('💫 Ki Bolt — choose direction!', 'good');
+  updateUI();
+  render();
+}
+
+function activateMonkMenu() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  const meditateReady = p.meditateCooldown <= 0;
+  const kiBoltReady = p.kiBoltCooldown <= 0;
+  inputLocked = true;
+  Audio.resume();
+  const overlay = $('levelup-overlay');
+  overlay.querySelector('h1').textContent = '🥋 MONK';
+  $('levelup-label').textContent = 'Choose an action:';
+  const container = $('perk-choices');
+  container.innerHTML = '';
+
+  const meditateBtn = document.createElement('button');
+  meditateBtn.className = 'perk-btn';
+  const inRoom = !!state.rooms.find(r => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
+  const tooHungry = p.hunger < 30;
+  const meditateNote = !meditateReady ? ` (${p.meditateCooldown}t)` : tooHungry ? ' (too hungry)' : !inRoom ? ' (need quiet room)' : '';
+  meditateBtn.innerHTML = `<div class="perk-name">🧘 Meditate</div><div class="perk-desc">Cleanse status effects and heal 20% HP${meditateNote}</div>`;
+  if (!meditateReady || tooHungry || !inRoom) meditateBtn.style.opacity = '0.5';
+  const meditateHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    activateMeditate();
+  };
+  meditateBtn.addEventListener('click', meditateHandler);
+  meditateBtn.addEventListener('touchend', (e) => { e.preventDefault(); meditateHandler(); }, { passive: false });
+  container.appendChild(meditateBtn);
+
+  const kiBoltBtn = document.createElement('button');
+  kiBoltBtn.className = 'perk-btn';
+  const kiBoltNote = !kiBoltReady ? ` (${p.kiBoltCooldown}t)` : '';
+  kiBoltBtn.innerHTML = `<div class="perk-name">💫 Ki Bolt</div><div class="perk-desc">Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8${kiBoltNote}</div>`;
+  if (!kiBoltReady) kiBoltBtn.style.opacity = '0.5';
+  const kiBoltHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+    activateKiBolt();
+  };
+  kiBoltBtn.addEventListener('click', kiBoltHandler);
+  kiBoltBtn.addEventListener('touchend', (e) => { e.preventDefault(); kiBoltHandler(); }, { passive: false });
+  container.appendChild(kiBoltBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'perk-btn';
+  cancelBtn.style.borderColor = 'var(--text-dim)';
+  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  const cancelHandler = () => {
+    overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
+    overlay.classList.remove('active');
+    inputLocked = false;
+  };
+  cancelBtn.addEventListener('click', cancelHandler);
+  cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
+  container.appendChild(cancelBtn);
+
+  overlay.classList.add('active');
+  render();
 }
 
 function activateAimedShot() {
@@ -13134,6 +13937,111 @@ function activateThunderclap() {
   p.thunderclapCooldown = 8;
   animateAoeBlast(p.x, p.y, 1.5, '#ffff40');
   Audio.useItem();
+  screenShake();
+  updateUI();
+  render();
+  endTurn();
+}
+
+// === EARTHSHAKER ABILITIES ===
+function activateTectonicSlam() {
+  if (inputLocked || state.gameOver || state.victory) return;
+  const p = state.player;
+  if (p.tectonicSlamCooldown > 0) {
+    addMessage(`Tectonic Slam recharging (${p.tectonicSlamCooldown} turns).`, '');
+    return;
+  }
+  Audio.resume();
+  haptic(50);
+
+  const tier = p.level >= 7 ? 4 : p.level >= 5 ? 3 : p.level >= 3 ? 2 : 1;
+  const damage = 3 + p.attack + Math.floor(state.floor / 3);
+  let hitCount = 0;
+  const hitEnemies = [];
+  const terraformTiles = [];
+
+  // Determine affected area
+  let affectedTiles = [];
+  if (tier === 4) {
+    // Entire room the player is in; fall back to radius 3 in corridors
+    const pRoom = state.rooms ? state.rooms.find(r =>
+      p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
+    ) : null;
+    if (pRoom) {
+      for (let ry = pRoom.y; ry < pRoom.y + pRoom.h; ry++) {
+        for (let rx = pRoom.x; rx < pRoom.x + pRoom.w; rx++) {
+          if (rx === p.x && ry === p.y) continue;
+          affectedTiles.push({ x: rx, y: ry });
+        }
+      }
+    } else {
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          affectedTiles.push({ x: p.x + dx, y: p.y + dy });
+        }
+      }
+    }
+  } else {
+    const radius = tier; // tier 1=1, tier 2=2, tier 3=3
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        affectedTiles.push({ x: p.x + dx, y: p.y + dy });
+      }
+    }
+  }
+
+  // Hit enemies in affected area
+  for (const { x, y } of affectedTiles) {
+    const enemies = state.entities.filter(e => e.type === 'enemy' && e.hp > 0 && !e.isAlly && e.x === x && e.y === y);
+    for (const enemy of enemies) {
+      enemy.hp -= damage;
+      hitCount++;
+      hitEnemies.push(enemy);
+      if (tier >= 2) addStatusEffect(enemy, 'frozen', 1);
+      addMessage(`🌋 ${enemy.name} shaken by tremor! (-${damage})${tier >= 2 ? ' Stunned!' : ''}`, 'good');
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    // Terrain effects
+    const t = getTile(x, y);
+    if (tier >= 2 && t === T.WALL_SECRET) terraformTiles.push({ x, y, to: T.FLOOR, secret: true });
+    if (tier >= 3 && (t === T.DOOR_SEALED || t === T.DOOR_LOCKED)) terraformTiles.push({ x, y, to: T.DOOR_OPEN });
+    if (tier === 4 && t === T.RUBBLE) terraformTiles.push({ x, y, to: T.FLOOR });
+  }
+
+  // Apply terrain changes
+  let anyTerrain = false;
+  for (const tf of terraformTiles) {
+    setTile(tf.x, tf.y, tf.to);
+    anyTerrain = true;
+    if (tf.secret) {
+      const secretItem = generateRandomItem(state.floor);
+      if (secretItem) {
+        state.entities.push(createItemEntity(secretItem, tf.x, tf.y));
+        addMessage(`A ${secretItem.name} was hidden in the wall!`, 'gold');
+      }
+    }
+  }
+  if (anyTerrain) computeFOV();
+
+  // Seismic Resonance perk: survivors get 2-turn poison
+  if (p.seismicResonance) {
+    for (const enemy of hitEnemies) {
+      if (enemy.hp > 0) addStatusEffect(enemy, 'poisoned', 2);
+    }
+  }
+
+  if (hitCount === 0) {
+    addMessage('🌋 The ground shakes — but no enemies nearby!', '');
+  }
+
+  const baseCooldown = getMasteryBonuses('earthshaker').fastSlam ? 8 : 10;
+  p.tectonicSlamCooldown = p.aftershock ? Math.max(1, baseCooldown - 3) : baseCooldown;
+
+  animateAoeBlast(p.x, p.y, tier === 4 ? 4 : tier + 0.5, '#c06020');
+  if (typeof Audio.earthshake === 'function') Audio.earthshake();
+  else Audio.hit();
   screenShake();
   updateUI();
   render();
