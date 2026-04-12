@@ -956,6 +956,9 @@ function normalizeLoadedPlayer(player) {
   player.arcaneResonance = !!player.arcaneResonance;
   player.twinCast = !!player.twinCast;
   player.divineAegis = !!player.divineAegis;
+  player.soulFragments = Math.max(0, player.soulFragments || 0);
+  player.soulWardHp = Math.max(0, player.soulWardHp || 0);
+  player.soulWardTurns = Math.max(0, player.soulWardTurns || 0);
   // Elementalist
   player.poisonImmune = player.classId === 'elementalist';
   player.acidImmune = player.classId === 'elementalist';
@@ -1575,6 +1578,8 @@ function createPlayer(classId = 'berserker') {
     chainLightning: false,
     // Soul Amulet
     soulFragments: 0,
+    soulWardHp: 0,
+    soulWardTurns: 0,
     defPurchases: 0, // Sage shop: tracks escalating +1 DEF cost
     // Per-floor class ability state (reset each floor in playerDescend)
     classState: {
@@ -1841,7 +1846,7 @@ const SPECIAL_DESC = {
   hunger:     'Hunger increases more slowly',
   detection:  'Reveals secret walls and hidden objects',
   lantern:    '+3 FOV while fueled (1 fuel per turn)',
-  soul:       'Collect soul fragments from kills, spend 5 to heal 10 HP',
+  soul:       'Spend fragments for healing, soul burst damage, or a protective ward',
   pierce:     'Ignores 1 point of enemy DEF',
 };
 
@@ -1894,7 +1899,7 @@ const CODEX_BIOME_DATA = [
 const SPECIALTY_ITEMS = {
   lantern: { name: 'Enchanted Lantern', glyph: '🔦', itemType: 'ring', special: 'lantern', value: 55, desc: 'Equip as ring. Use Oil Flasks to fuel (+3 FOV while lit)' },
   oil: { name: 'Oil Flask', glyph: '🛢️', itemType: 'oil', value: 8, desc: 'Fuel for Enchanted Lantern (+20 turns of light)' },
-  soulAmulet: { name: 'Soul Amulet', glyph: '📿', itemType: 'ring', special: 'soul', value: 60, desc: 'Collect soul fragments from kills. Spend 5 to heal 10 HP' },
+  soulAmulet: { name: 'Soul Amulet', glyph: '📿', itemType: 'ring', special: 'soul', value: 60, desc: 'Collect soul fragments and channel them into mend, burst, or ward powers' },
   mortar: { name: "Alchemist's Mortar", glyph: '🧪', itemType: 'mortar', value: 40, desc: 'Combine 3 herbs to brew a random potion' },
   herb: { name: 'Cave Herb', glyph: '🌿', itemType: 'herb', value: 3, desc: 'Ingredient for brewing. Collect 3 + mortar to brew a potion' }
 };
@@ -4575,6 +4580,24 @@ function attackEntity(attacker, defender) {
     damage = Math.max(1, damage - 1);
   }
 
+  // Soul Ward: absorb incoming damage before HP loss
+  if (defender === state.player && (state.player.soulWardHp || 0) > 0) {
+    const absorbed = Math.min(damage, state.player.soulWardHp);
+    state.player.soulWardHp -= absorbed;
+    damage -= absorbed;
+    if (absorbed > 0) addMessage(`Soul Ward absorbs ${absorbed} damage.`, 'good');
+    if (state.player.soulWardHp <= 0) {
+      state.player.soulWardHp = 0;
+      state.player.soulWardTurns = 0;
+      addMessage('Soul Ward shatters!', 'damage');
+    }
+    if (damage <= 0) {
+      addMessage(`${attacker.name}'s strike is fully warded!`, 'good');
+      Audio.miss();
+      return;
+    }
+  }
+
   // Ghost miss chance (suppressed while weakened)
   if (defender.special === 'phase' && !hasStatusEffect(defender, 'weakened') && Math.random() < 0.5) {
     addMessage(`Your attack passes through the ${defender.name}!`, '');
@@ -5239,6 +5262,7 @@ function hasStatusEffect(entity, type) {
 function processStatusEffects() {
   // Player effects
   processEntityEffects(state.player);
+  tickSoulWard();
 
   // Dirge: damage all visible enemies each turn
   if (hasStatusEffect(state.player, 'dirge')) {
@@ -7290,21 +7314,95 @@ function brewWithMortar(mortarIndex) {
   Audio.useItem();
 }
 
-// Soul Amulet: collect fragments on kill, spend to heal
+// Soul Amulet: collect fragments and spend them on scaling effects
+const SOUL_AMULET_COST = 5;
+const SOUL_WARD_TURNS = 4;
+
+function getSoulAmuletValues(level) {
+  const lv = Math.max(1, level || 1);
+  return {
+    heal: Math.min(11, 5 + Math.floor(lv / 2)),
+    burst: Math.min(10, 4 + Math.floor(lv / 2)),
+    ward: Math.min(6, 3 + Math.floor(lv / 3))
+  };
+}
+
+function getNearestVisibleEnemy() {
+  if (!state?.player || !state?.visible) return null;
+  const p = state.player;
+  let best = null;
+  let bestDist = Infinity;
+  for (const e of state.entities) {
+    if (e.type !== 'enemy' || e.hp <= 0 || e.isAlly) continue;
+    if (!state.visible[e.y * MAP_W + e.x]) continue;
+    const dist = Math.abs(e.x - p.x) + Math.abs(e.y - p.y);
+    if (dist < bestDist) {
+      best = e;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 function soulAmuletCollect() {
   if (state.player.equipped.ring?.special !== 'soul') return;
   state.player.soulFragments++;
   addMessage(`Soul fragment collected! (${state.player.soulFragments})`, 'good');
 }
 
-function soulAmuletSpend() {
+function soulAmuletSpend(effect = 'mend') {
   const p = state.player;
   if (p.equipped.ring?.special !== 'soul') { addMessage('Equip the Soul Amulet first!', 'damage'); return; }
-  if (p.soulFragments < 5) { addMessage(`Need 5 soul fragments (have ${p.soulFragments}).`, 'damage'); return; }
-  p.soulFragments -= 5;
-  p.hp = Math.min(p.maxHp, p.hp + 10);
-  addMessage('You channel soul energy! (+10 HP)', 'good');
+  if (p.soulFragments < SOUL_AMULET_COST) { addMessage(`Need ${SOUL_AMULET_COST} soul fragments (have ${p.soulFragments}).`, 'damage'); return false; }
+
+  const values = getSoulAmuletValues(p.level);
+
+  if (effect === 'burst') {
+    const target = getNearestVisibleEnemy();
+    if (!target) {
+      addMessage('No visible enemy to target.', 'damage');
+      return false;
+    }
+    p.soulFragments -= SOUL_AMULET_COST;
+    target.hp -= values.burst;
+    animateDamageNumber(target.x, target.y, values.burst, false, false);
+    animateEntityFlash(target.x, target.y, '#c080ff');
+    addMessage(`Soul Burst hits ${target.name} for ${values.burst}.`, 'good');
+    if (target.hp <= 0) killEnemy(target);
+    Audio.useItem();
+    return true;
+  }
+
+  if (effect === 'ward') {
+    p.soulFragments -= SOUL_AMULET_COST;
+    p.soulWardHp = Math.max(p.soulWardHp || 0, values.ward);
+    p.soulWardTurns = SOUL_WARD_TURNS;
+    addMessage(`Soul Ward: ${p.soulWardHp} shield for ${SOUL_WARD_TURNS} turns.`, 'good');
+    Audio.useItem();
+    return true;
+  }
+
+  p.soulFragments -= SOUL_AMULET_COST;
+  p.hp = Math.min(p.maxHp, p.hp + values.heal);
+  addMessage(`Soul Mend restores ${values.heal} HP.`, 'good');
   Audio.useItem();
+  return true;
+}
+
+function tickSoulWard() {
+  const p = state.player;
+  if (!p) return;
+  if ((p.soulWardHp || 0) <= 0 || (p.soulWardTurns || 0) <= 0) {
+    p.soulWardHp = 0;
+    p.soulWardTurns = 0;
+    return;
+  }
+  p.soulWardTurns--;
+  if (p.soulWardTurns <= 0) {
+    p.soulWardHp = 0;
+    p.soulWardTurns = 0;
+    addMessage('Soul Ward fades.', '');
+  }
 }
 
 // Lantern fuel tick — consume 1 fuel per turn when equipped
@@ -10695,12 +10793,25 @@ function showEquippedMenu(eq, event) {
 
   // Soul Amulet: spend fragments
   if (item.special === 'soul') {
-    const soulBtn = document.createElement('button');
-    soulBtn.textContent = `Channel Souls (5 → +10 HP) [${state.player.soulFragments}]`;
-    const soulFn = () => { soulAmuletSpend(); updateUI(); render(); closeItemMenu(); };
-    soulBtn.addEventListener('click', (e) => { e.stopPropagation(); soulFn(); });
-    soulBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); soulFn(); }, { passive: false });
-    menu.appendChild(soulBtn);
+    const soul = getSoulAmuletValues(state.player.level);
+    const soulActions = [
+      { label: `Soul Mend (${SOUL_AMULET_COST} → +${soul.heal} HP) [${state.player.soulFragments}]`, effect: 'mend' },
+      { label: `Soul Burst (${SOUL_AMULET_COST} → ${soul.burst} DMG) [${state.player.soulFragments}]`, effect: 'burst' },
+      { label: `Soul Ward (${SOUL_AMULET_COST} → ${soul.ward} SH, ${SOUL_WARD_TURNS}t) [${state.player.soulFragments}]`, effect: 'ward' }
+    ];
+    for (const action of soulActions) {
+      const btn = document.createElement('button');
+      btn.textContent = action.label;
+      const soulFn = () => {
+        const used = soulAmuletSpend(action.effect);
+        updateUI();
+        render();
+        if (used) closeItemMenu();
+      };
+      btn.addEventListener('click', (e) => { e.stopPropagation(); soulFn(); });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); soulFn(); }, { passive: false });
+      menu.appendChild(btn);
+    }
   }
 
   // Lantern: show fuel status
@@ -10816,7 +10927,11 @@ function showGearDetail(item) {
   const extraLines = [];
   if (item.cursed && item.curseRevealed) extraLines.push('\u26a0 CURSED — cannot unequip without Remove Curse');
   if (item.special === 'lantern' && state.player) extraLines.push(`Fuel: ${state.player.lanternFuel} turns remaining`);
-  if (item.special === 'soul' && state.player) extraLines.push(`Soul fragments: ${state.player.soulFragments}`);
+  if (item.special === 'soul' && state.player) {
+    const soul = getSoulAmuletValues(state.player.level);
+    extraLines.push(`Soul fragments: ${state.player.soulFragments}`);
+    extraLines.push(`Soul Mend +${soul.heal} HP, Soul Burst ${soul.burst} DMG, Soul Ward ${soul.ward} SH`);
+  }
   if (item.loadedArrow) extraLines.push(`Loaded: ${item.loadedArrow.name}`);
   if (item.desc && item.desc !== '???') extraLines.push(item.desc);
   for (const line of extraLines) {
@@ -12927,6 +13042,9 @@ function renderStatusFX() {
   }
   if (state.fortifyMode) {
     html += '<div class="fx-pill" style="background:rgba(192,144,64,0.2);border-color:#c09040;color:#c09040;">🧱 Build&hellip;</div>';
+  }
+  if ((state.player.soulWardHp || 0) > 0 && (state.player.soulWardTurns || 0) > 0) {
+    html += `<div class="fx-pill" style="background:rgba(96,160,255,0.2);border-color:#60a0ff;color:#60a0ff;">🛡️ Ward ${state.player.soulWardHp}/${state.player.soulWardTurns}</div>`;
   }
   for (const eff of effects) {
     const cfg = labels[eff.type];

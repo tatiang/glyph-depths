@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 12, 2026 — 12:04 AM PT — Soul Amulets now offer level-scaled heal, burst, and ward powers
+- Replaced the single Soul Amulet heal action with three options: `Soul Mend`, `Soul Burst`, and `Soul Ward`.
+- Added player-level scaling for all three effects and a 4-turn Soul Ward shield that absorbs incoming damage.
+- Updated Soul Amulet gear/menu text to show current per-level effect values in-game.
+
 Apr 11, 2026 — 11:46 PM PT — Improved title-screen exit flow and fixed multiple targeting/shop bugs
 - Added `Back to Title` on class select and `Esc` support to return to the title screen.
 - Fixed Merchant item-card `Cancel` interactions and added quantity tags for stackable store inventory entries.
