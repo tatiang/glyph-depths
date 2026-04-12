@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 11, 2026 — 11:46 PM PT — Improved title-screen exit flow and fixed multiple targeting/shop bugs
+- Added `Back to Title` on class select and `Esc` support to return to the title screen.
+- Fixed Merchant item-card `Cancel` interactions and added quantity tags for stackable store inventory entries.
+- Mimics now disguise as monsters instead of gear/chest-like visuals, and Ki Bolt indicators with Iron Focus no longer stop at monsters.
+
 Apr 11, 2026 — 2:53 PM PT — Resolved PR #44 merge conflicts against current mainline
 - Merged latest `main` changes into PR branch `claude/wizardly-northcutt` to make PR #44 mergeable again.
 - Kept current class/audio/input behavior from `main` while preserving existing Bishop class feature content.

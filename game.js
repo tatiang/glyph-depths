@@ -1343,6 +1343,7 @@ function showClassSelect() {
     if (!$('title-screen') || !$('title-screen').classList.contains('active') || $('class-section').style.display === 'none') return;
     if (e.key === 'ArrowRight' && currentPage < pages.length - 1) { goToPage(currentPage + 1); e.preventDefault(); e.stopPropagation(); }
     else if (e.key === 'ArrowLeft' && currentPage > 0) { goToPage(currentPage - 1); e.preventDefault(); e.stopPropagation(); }
+    else if (e.key === 'Escape') { showTitle(); e.preventDefault(); e.stopPropagation(); }
   }
   document.addEventListener('keydown', classKeyNav);
   pager._classKeyNav = classKeyNav;
@@ -2746,7 +2747,27 @@ function getFarthestRoom(fromX, fromY) {
 }
 
 // === ENTITY SYSTEM ===
+const MIMIC_DISGUISE_POOL = (() => {
+  const seen = new Set();
+  const pool = [];
+  for (const tier of Object.values(ENEMY_TIERS)) {
+    for (const t of tier) {
+      if (!t || t.special === 'mimic') continue;
+      const key = `${t.name}|${t.glyph}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pool.push({ name: t.name, glyph: t.glyph });
+    }
+  }
+  return pool.length ? pool : [{ name: 'Skeleton', glyph: '💀' }];
+})();
+
+function pickMimicMonsterDisguise() {
+  return MIMIC_DISGUISE_POOL[Math.floor(Math.random() * MIMIC_DISGUISE_POOL.length)];
+}
+
 function createEnemy(template, x, y) {
+  const mimicDisguise = template.special === 'mimic' ? pickMimicMonsterDisguise() : null;
   return {
     type: 'enemy',
     x, y,
@@ -2769,11 +2790,13 @@ function createEnemy(template, x, y) {
     isAlly: false,
     allyTurns: 0,
     confused: 0,
+    mimicDisguiseGlyph: mimicDisguise?.glyph || null,
+    mimicDisguiseName: mimicDisguise?.name || null,
     // Boss specific
     phase: 1,
     teleportCooldown: 0,
-    // Mimic disguise: random class icon
-    disguiseGlyph: template.special === 'mimic' ? CLASS_DEFS[Math.floor(Math.random() * CLASS_DEFS.length)].icon : undefined
+    // Backward-compatible alias used by older save/load and render paths
+    disguiseGlyph: mimicDisguise?.glyph
   };
 }
 
@@ -7489,15 +7512,50 @@ function renderDropSection(container, refreshCallback) {
   dropLabel.style.cssText = 'color:var(--text-dim);font-size:11px;margin:12px 0 4px;text-align:center;letter-spacing:0.05em;';
   dropLabel.textContent = `— DROP ITEM (${p.inventory.length}/${MAX_INVENTORY}) —`;
   container.appendChild(dropLabel);
+
+  const qtyKey = (item) => {
+    if (!item) return '';
+    if (item.itemType === 'potion' || item.itemType === 'scroll') {
+      return `${item.itemType}:${item.effectId || item.trueName || item.name}`;
+    }
+    if (item.itemType === 'special_arrow') return `${item.itemType}:${item.arrowType || item.name}`;
+    if (item.itemType === 'song') return `${item.itemType}:${item.songId || item.name}`;
+    return `${item.itemType}:${item.name}`;
+  };
+
+  const qtyFor = (item) => {
+    if (!item) return 1;
+    if (item.itemType === 'food') return Math.max(1, item.stack || item.count || 1);
+    if (item.itemType === 'thrown' || item.itemType === 'special_arrow') return Math.max(1, item.ammo || 1);
+    if (item.itemType === 'arrows') return Math.max(1, item.count || 1);
+    if (item.count && item.count > 1) return item.count;
+    if (item.stack && item.stack > 1) return item.stack;
+    if (item.itemType === 'potion' || item.itemType === 'scroll' || item.itemType === 'song') {
+      const key = qtyKey(item);
+      const total = p.inventory.reduce((sum, inv) => {
+        if (qtyKey(inv) !== key) return sum;
+        return sum + Math.max(1, inv.count || inv.stack || 1);
+      }, 0);
+      return Math.max(1, total);
+    }
+    return 1;
+  };
+
   for (let i = 0; i < p.inventory.length; i++) {
     const item = p.inventory[i];
     const div = document.createElement('div');
     div.className = 'shop-item';
     let detail = '';
+    let showQtyTag = true;
     if (item.itemType === 'weapon' && item.attack != null) detail = ` [+${item.attack} ATK]`;
     else if (item.itemType === 'armor' && item.defense != null) detail = ` [+${item.defense} DEF]`;
-    else if (item.itemType === 'thrown') detail = ` [×${item.ammo}]`;
-    div.innerHTML = `<span>${item.glyph || ''} ${item.name}${detail}</span><span style="color:#ff6040;font-size:11px;">Drop</span>`;
+    else if (item.itemType === 'thrown') { detail = ` [×${item.ammo}]`; showQtyTag = false; }
+    else if (item.itemType === 'special_arrow') { detail = ` [×${item.ammo}]`; showQtyTag = false; }
+    else if (item.itemType === 'food' && (item.stack || 1) > 1) { detail = ` [×${item.stack || 1}]`; showQtyTag = false; }
+    else if (item.itemType === 'arrows' && (item.count || 1) > 1) { detail = ` [×${item.count || 1}]`; showQtyTag = false; }
+    const qty = qtyFor(item);
+    const qtyTag = showQtyTag && qty > 1 ? ` [×${qty}]` : '';
+    div.innerHTML = `<span>${item.glyph || ''} ${item.name}${detail}${qtyTag}</span><span style="color:#ff6040;font-size:11px;">Drop</span>`;
     const idx = i;
     const dropHandler = () => {
       dropItem(idx);
@@ -7663,17 +7721,27 @@ function renderShopItems(merchant) {
 
       const buyBtn = div.querySelector('#_shop_buy_btn');
       const cancelBtn = div.querySelector('#_shop_cancel_btn');
-      const doBuy = () => { buyHandler(); };
-      const doCancel = () => {
+      const doBuy = (e) => {
+        if (e) {
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
+        buyHandler();
+      };
+      const doCancel = (e) => {
+        if (e) {
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
         div.innerHTML = collapsedHTML;
         div.style.flexDirection = '';
         div.style.alignItems = '';
         expandedDiv = null;
       };
       buyBtn.addEventListener('click', doBuy);
-      buyBtn.addEventListener('touchend', (e) => { e.preventDefault(); doBuy(); }, { passive: false });
+      buyBtn.addEventListener('touchend', doBuy, { passive: false });
       cancelBtn.addEventListener('click', doCancel);
-      cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); doCancel(); }, { passive: false });
+      cancelBtn.addEventListener('touchend', doCancel, { passive: false });
       expandedDiv = div;
     };
 
@@ -9530,6 +9598,10 @@ function render() {
     const throwItem = state.throwItem?.item;
     const moundRangeBonus = getTile(state.player.x, state.player.y) === T.MOUND ? 1 : 0;
     const maxRange = (throwItem?.itemType === 'aimed_shot' ? 15 : (throwItem?.range || 8)) + moundRangeBonus;
+    const throwName = (throwItem?.name || '').toLowerCase();
+    const isKiBolt = throwItem?.itemType === 'ki_bolt' || throwName.includes('ki bolt');
+    const hasIronFocus = !!(state.player?.ironFocus || state.player?.hasIronFocus);
+    const ignoreEnemyBlocking = isKiBolt && hasIronFocus;
     const isBlast = throwItem?.itemType === 'special_arrow' && throwItem?.arrowType === 'blast';
     // If a special arrow is loaded, check for blast
     const loadedArrow = state.player.loadedSpecialArrow;
@@ -9564,7 +9636,10 @@ function render() {
               }
             }
             ctx.globalAlpha = 1.0;
-            break; // Stop at first enemy in this direction
+            if (!ignoreEnemyBlocking) break; // Stop at first enemy unless Iron Focus Ki Bolt
+            tx += ddx;
+            ty += ddy;
+            continue;
           }
           { const tt = getTile(tx, ty); if (!isWalkable(tx, ty) && tt !== T.WATER && tt !== T.WATERFALL) break; }
           // Highlight path tile
@@ -9861,13 +9936,20 @@ function render() {
       if (dist > 3) continue; // completely invisible at distance
     }
 
-    // Mimic disguise: shows class icon when undamaged/unaware, box when revealed
+    // Mimics should disguise as monsters (never gear) until they are revealed.
     if (e.special === 'mimic') {
       const revealed = e.hp < e.maxHp || e.alertness >= 2;
+      if (!e.mimicDisguiseGlyph) {
+        const disguise = pickMimicMonsterDisguise();
+        e.mimicDisguiseGlyph = disguise.glyph;
+        e.mimicDisguiseName = disguise.name;
+        e.disguiseGlyph = disguise.glyph;
+      }
       const sx = (e.x - camX) * ts + ts / 2;
       const sy = (e.y - camY) * ts + ts / 2;
       ctx.font = `${Math.floor(ts * 0.65)}px serif`;
-      ctx.fillText(revealed ? '📦' : (e.disguiseGlyph || '📦'), sx, sy);
+      const hiddenGlyph = e.mimicDisguiseGlyph || e.disguiseGlyph || '💀';
+      ctx.fillText(revealed ? '📦' : hiddenGlyph, sx, sy);
       if (!revealed) continue;
     }
 
@@ -10842,6 +10924,8 @@ function setupInput() {
       if ($('minimap-overlay').classList.contains('active')) { state.minimapOpen = false; $('minimap-overlay').classList.remove('active'); stopMinimapPulse(); inputLocked = false; return; }
       // Badge overlay
       if ($('badge-overlay').classList.contains('active')) { closeBadgeOverlay(); return; }
+      // Class selection (title screen step 2)
+      if ($('title-screen').classList.contains('active') && $('class-section').style.display !== 'none') { showTitle(); return; }
       // Merchant
       if ($('merchant-overlay').classList.contains('active')) { $('merchant-overlay').classList.remove('active'); inputLocked = false; endTurn(); return; }
       // Sage
@@ -11162,6 +11246,12 @@ function setupUI() {
   // Title screen
   $('btn-start').addEventListener('click', startGame);
   $('btn-start').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); }, { passive: false });
+  const backToTitleBtn = $('btn-back-to-title');
+  if (backToTitleBtn) {
+    const backToTitle = () => { Audio.resume(); showTitle(); };
+    backToTitleBtn.addEventListener('click', backToTitle);
+    backToTitleBtn.addEventListener('touchend', (e) => { e.preventDefault(); backToTitle(); }, { passive: false });
+  }
 
   // Badge buttons
   const badgeBtn = $('btn-badges');
