@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 12, 2026 — 12:13 AM PT — Bone key gates now generate only on true room boundaries
+- Reworked bonus wing entrance selection to validate room-edge wall tiles before placing a locked bone key gate.
+- Locked gates now always have room floor on the inside and newly carved wing space on the outside.
+- Bone Keys now spawn from pre-wing main-floor rooms to keep the locked wing reliably reachable.
+
 Apr 12, 2026 — 12:04 AM PT — Soul Amulets now offer level-scaled heal, burst, and ward powers
 - Replaced the single Soul Amulet heal action with three options: `Soul Mend`, `Soul Burst`, and `Soul Ward`.
 - Added player-level scaling for all three effects and a 4-turn Soul Ward shield that absorbs incoming damage.

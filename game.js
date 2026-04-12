@@ -3457,107 +3457,154 @@ function spawnSecretWalls() {
 
 // === BONUS WING ===
 function generateBonusWing() {
-  // Find a suitable wall on a room edge to carve a bonus wing
+  // Find a validated room-edge wall tile and carve a locked wing from it.
   if (!state.rooms || state.rooms.length < 3) return;
-  const room = state.rooms[Math.floor(Math.random() * (state.rooms.length - 1)) + 1];
-  // Try to carve rooms beyond the right or bottom edge of chosen room
-  const directions = [
-    { dx: 1, dy: 0, wallX: room.x + room.w, wallY: room.y + Math.floor(room.h / 2) },
-    { dx: 0, dy: 1, wallX: room.x + Math.floor(room.w / 2), wallY: room.y + room.h },
-    { dx: -1, dy: 0, wallX: room.x - 1, wallY: room.y + Math.floor(room.h / 2) },
-    { dx: 0, dy: -1, wallX: room.x + Math.floor(room.w / 2), wallY: room.y - 1 }
-  ];
-  // Shuffle directions and try each
-  directions.sort(() => Math.random() - 0.5);
-  for (const dir of directions) {
-    const { dx, dy, wallX, wallY } = dir;
-    if (wallX < 2 || wallX >= MAP_W - 2 || wallY < 2 || wallY >= MAP_H - 2) continue;
-    // Check if we have enough space for 2 small rooms in this direction
-    const startX = wallX + dx * 2;
-    const startY = wallY + dy * 2;
-    const wingRooms = [];
-    let cx = startX, cy = startY;
-    let canFit = true;
-    for (let r = 0; r < 2; r++) {
-      const rw = 3 + Math.floor(Math.random() * 2); // 3-4
-      const rh = 3 + Math.floor(Math.random() * 2);
-      // Check bounds
-      if (cx < 1 || cy < 1 || cx + rw >= MAP_W - 1 || cy + rh >= MAP_H - 1) { canFit = false; break; }
-      // Check that area is all walls (unclaimed space)
-      let allWall = true;
-      for (let yy = cy - 1; yy <= cy + rh; yy++) {
-        for (let xx = cx - 1; xx <= cx + rw; xx++) {
-          if (xx < 0 || xx >= MAP_W || yy < 0 || yy >= MAP_H) { allWall = false; break; }
-          if (getTile(xx, yy) !== T.WALL) { allWall = false; break; }
-        }
-        if (!allWall) break;
-      }
-      if (!allWall) { canFit = false; break; }
-      wingRooms.push({ x: cx, y: cy, w: rw, h: rh });
-      cx += (dx === 0 ? 0 : dx * (rw + 1));
-      cy += (dy === 0 ? 0 : dy * (rh + 1));
-    }
-    if (!canFit || wingRooms.length < 2) continue;
 
-    // Carve the wing rooms
-    for (const wr of wingRooms) {
-      for (let yy = wr.y; yy < wr.y + wr.h; yy++) {
-        for (let xx = wr.x; xx < wr.x + wr.w; xx++) {
-          setTile(xx, yy, T.FLOOR);
+  const preWingRooms = state.rooms.slice();
+  const candidateRooms = (state.rooms.length > 2 ? state.rooms.slice(2) : state.rooms.slice())
+    .sort(() => Math.random() - 0.5);
+
+  function inRoomInterior(rooms, x, y) {
+    return rooms.some(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  }
+
+  function randomRoomTileFromList(rooms) {
+    if (!rooms || rooms.length === 0) return randomRoomFloorTile();
+    for (let attempts = 0; attempts < 100; attempts++) {
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+      const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+      if (getTile(x, y) !== T.FLOOR) continue;
+      if (x === state.player.x && y === state.player.y) continue;
+      if (enemyAt(x, y)) continue;
+      if (itemsAt(x, y).length > 0) continue;
+      return { x, y };
+    }
+    return randomRoomFloorTile();
+  }
+
+  function buildEdgeCandidates(room) {
+    const edges = [];
+    for (let y = room.y; y < room.y + room.h; y++) {
+      edges.push({ dx: 1, dy: 0, wallX: room.x + room.w, wallY: y });
+      edges.push({ dx: -1, dy: 0, wallX: room.x - 1, wallY: y });
+    }
+    for (let x = room.x; x < room.x + room.w; x++) {
+      edges.push({ dx: 0, dy: 1, wallX: x, wallY: room.y + room.h });
+      edges.push({ dx: 0, dy: -1, wallX: x, wallY: room.y - 1 });
+    }
+    return edges.sort(() => Math.random() - 0.5);
+  }
+
+  for (const room of candidateRooms) {
+    const edgeCandidates = buildEdgeCandidates(room);
+    for (const cand of edgeCandidates) {
+      const { dx, dy, wallX, wallY } = cand;
+      if (wallX < 2 || wallX >= MAP_W - 2 || wallY < 2 || wallY >= MAP_H - 2) continue;
+
+      const roomX = wallX - dx;
+      const roomY = wallY - dy;
+      const wingX = wallX + dx;
+      const wingY = wallY + dy;
+
+      // Gate must be a true room-edge wall doorway, never inside a room interior tile.
+      if (getTile(roomX, roomY) !== T.FLOOR) continue;
+      if (getTile(wallX, wallY) !== T.WALL) continue;
+      if (getTile(wingX, wingY) !== T.WALL) continue;
+      if (inRoomInterior(preWingRooms, wallX, wallY)) continue;
+      if (inRoomInterior(preWingRooms, wingX, wingY)) continue;
+
+      // Check if we have enough space for 2 small rooms in this direction.
+      const startX = wallX + dx * 2;
+      const startY = wallY + dy * 2;
+      const wingRooms = [];
+      let cx = startX, cy = startY;
+      let canFit = true;
+      for (let r = 0; r < 2; r++) {
+        const rw = 3 + Math.floor(Math.random() * 2); // 3-4
+        const rh = 3 + Math.floor(Math.random() * 2);
+        if (cx < 1 || cy < 1 || cx + rw >= MAP_W - 1 || cy + rh >= MAP_H - 1) { canFit = false; break; }
+        let allWall = true;
+        for (let yy = cy - 1; yy <= cy + rh; yy++) {
+          for (let xx = cx - 1; xx <= cx + rw; xx++) {
+            if (xx < 0 || xx >= MAP_W || yy < 0 || yy >= MAP_H) { allWall = false; break; }
+            if (getTile(xx, yy) !== T.WALL) { allWall = false; break; }
+          }
+          if (!allWall) break;
+        }
+        if (!allWall) { canFit = false; break; }
+        wingRooms.push({ x: cx, y: cy, w: rw, h: rh });
+        cx += (dx === 0 ? 0 : dx * (rw + 1));
+        cy += (dy === 0 ? 0 : dy * (rh + 1));
+      }
+      if (!canFit || wingRooms.length < 2) continue;
+
+      // Carve the wing rooms.
+      for (const wr of wingRooms) {
+        for (let yy = wr.y; yy < wr.y + wr.h; yy++) {
+          for (let xx = wr.x; xx < wr.x + wr.w; xx++) {
+            setTile(xx, yy, T.FLOOR);
+          }
+        }
+        state.rooms.push(wr);
+      }
+
+      // Connect wing rooms with corridors.
+      for (let r = 0; r < wingRooms.length - 1; r++) {
+        const a = wingRooms[r], b = wingRooms[r + 1];
+        const ax = a.x + Math.floor(a.w / 2), ay = a.y + Math.floor(a.h / 2);
+        const bx = b.x + Math.floor(b.w / 2), by = b.y + Math.floor(b.h / 2);
+        let x = ax, y = ay;
+        while (x !== bx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < bx ? 1 : -1; }
+        while (y !== by) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < by ? 1 : -1; }
+      }
+
+      // Carve corridor from room-edge gate to the first wing room.
+      let x = wallX, y = wallY;
+      const firstWR = wingRooms[0];
+      const tx = firstWR.x + Math.floor(firstWR.w / 2), ty = firstWR.y + Math.floor(firstWR.h / 2);
+      while (x !== tx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < tx ? 1 : -1; }
+      while (y !== ty) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < ty ? 1 : -1; }
+
+      // Place locked gate on the room boundary.
+      setTile(wallX, wallY, T.DOOR_LOCKED);
+
+      // Spawn Bone Key in pre-wing rooms (reachable main floor).
+      const keyPos = randomRoomTileFromList(preWingRooms);
+      if (keyPos) {
+        state.entities.push(createItemEntity({
+          name: 'Bone Key', glyph: '🗝️', itemType: 'key', keyType: 'bone', value: 0
+        }, keyPos.x, keyPos.y));
+      }
+
+      // Spawn tougher enemies in wing rooms.
+      const tier = Math.min(7, Math.ceil(state.floor / 3) + 1);
+      for (const wr of wingRooms) {
+        const ex = wr.x + Math.floor(Math.random() * wr.w);
+        const ey = wr.y + Math.floor(Math.random() * wr.h);
+        if (getTile(ex, ey) === T.FLOOR && !enemyAt(ex, ey)) {
+          const template = getEnemyTemplate(tier);
+          if (template) {
+            const enemy = createEnemy(template, ex, ey);
+            enemy.alertness = 2;
+            state.entities.push(enemy);
+          }
         }
       }
-      state.rooms.push(wr);
-    }
-    // Connect wing rooms with corridors
-    for (let r = 0; r < wingRooms.length - 1; r++) {
-      const a = wingRooms[r], b = wingRooms[r + 1];
-      const ax = a.x + Math.floor(a.w / 2), ay = a.y + Math.floor(a.h / 2);
-      const bx = b.x + Math.floor(b.w / 2), by = b.y + Math.floor(b.h / 2);
-      // Carve L-shaped corridor
-      let x = ax, y = ay;
-      while (x !== bx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < bx ? 1 : -1; }
-      while (y !== by) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < by ? 1 : -1; }
-    }
-    // Carve corridor from main room wall to first wing room
-    let x = wallX, y = wallY;
-    const firstWR = wingRooms[0];
-    const tx = firstWR.x + Math.floor(firstWR.w / 2), ty = firstWR.y + Math.floor(firstWR.h / 2);
-    while (x !== tx) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); x += x < tx ? 1 : -1; }
-    while (y !== ty) { if (getTile(x, y) === T.WALL) setTile(x, y, T.CORRIDOR); y += y < ty ? 1 : -1; }
-    // Place locked door at the entrance
-    setTile(wallX, wallY, T.DOOR_LOCKED);
-    // Spawn Bone Key somewhere on the main floor (in a room)
-    const keyPos = randomRoomFloorTile();
-    if (keyPos) {
-      state.entities.push(createItemEntity({
-        name: 'Bone Key', glyph: '🗝️', itemType: 'key', keyType: 'bone', value: 0
-      }, keyPos.x, keyPos.y));
-    }
-    // Spawn tougher enemies in wing rooms
-    const tier = Math.min(7, Math.ceil(state.floor / 3) + 1);
-    for (const wr of wingRooms) {
-      const ex = wr.x + Math.floor(Math.random() * wr.w);
-      const ey = wr.y + Math.floor(Math.random() * wr.h);
-      if (getTile(ex, ey) === T.FLOOR && !enemyAt(ex, ey)) {
-        const template = getEnemyTemplate(tier);
-        if (template) {
-          const enemy = createEnemy(template, ex, ey);
-          enemy.alertness = 2; // already alert
-          state.entities.push(enemy);
-        }
+
+      // Spawn guaranteed rare loot in the last wing room.
+      const lastWR = wingRooms[wingRooms.length - 1];
+      const lootPos = { x: lastWR.x + Math.floor(lastWR.w / 2), y: lastWR.y + Math.floor(lastWR.h / 2) };
+      const loot = generateRandomItem(state.floor + 3);
+      if (loot) {
+        state.entities.push(createItemEntity(loot, lootPos.x, lootPos.y));
       }
+
+      // Also spawn some gold.
+      const goldAmt = 15 + Math.floor(Math.random() * 20) + state.floor * 2;
+      state.entities.push(createItemEntity({ name: `${goldAmt} Gold`, glyph: '💰', itemType: 'gold', goldAmount: goldAmt, value: 0 }, lastWR.x + 1, lastWR.y + 1));
+      return; // only one bonus wing per floor
     }
-    // Spawn guaranteed rare loot in the last wing room
-    const lastWR = wingRooms[wingRooms.length - 1];
-    const lootPos = { x: lastWR.x + Math.floor(lastWR.w / 2), y: lastWR.y + Math.floor(lastWR.h / 2) };
-    const loot = generateRandomItem(state.floor + 3);
-    if (loot) {
-      state.entities.push(createItemEntity(loot, lootPos.x, lootPos.y));
-    }
-    // Also spawn some gold
-    const goldAmt = 15 + Math.floor(Math.random() * 20) + state.floor * 2;
-    state.entities.push(createItemEntity({ name: `${goldAmt} Gold`, glyph: '💰', itemType: 'gold', goldAmount: goldAmt, value: 0 }, lastWR.x + 1, lastWR.y + 1));
-    break; // only one bonus wing per floor
   }
 }
 
