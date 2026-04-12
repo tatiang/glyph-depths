@@ -1,68 +1,98 @@
 # Glyph Depths Roadmap
 
-*Assessment date: 3/27/26*
+*Last refreshed: April 12, 2026 (PT)*
 
 ---
 
-## What's Already Strong
+## Completed Foundations (Shipped)
 
-15 classes, 60 badges, 12 runes with synergies, 5 biomes, 20 floors, a multi-phase boss, mastery meta-progression, procedural audio, polished mobile UI — this is genuinely remarkable for a zero-dependency PWA. The mechanical depth rivals commercial roguelikes.
+- Ambient biome audio / exploration soundscape
+- Floor transition biome cards
+- Floating damage numbers / hit feedback
+- Enemy intent indicators
+- Persistent Codex (bestiary, runes, lore, biomes)
+- Run Chronicle + lifetime stats (local + cloud merge)
 
----
-
-## High-Impact Additions
-
-### 1. Ambient Soundscape / Floor Music
-The audio system is excellent but silent during gameplay. Title music exists, boss entry exists, but floors 1-19 have no ambient audio. A procedurally generated drone/pad per biome (Sewers = dripping reverb, Crypt = eerie chords, Abyss = deep rumbles) playing quietly during exploration would massively elevate atmosphere. This is probably the single highest-impact change — silence makes it feel like a prototype.
-
-### 2. Run History / Death Log
-Award-winning roguelikes (Hades, Slay the Spire, Spelunky) all have a persistent record of past runs. Show a scrollable history: class played, floor reached, cause of death, runes collected, badges earned, turns taken. This creates the "one more run" loop and makes each death feel meaningful rather than disposable.
-
-### 3. Lore Discovery System
-You have 43 NPC lore entries, but they're random and fire-and-forget. A persistent Codex/Bestiary that unlocks entries as you encounter enemies, find runes, read lore, and discover biomes would give collectors a reason to keep playing. Award judges love discoverable narrative.
-
-### 4. Daily Challenge / Seeded Runs
-A seeded daily run where all players get the same dungeon would add competitive replayability. Show a leaderboard (even just local). This is a hallmark feature of award-winning roguelikes (Spelunky Daily Challenge, Dead Cells).
-
-### 5. Animation Polish: Death Animations & Transitions
-Enemies currently just disappear. A brief death animation (flash → fade, or glyph scatter) and a floor transition effect (fade to black → biome name card → fade in) would make the game feel cinematic. The screen shake system is already there — extend it.
-
-### 6. Interactive Tutorial / First-Run Experience
-New players are dropped into the deep end. A guided first floor that teaches movement, combat, items, hunger, and doors through play (not text walls) would dramatically improve first impressions. Award judges play the game once — that first impression matters enormously.
-
-### 7. Event System / Floor Modifiers
-Random per-floor modifiers ("This floor is cursed — enemies regenerate", "Merchant's blessing — all items half price", "Darkness — FOV reduced by 2") would make each run feel more unique and create memorable moments. Roguelikes live and die by emergent stories.
-
-### 8. Visual Juice: Hit Numbers & Damage Popups
-Floating damage numbers that drift upward on hits (both player and enemy) would make combat feel impactful. Canvas-rendered, short-lived, color-coded (red for damage taken, white for dealt, gold for crits). Small change, huge feel improvement.
-
-### 9. Unlockable Starting Conditions
-Beyond mastery bonuses, let players unlock starting loadout options or challenge modifiers through badges. "Earn Regicide → unlock Cursed Crown start item" or "Earn Speed Runner → unlock Turbo Mode". This creates goal-oriented play across runs.
-
-### 10. Deeper Boss Encounter
-The Glyph King is good with 3 phases, but award-winning boss fights have environmental mechanics. Pillars that block line of sight, rune circles on the floor that power up/heal him if you stand on them, a phase where he extinguishes your FOV to 2 tiles — make the arena itself part of the fight.
+These systems form the current quality baseline and should be treated as platform features, not experiments.
 
 ---
 
-## Lower-Effort / Polish Items
+## Now (Highest Impact)
 
-- **Tombstones**: Mark where previous runs died with a small grave glyph on the map
-- **Streak counter**: Track consecutive wins per class
-- **Stats page**: Total play time, total kills, favorite class, deepest floor across all runs
-- **Biome name card**: Brief text overlay ("Entering The Crypt...") on floor transitions
-- **Inventory tooltips**: Long-press on mobile to see item stats without using it
-- **Enemy intent indicators**: Show what an enemy will do next turn (attack, move, special) like Slay the Spire — this is a massive strategic depth addition
+### 1) Daily Seeded Challenge + Leaderboard
+- Single daily seed for all players.
+- Local leaderboard first; cloud/global leaderboard second.
+- Shareable seed/run summary to drive repeat sessions.
+
+Success metrics:
+- Daily-run participation rate
+- 7-day return rate among daily players
+- Average runs per active day
+
+### 2) Interactive First-Run Onboarding
+- Guided tutorial floor that teaches movement, combat, hunger, items, and doors through play.
+- No modal walls of text; contextual prompts only.
+
+Success metrics:
+- New-player floor-3 reach rate
+- New-player session duration
+- First-session restart rate ("one more run")
+
+### 3) Floor Mutator/Event System
+- Add per-floor run modifiers with clear reward/risk impact.
+- Surface modifier at floor start and include in run chronicle.
+
+Success metrics:
+- Modifier run pick/engagement rate
+- Session variety index (distinct run states seen per player)
+- Mid-run abandonment drop
 
 ---
 
-## Suggested Priority Order
+## Next (Depth + Prestige)
 
-If aiming for an award submission, tackle in this order:
+### 4) Boss Encounter 2.0 (Glyph King Arena Mechanics)
+- Environmental mechanics (LOS pillars, rune zones, threat telegraphs).
+- Distinct phase identities with readable counterplay.
 
-1. **Ambient biome audio** — transforms the feel immediately
-2. **Floating damage numbers** — makes combat satisfying
-3. **Floor transition cards** — biome name + brief atmosphere text
-4. **Run history log** — "one more run" addiction loop
-5. **Enemy intent indicators** — strategic depth leap
-6. **Codex/Bestiary** — collectible narrative
-7. **Interactive tutorial** — first impression for judges
+Success metrics:
+- Boss attempt-to-clear conversion
+- Average attempts before first clear
+- Post-boss replay rate
+
+### 5) Unlockable Starting Conditions / Challenge Toggles
+- Badge/mastery-driven start kits and challenge modifiers.
+- Keep options side-grade, not strict power creep.
+
+Success metrics:
+- Unlock pursuit rate
+- Challenge-mode adoption
+- Run completion by unlock tier
+
+### 6) Meta Goal Layer Expansion
+- Streaks, class-specific milestones, and run objective tracks.
+- Integrate objectives into title and chronicle surfaces.
+
+Success metrics:
+- Long-term retention (D14/D30)
+- Class diversity across sessions
+- Objective completion cadence
+
+---
+
+## Later (Polish and Presentation)
+
+- Tombstones of past deaths on future floors
+- Biome intro VO-like text stingers / flavor variants
+- Additional transition and enemy-death visual polish
+- Richer run recap screens (timeline + key moments)
+- Leaderboard anti-cheat / run validation hardening
+
+---
+
+## Prioritization Rules
+
+1. Prefer features that increase replay loop strength (start run -> meaningful run story -> restart).
+2. Prioritize retention metrics over raw feature count.
+3. Every major system should report at least one measurable KPI.
+4. New mechanics must preserve mobile clarity and touch ergonomics.

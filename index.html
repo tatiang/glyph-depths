@@ -584,6 +584,94 @@
       font-size: 12px;
     }
 
+    /* Run History / Chronicle */
+    .run-history-list {
+      width: 100%;
+      max-width: 360px;
+      overflow-y: auto;
+      flex: 1;
+      padding: 0 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .run-history-empty {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 12px;
+      padding: 24px 12px;
+      border: 1px dashed var(--panel-border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      line-height: 1.6;
+    }
+    .run-entry {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .run-entry-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .run-entry-class {
+      font-size: 12px;
+      color: var(--gold);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .run-entry-class-name {
+      color: var(--text-dim);
+      font-weight: 500;
+      font-size: 11px;
+    }
+    .run-entry-time {
+      font-size: 10px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .run-entry-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+    .run-entry-stats {
+      font-size: 11px;
+      color: var(--text);
+      line-height: 1.4;
+    }
+    .run-entry-chips {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .run-chip {
+      font-size: 10px;
+      color: var(--text-dim);
+      border: 1px solid var(--panel-border);
+      border-radius: 5px;
+      padding: 3px 6px;
+      background: rgba(255,255,255,0.02);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .run-outcome {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-right: 6px;
+    }
+    .run-outcome.death { color: #e06060; }
+    .run-outcome.victory { color: #68d080; }
+    .run-outcome.giveup { color: #d0b060; }
+
     .overlay h1 {
       font-size: 28px;
       margin-bottom: 12px;
@@ -1563,6 +1651,7 @@
       <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
         <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
+        <button class="help-btn" id="btn-runs-from-title" style="animation:none;opacity:1;">📜 Runs</button>
         <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
         <button class="help-btn" id="btn-updatelog-from-title" style="animation:none;opacity:1;">📋 Updates</button>
       </div>
@@ -1709,6 +1798,7 @@
             <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
               <button class="big-btn" id="btn-saves-game" style="padding:12px 20px;background:var(--panel-bg);border-color:#69b;color:#69b;">💾 Saved Games</button>
               <button class="big-btn" id="btn-badges-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:var(--gold);color:var(--gold);">🏆 Badges</button>
+              <button class="big-btn" id="btn-runs-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:#7ab090;color:#7ab090;">📜 Run Chronicle</button>
               <button class="big-btn" id="btn-codex-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:#60b0c0;color:#60b0c0;">📖 Codex</button>
               <button class="big-btn" id="btn-manual-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:#a080d0;color:#a080d0;">📜 Manual</button>
               <button class="big-btn" id="btn-help-from-settings" style="padding:12px 20px;background:var(--panel-bg);border-color:var(--panel-border);">⚡ Quickstart</button>
@@ -2019,6 +2109,16 @@
 
   <div class="overlay" id="saves-overlay" style="justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <div id="saves-overlay-inner" style="width:100%;max-width:360px;display:flex;flex-direction:column;padding:20px 16px;box-sizing:border-box;"></div>
+  </div>
+
+  <div class="overlay" id="run-history-overlay" style="justify-content:flex-start;padding-top:calc(16px + var(--safe-top));padding-bottom:calc(16px + var(--safe-bottom));overflow:hidden;align-items:center;">
+    <h1 style="font-size:22px;margin-bottom:4px;color:#7ab090;letter-spacing:0.08em;flex-shrink:0;">📜 RUN CHRONICLE</h1>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;flex-shrink:0;">Every ending is remembered.</div>
+    <div class="stats-heading" style="width:100%;max-width:360px;margin-bottom:6px;flex-shrink:0;">LIFETIME</div>
+    <div id="lifetime-stats-grid" class="stats-grid" style="width:100%;max-width:360px;margin-bottom:10px;flex-shrink:0;"></div>
+    <div class="stats-heading" style="width:100%;max-width:360px;margin-bottom:6px;flex-shrink:0;">RUN HISTORY</div>
+    <div id="run-history-list" class="run-history-list"></div>
+    <button class="big-btn" id="btn-close-run-history" style="margin-top:10px;flex-shrink:0;">Close</button>
   </div>
 
   <div id="minimap-overlay">

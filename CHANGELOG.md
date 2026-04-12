@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 12, 2026 — 12:41 AM PT — Added persistent Run Chronicle with lifetime stats and cloud run-history merge
+- Added a new Run Chronicle overlay with scrollable run history entries (class, floor, outcome/cause, runes, badges, turns, steps, kills, score).
+- Added persistent lifetime metrics across runs: total turns, total steps, total kills, favorite class, and deepest floor.
+- Added local archive storage (`glyphDepths_runArchive_v1`) plus cloud run-history sync using run-id merge to avoid duplicates across devices.
+
 Apr 12, 2026 — 12:13 AM PT — Bone key gates now generate only on true room boundaries
 - Reworked bonus wing entrance selection to validate room-edge wall tiles before placing a locked bone key gate.
 - Locked gates now always have room floor on the inside and newly carved wing space on the outside.

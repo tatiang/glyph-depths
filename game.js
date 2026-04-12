@@ -27,6 +27,10 @@ let settings = { sound: true, haptics: true, dpad: true, autopickup: true, autoE
 const HERO_ICONS = ['🧝', '🥷', '🧛', '🧟', '🧞', '🧚', '🦸', '🏹', '🐉'];
 const GAME_VERSION = 'v0.9.8 — waterfall, mound, icy path, fire path, enchanted wall, chasm'; // updated each push
 const LAST_UPDATED = 'March 27, 2026 at 12:00 PM';
+const RUN_ARCHIVE_KEY = 'glyphDepths_runArchive_v1';
+const RUN_ARCHIVE_VERSION = 1;
+const RUN_ARCHIVE_LIMIT = 1000;
+const RUN_HISTORY_VISIBLE_LIMIT = 200;
 
 // === BADGE / ACHIEVEMENT SYSTEM ===
 const BADGE_DEFS = [
@@ -75,6 +79,7 @@ const BADGE_DEFS = [
 let badgeState = {}; // { badgeId: { unlocked: true, date: '...' } }
 let badgeCounts = {}; // cumulative counters: { exterminator: 100, rat_catcher: 10, ... }
 let badgesEarnedThisRun = []; // badges unlocked during current run
+let runArchive = { version: RUN_ARCHIVE_VERSION, runs: [] };
 
 let codexUnlocked = new Set(); // IDs of discovered codex entries
 let codexNew = new Set();      // IDs unlocked since last Codex open
@@ -330,6 +335,226 @@ function renderBadgesEarned(containerId) {
     const b = BADGE_DEFS.find(d => d.id === id);
     return b ? `<span class="badge-earned">${b.icon} ${b.name}</span>` : '';
   }).join('');
+}
+
+// === RUN ARCHIVE / LIFETIME STATS ===
+function createRunId() {
+  return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function sanitizeRunArchive(raw) {
+  const runs = Array.isArray(raw?.runs) ? raw.runs : [];
+  const byId = new Map();
+  for (const r of runs) {
+    if (!r || typeof r !== 'object') continue;
+    const endedAt = typeof r.endedAt === 'string' ? r.endedAt : new Date().toISOString();
+    const fallbackId = `legacy_${endedAt}_${r.classId || 'unknown'}_${r.floorReached || 1}_${r.score || 0}_${r.turns || 0}`
+      .replace(/[^a-zA-Z0-9_:-]/g, '');
+    const runId = typeof r.runId === 'string' && r.runId ? r.runId : fallbackId;
+    const rec = {
+      runId,
+      endedAt,
+      outcome: ['death', 'victory', 'give_up'].includes(r.outcome) ? r.outcome : 'death',
+      classId: typeof r.classId === 'string' ? r.classId : 'berserker',
+      className: typeof r.className === 'string' ? r.className : 'Unknown',
+      classIcon: typeof r.classIcon === 'string' ? r.classIcon : '❔',
+      floorReached: Number.isFinite(r.floorReached) ? Math.max(1, Math.floor(r.floorReached)) : 1,
+      causeText: typeof r.causeText === 'string' ? r.causeText : 'Unknown',
+      causeGlyph: typeof r.causeGlyph === 'string' ? r.causeGlyph : '',
+      runeIds: Array.isArray(r.runeIds) ? r.runeIds.filter(v => typeof v === 'string') : [],
+      badgeIds: Array.isArray(r.badgeIds) ? r.badgeIds.filter(v => typeof v === 'string') : [],
+      turns: Number.isFinite(r.turns) ? Math.max(0, Math.floor(r.turns)) : 0,
+      steps: Number.isFinite(r.steps) ? Math.max(0, Math.floor(r.steps)) : 0,
+      kills: Number.isFinite(r.kills) ? Math.max(0, Math.floor(r.kills)) : 0,
+      score: Number.isFinite(r.score) ? Math.max(0, Math.floor(r.score)) : 0,
+      difficulty: ['easy', 'normal', 'hard'].includes(r.difficulty) ? r.difficulty : 'normal',
+      playerName: typeof r.playerName === 'string' ? r.playerName : '',
+      playerEpithet: typeof r.playerEpithet === 'string' ? r.playerEpithet : ''
+    };
+    const prev = byId.get(rec.runId);
+    if (!prev || new Date(rec.endedAt).getTime() > new Date(prev.endedAt).getTime()) {
+      byId.set(rec.runId, rec);
+    }
+  }
+  const merged = Array.from(byId.values()).sort((a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime());
+  return {
+    version: RUN_ARCHIVE_VERSION,
+    runs: merged.slice(0, RUN_ARCHIVE_LIMIT)
+  };
+}
+
+function loadRunArchive() {
+  try {
+    const raw = localStorage.getItem(RUN_ARCHIVE_KEY);
+    runArchive = sanitizeRunArchive(raw ? JSON.parse(raw) : null);
+  } catch {
+    runArchive = { version: RUN_ARCHIVE_VERSION, runs: [] };
+  }
+}
+
+function saveRunArchive() {
+  try {
+    localStorage.setItem(RUN_ARCHIVE_KEY, JSON.stringify(runArchive));
+  } catch {}
+}
+
+function mergeRunArchivesByRunId(localArchive, remoteArchive) {
+  const localRuns = Array.isArray(localArchive?.runs) ? localArchive.runs : [];
+  const remoteRuns = Array.isArray(remoteArchive?.runs) ? remoteArchive.runs : [];
+  return sanitizeRunArchive({ runs: localRuns.concat(remoteRuns) });
+}
+
+function buildRunRecord(outcome, causeText, causeGlyph) {
+  if (!state || !state.player) return null;
+  const cls = getClassDef(state.player.classId);
+  return {
+    runId: state.runId || createRunId(),
+    endedAt: new Date().toISOString(),
+    outcome,
+    classId: state.player.classId,
+    className: cls.name,
+    classIcon: cls.icon,
+    floorReached: state.floor,
+    causeText: causeText || 'Unknown',
+    causeGlyph: causeGlyph || '',
+    runeIds: (state.player.runes || []).map(r => r.id),
+    badgeIds: [...new Set(badgesEarnedThisRun)],
+    turns: state.player.turnsSurvived || 0,
+    steps: state.player.stepsMoved || 0,
+    kills: state.enemiesKilled || 0,
+    score: state.score || 0,
+    difficulty: state.difficulty || 'normal',
+    playerName: state.playerName || '',
+    playerEpithet: state.playerEpithet || ''
+  };
+}
+
+function finalizeRunOnce(outcome, causeText, causeGlyph) {
+  if (!state || state._runFinalized) return;
+  const rec = buildRunRecord(outcome, causeText, causeGlyph);
+  if (!rec) return;
+  state._runFinalized = true;
+  runArchive = sanitizeRunArchive({ runs: [rec].concat(runArchive.runs || []) });
+  saveRunArchive();
+  saveHighScore();
+  if (firebaseUser && firebaseDb) {
+    cloudLoadRunArchive().then(remoteArchive => {
+      if (remoteArchive) {
+        runArchive = mergeRunArchivesByRunId(runArchive, remoteArchive);
+        saveRunArchive();
+      }
+      return cloudSaveRunArchive();
+    }).catch(() => {});
+  }
+}
+
+function computeLifetimeStatsFromArchive() {
+  const runs = Array.isArray(runArchive.runs) ? runArchive.runs : [];
+  const byClass = new Map();
+  let totalTurns = 0;
+  let totalSteps = 0;
+  let totalKills = 0;
+  let deepestFloor = 0;
+  for (const r of runs) {
+    totalTurns += r.turns || 0;
+    totalSteps += r.steps || 0;
+    totalKills += r.kills || 0;
+    deepestFloor = Math.max(deepestFloor, r.floorReached || 0);
+    if (!r.classId) continue;
+    byClass.set(r.classId, (byClass.get(r.classId) || 0) + 1);
+  }
+  let favoriteClassId = null;
+  let favoriteClassCount = 0;
+  for (const [classId, count] of byClass.entries()) {
+    if (count > favoriteClassCount) {
+      favoriteClassId = classId;
+      favoriteClassCount = count;
+    }
+  }
+  const favClass = favoriteClassId ? getClassDef(favoriteClassId) : null;
+  return {
+    totalRuns: runs.length,
+    totalTurns,
+    totalSteps,
+    totalKills,
+    deepestFloor,
+    favoriteClassName: favClass ? favClass.name : '—',
+    favoriteClassIcon: favClass ? favClass.icon : '',
+    favoriteClassCount
+  };
+}
+
+function formatRunEndedAt(isoStr) {
+  try {
+    return new Date(isoStr).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return isoStr || '';
+  }
+}
+
+function renderRunHistoryOverlay() {
+  const statsEl = $('lifetime-stats-grid');
+  const listEl = $('run-history-list');
+  if (!statsEl || !listEl) return;
+  const stat = computeLifetimeStatsFromArchive();
+  const statRow = (label, val) => `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-val">${val}</span></div>`;
+  statsEl.innerHTML = [
+    statRow('Total Runs', stat.totalRuns),
+    statRow('Total Turns', stat.totalTurns),
+    statRow('Total Steps', stat.totalSteps),
+    statRow('Total Kills', stat.totalKills),
+    statRow('Deepest Floor', stat.deepestFloor || '—'),
+    statRow('Favorite Class', stat.favoriteClassName === '—' ? '—' : `${stat.favoriteClassIcon} ${stat.favoriteClassName}`),
+  ].join('');
+
+  const runs = (runArchive.runs || []).slice(0, RUN_HISTORY_VISIBLE_LIMIT);
+  if (runs.length === 0) {
+    listEl.innerHTML = '<div class="run-history-empty">No completed runs yet. Your next ending will be recorded here.</div>';
+    return;
+  }
+  listEl.innerHTML = runs.map(run => {
+    const outcomeLabel = run.outcome === 'victory' ? 'Victory' : run.outcome === 'give_up' ? 'Gave Up' : 'Death';
+    const outcomeCls = run.outcome === 'victory' ? 'victory' : run.outcome === 'give_up' ? 'giveup' : 'death';
+    const runeSymbols = (run.runeIds || []).map(id => GLYPH_RUNES.find(r => r.id === id)?.symbol || '✦').join(' ');
+    const badgeSymbols = (run.badgeIds || []).map(id => BADGE_DEFS.find(b => b.id === id)?.icon || '🏆').join(' ');
+    const charName = `${run.playerName || 'Unknown'}${run.playerEpithet ? ' ' + run.playerEpithet : ''}`.trim();
+    return (
+      `<div class="run-entry">`
+      + `<div class="run-entry-head">`
+      + `<div class="run-entry-class">${run.classIcon || '❔'} ${charName} <span class="run-entry-class-name">(${run.className || 'Unknown'})</span></div>`
+      + `<div class="run-entry-time">${formatRunEndedAt(run.endedAt)}</div>`
+      + `</div>`
+      + `<div class="run-entry-meta"><span class="run-outcome ${outcomeCls}">${outcomeLabel}</span> Floor ${run.floorReached} · ${run.causeGlyph || ''} ${run.causeText || 'Unknown cause'}</div>`
+      + `<div class="run-entry-stats">Turns ${run.turns} · Steps ${run.steps} · Kills ${run.kills} · Score ${run.score}</div>`
+      + `<div class="run-entry-chips">`
+      + `<span class="run-chip">✦ ${run.runeIds.length}${runeSymbols ? ': ' + runeSymbols : ''}</span>`
+      + `<span class="run-chip">🏆 ${run.badgeIds.length}${badgeSymbols ? ': ' + badgeSymbols : ''}</span>`
+      + `</div>`
+      + `</div>`
+    );
+  }).join('');
+}
+
+function closeRunHistoryOverlay() {
+  $('run-history-overlay').classList.remove('active');
+  inputLocked = false;
+}
+
+function showRunHistoryOverlay() {
+  inputLocked = true;
+  $('run-history-overlay').classList.add('active');
+  renderRunHistoryOverlay();
+  if (!isFirebaseConfigured()) return;
+  loadFirebaseSDK().then(() => initFirebase()).then(() => {
+    if (!firebaseUser || !firebaseDb) return;
+    return cloudLoadRunArchive().then(remoteArchive => {
+      if (!remoteArchive) return;
+      runArchive = mergeRunArchivesByRunId(runArchive, remoteArchive);
+      saveRunArchive();
+      renderRunHistoryOverlay();
+      return cloudSaveRunArchive();
+    });
+  }).catch(() => {});
 }
 
 // === PRESTIGE / MASTERY SYSTEM ===
@@ -949,6 +1174,7 @@ function normalizeLoadedPlayer(player) {
   player.sharpDealer = false;
   player.encore = false;
   player.backstab = false;
+  player.stepsMoved = Number.isFinite(player.stepsMoved) ? Math.max(0, Math.floor(player.stepsMoved)) : 0;
   // Bishop
   if (!player.bishopSpellCooldowns || typeof player.bishopSpellCooldowns !== 'object') {
     player.bishopSpellCooldowns = {};
@@ -1041,6 +1267,7 @@ function boot() {
   loadBadges();
   loadCodex();
   loadMastery();
+  loadRunArchive();
   setupCanvas();
   setupInput();
   setupUI();
@@ -1399,6 +1626,7 @@ function newRun(classId = 'berserker') {
   setupCanvas();
   randomizePotionScrollNames();
   state = {
+    runId: createRunId(),
     floor: 1,
     difficulty: settings.difficulty || 'normal',
     turnCount: 0,
@@ -1440,7 +1668,8 @@ function newRun(classId = 'berserker') {
       scrollsUsed: 0,
       foodEaten: 0,
       prevFloorExplored: 0
-    }
+    },
+    _runFinalized: false
   };
   badgesEarnedThisRun = [];
   const charName = generateCharacterName();
@@ -1509,6 +1738,7 @@ function createPlayer(classId = 'berserker') {
     hungerRate: cls.hungerRate,
     regenCounter: 0,
     turnsSurvived: 0,
+    stepsMoved: 0,
     // Class special abilities
     enrageActive: false,
     engageTurnsLeft: 0,
@@ -5157,6 +5387,7 @@ function playerDeath(killerName, killerGlyph) {
   trackRuneCollection(state.player.runes ? state.player.runes.length : 0);
   checkMasteryUnlocks();
   renderBadgesEarned('death-badges');
+  finalizeRunOnce('death', killerName, killerGlyph || '');
 
   setTimeout(() => {
     $('death-overlay').classList.add('active');
@@ -5190,12 +5421,11 @@ function showVictory() {
   trackRuneCollection(state.player.runes ? state.player.runes.length : 0);
   checkMasteryUnlocks();
   renderBadgesEarned('victory-badge-list');
+  finalizeRunOnce('victory', 'Defeated the Glyph King', '👑');
 
   setTimeout(() => {
     $('victory-overlay').classList.add('active');
   }, 500);
-
-  saveHighScore();
 }
 
 // === LEVEL UP ===
@@ -6090,10 +6320,12 @@ function playerMove(dx, dy) {
   // Check for friendly ally at destination — swap positions
   const ally = allyAt(nx, ny);
   if (ally) {
+    const fromX = p.x, fromY = p.y;
     ally.x = p.x;
     ally.y = p.y;
     p.x = nx;
     p.y = ny;
+    p.stepsMoved = (p.stepsMoved || 0) + Math.abs(p.x - fromX) + Math.abs(p.y - fromY);
     addMessage(`You swap places with your ${ally.name}.`, '');
     computeFOV();
     autoPickup();
@@ -6172,6 +6404,8 @@ function playerMove(dx, dy) {
 
   // Check for one-way door — player moves through, door seals at the door frame behind them
   if (getTile(nx, ny) === T.DOOR_ONEWAY) {
+    const fromX = state.player.x;
+    const fromY = state.player.y;
     const dx = nx - state.player.x, dy = ny - state.player.y;
     const throughX = nx + dx, throughY = ny + dy;
     // Move through the door if the far side is walkable; otherwise stop at the door tile
@@ -6195,6 +6429,7 @@ function playerMove(dx, dy) {
       state.runStats.oneWayDoorsUsed++;
       if (state.runStats.oneWayDoorsUsed >= 5) unlockBadge('no_turning_back');
     }
+    p.stepsMoved = (p.stepsMoved || 0) + Math.abs(state.player.x - fromX) + Math.abs(state.player.y - fromY);
     autoPickup();
     endTurn();
     return;
@@ -6323,6 +6558,7 @@ function playerMove(dx, dy) {
   const oldX = p.x, oldY = p.y;
   p.x = nx;
   p.y = ny;
+  p.stepsMoved = (p.stepsMoved || 0) + Math.abs(p.x - oldX) + Math.abs(p.y - oldY);
   p.movedLastTurn = true;
   Audio.step();
   haptic(10);
@@ -8597,6 +8833,8 @@ function normalizeLoadedStateObject(s) {
   if (!s || !s.player) return;
   normalizeLoadedPlayer(s.player);
   ensureMonkInstrument(s.player);
+  s.runId = typeof s.runId === 'string' && s.runId ? s.runId : createRunId();
+  s._runFinalized = !!s._runFinalized;
   if (!Array.isArray(s.entities)) s.entities = [];
   s.entities = s.entities.filter(e => {
     if (!e || !e.type) return false;
@@ -9496,6 +9734,32 @@ function cloudLoadGame(slotName) {
   });
 }
 
+function cloudRunArchiveDocId() {
+  return `${firebaseUser.uid}__run_archive_v1`;
+}
+
+function cloudLoadRunArchive() {
+  if (!firebaseUser || !firebaseDb) return Promise.resolve(null);
+  return firestoreTimeout(firebaseDb.collection('saves').doc(cloudRunArchiveDocId()).get()).then(doc => {
+    if (!doc.exists) return null;
+    const data = doc.data() || {};
+    if (data.saveType !== 'run_archive') return null;
+    return sanitizeRunArchive({ runs: Array.isArray(data.runs) ? data.runs : [] });
+  });
+}
+
+function cloudSaveRunArchive() {
+  if (!firebaseUser || !firebaseDb) return Promise.reject('Not signed in');
+  const payload = {
+    uid: firebaseUser.uid,
+    saveType: 'run_archive',
+    timestamp: new Date().toISOString(),
+    version: RUN_ARCHIVE_VERSION,
+    runs: (runArchive.runs || []).slice(0, RUN_ARCHIVE_LIMIT)
+  };
+  return firestoreTimeout(firebaseDb.collection('saves').doc(cloudRunArchiveDocId()).set(payload));
+}
+
 function cloudListSaves() {
   if (!firebaseUser || !firebaseDb) return Promise.resolve([]);
   // No .orderBy() here — that would require a composite Firestore index that may not exist.
@@ -9504,7 +9768,7 @@ function cloudListSaves() {
     return firestoreTimeout(
       firebaseDb.collection('saves').where('uid', '==', firebaseUser.uid).get(),
       15000
-    ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    ).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !!d.state));
   }
   return attempt().catch(err => {
     console.error('[Glyph Depths] cloudListSaves failed, retrying:', err);
@@ -11074,6 +11338,8 @@ function setupInput() {
     if (e.key === 'Escape') {
       // Saves overlay
       if ($('saves-overlay').classList.contains('active')) { closeSavesOverlay(); return; }
+      // Run history overlay
+      if ($('run-history-overlay').classList.contains('active')) { closeRunHistoryOverlay(); return; }
       // Item menu
       if ($('item-menu').classList.contains('active')) { closeItemMenu(); return; }
       // Settings
@@ -11447,7 +11713,6 @@ function setupUI() {
   $('btn-close-death-stats').addEventListener('touchend', (e) => { e.preventDefault(); closeDeathStatsFn(); }, { passive: false });
   $('btn-restart').addEventListener('click', () => {
     saveGhost();
-    saveHighScore();
     $('death-overlay').classList.remove('active');
     $('death-full-stats').style.display = 'none';
     $('btn-death-stats').textContent = 'View Stats';
@@ -11456,7 +11721,6 @@ function setupUI() {
 
   // Victory screen
   $('btn-victory-restart').addEventListener('click', () => {
-    saveHighScore();
     $('victory-overlay').classList.remove('active');
     showTitle();
   });
@@ -11576,12 +11840,33 @@ function setupUI() {
     savesGameBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
   }
 
+  const runsSettingsBtn = $('btn-runs-from-settings');
+  if (runsSettingsBtn) {
+    const fn = () => { $('settings-overlay').classList.remove('active'); showRunHistoryOverlay(); };
+    runsSettingsBtn.addEventListener('click', fn);
+    runsSettingsBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
+  }
+
   // Saved Games from title screen
   const savesFromTitle = $('btn-saves-from-title');
   if (savesFromTitle) {
     const fn = () => { Audio.resume(); showSavesOverlay(true); };
     savesFromTitle.addEventListener('click', fn);
     savesFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
+  }
+
+  const runsFromTitle = $('btn-runs-from-title');
+  if (runsFromTitle) {
+    const fn = () => { Audio.resume(); showRunHistoryOverlay(); };
+    runsFromTitle.addEventListener('click', fn);
+    runsFromTitle.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
+  }
+
+  const closeRunsBtn = $('btn-close-run-history');
+  if (closeRunsBtn) {
+    const fn = () => closeRunHistoryOverlay();
+    closeRunsBtn.addEventListener('click', fn);
+    closeRunsBtn.addEventListener('touchend', (e) => { e.preventDefault(); fn(); }, { passive: false });
   }
 
   // Give Up button
@@ -11605,7 +11890,9 @@ function setupUI() {
         state.gameOver = true;
         state.player.hp = 0;
         saveGhost();
-        saveHighScore();
+        trackRuneCollection(state.player.runes ? state.player.runes.length : 0);
+        checkMasteryUnlocks();
+        finalizeRunOnce('give_up', 'Gave up the run', '☠️');
         showTitle();
       };
       yesBtn.addEventListener('click', confirmFn);

@@ -1,5 +1,12 @@
 # Release Summary
 
+## Run Chronicle + Lifetime Stats
+- Added a persistent Run Chronicle overlay available from both title and in-run Config screens.
+- Each completed run now records class, floor reached, outcome/cause, runes collected, badges earned, turns, steps, kills, and score.
+- Added lifetime cross-run stats: total turns, total steps, total kills, favorite class, and deepest floor.
+- Added cloud run-archive sync metadata with run-id merge so multi-device history combines cleanly without duplicate entries.
+- Added idempotent run finalization hooks for death, victory, and give-up outcomes.
+
 ## Character class consolidation
 - The class roster is now centered on 9 archetypes with deleted classes removed from active play.
 - Monk and Beastmaster remain locked behind the existing floor-13 `maze_master` badge.
