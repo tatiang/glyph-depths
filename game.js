@@ -1253,9 +1253,25 @@ let potionNames = [];
 let scrollNames = [];
 let potionIdentified = {};
 let scrollIdentified = {};
+let specialMenuActions = null;
+let specialMenuCancel = null;
 
 // === DOM REFS ===
 const $ = id => document.getElementById(id);
+
+function clearSpecialMenuBindings() {
+  specialMenuActions = null;
+  specialMenuCancel = null;
+}
+
+function bindSpecialMenu(actions, cancelFn) {
+  const hotkeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+  specialMenuActions = {};
+  for (let i = 0; i < actions.length && i < hotkeys.length; i++) {
+    if (typeof actions[i] === 'function') specialMenuActions[hotkeys[i]] = actions[i];
+  }
+  specialMenuCancel = typeof cancelFn === 'function' ? cancelFn : null;
+}
 
 // === INITIALIZATION ===
 function boot() {
@@ -1611,6 +1627,7 @@ function showClassSelect() {
 function newRun(classId = 'berserker') {
   classId = normalizeClassId(classId);
   setupCanvas();
+  clearSpecialMenuBindings();
   randomizePotionScrollNames();
   state = {
     runId: createRunId(),
@@ -1663,6 +1680,8 @@ function newRun(classId = 'berserker') {
   state.playerName = charName.first;
   state.playerEpithet = charName.epithet;
   applyClassStartingItems(classId);
+  enforceClassOmniscience();
+  refreshIdentifiedItems();
   applyMasteryBonuses(classId);
   const className = getClassDef(classId).name || 'Berserker';
   // Welcome messages with player name and class
@@ -4369,7 +4388,7 @@ function collectGlyphRune(runeEntity) {
     // are checked dynamically in combat/hunger/etc.
   }
 
-  addMessage(`${rune.symbol} ${rune.name} — ${rune.desc}`, 'gold');
+  addMessage(`${rune.symbol} ${rune.name}: ${rune.desc}`, 'gold');
   haptic(50);
   checkNewSynergies();
   // Animation: expanding glyph circle
@@ -4553,9 +4572,28 @@ function generateMonsterDrop(floor, enemyXp) {
   }
 }
 
+function enforceClassOmniscience(player = state?.player) {
+  if (!player || (player.classId !== 'conjurer' && player.classId !== 'bishop')) return false;
+  let changed = false;
+  for (const pn of potionNames) {
+    if (!potionIdentified[pn.id]) {
+      potionIdentified[pn.id] = true;
+      changed = true;
+    }
+  }
+  for (const sn of scrollNames) {
+    if (!scrollIdentified[sn.id]) {
+      scrollIdentified[sn.id] = true;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 // Update ALL existing potion/scroll items in the game to reflect current identification state.
 // Called after any identification event (use, Scroll of Identify, Sage Identify All).
 function refreshIdentifiedItems() {
+  enforceClassOmniscience();
   const p = state.player;
   // Inventory
   for (const inv of p.inventory) {
@@ -5423,6 +5461,7 @@ function showLevelUp() {
   setTimeout(() => $('canvas-wrap').classList.remove('levelup-flash'), 500);
 
   inputLocked = true;
+  clearSpecialMenuBindings();
   const p = state.player;
   const atkTotal = getDisplayedPlayerAttack(p);
   const defTotal = getDisplayedPlayerDefense(p);
@@ -7722,6 +7761,7 @@ function triggerSpecialEvent() {
 
 function showShrineChoice() {
   inputLocked = true;
+  clearSpecialMenuBindings();
   const allSacrifices = [
     // High-cost options
     { text: 'Sacrifice 5 Max HP for +2 Attack', apply: () => { state.player.maxHp -= 5; state.player.hp = Math.min(state.player.hp, state.player.maxHp); state.player.attack += 2; }},
@@ -8819,6 +8859,7 @@ function serializeState() {
 function normalizeLoadedStateObject(s) {
   if (!s || !s.player) return;
   normalizeLoadedPlayer(s.player);
+  enforceClassOmniscience(s.player);
   ensureMonkInstrument(s.player);
   s.runId = typeof s.runId === 'string' && s.runId ? s.runId : createRunId();
   s._runFinalized = !!s._runFinalized;
@@ -8853,6 +8894,7 @@ function loadFromRaw(raw) {
     normalizeLoadedStateObject(s);
     state = s;
     inputLocked = false;
+    clearSpecialMenuBindings();
     state.throwMode = false;
     state.throwItem = null;
     state.fortifyMode = false;
@@ -8866,6 +8908,7 @@ function loadFromRaw(raw) {
     fixBlockedStairs();
     Audio.startAmbient(getBiomeKey(state.floor));
     ensureBeastmasterHound();
+    refreshIdentifiedItems();
     computeFOV();
     render();
     updateUI();
@@ -8941,6 +8984,7 @@ function loadGameFromSlot(slot) {
     }
     normalizeLoadedStateObject(s);
     state = s;
+    clearSpecialMenuBindings();
 
     // Save migration: if save was made before Caverns biome (MAX_FLOOR was 20)
     // and floor >= 5, shift floor numbers up by 4 to match new 24-floor layout
@@ -8972,6 +9016,7 @@ function loadGameFromSlot(slot) {
     // Safety net: if rubble blocks path to stairs, clear all rubble
     fixBlockedStairs();
     ensureBeastmasterHound();
+    refreshIdentifiedItems();
     // Recompute FOV and render
     setupCanvas();
     computeFOV();
@@ -11323,6 +11368,8 @@ function setupInput() {
 
     // ESC: close any open overlay, menu, or cancel throw mode
     if (e.key === 'Escape') {
+      // Class spell/action menus opened from Q
+      if (specialMenuCancel) { e.preventDefault(); specialMenuCancel(); return; }
       // Saves overlay
       if ($('saves-overlay').classList.contains('active')) { closeSavesOverlay(); return; }
       // Run history overlay
@@ -11353,6 +11400,12 @@ function setupInput() {
     }
 
     if (!state) return;
+
+    if (specialMenuActions && specialMenuActions[e.key]) {
+      e.preventDefault();
+      specialMenuActions[e.key]();
+      return;
+    }
 
     switch (e.key) {
       case 'ArrowUp': case 'w': playerMove(0, -1); break;
@@ -13855,9 +13908,10 @@ function activateClericMenu() {
 
   const weakenBtn = document.createElement('button');
   weakenBtn.className = 'perk-btn';
-  weakenBtn.innerHTML = `<div class="perk-name">🌀 Weaken</div><div class="perk-desc">Debuff enemies in this room for 4 turns${weakenReady ? '' : ` (${p.weakenCooldown} turns)`}</div>`;
+  weakenBtn.innerHTML = `<div class="perk-name">[1] 🌀 Weaken</div><div class="perk-desc">Debuff enemies in this room for 4 turns${weakenReady ? '' : ` (${p.weakenCooldown} turns)`}</div>`;
   if (!weakenReady) weakenBtn.style.opacity = '0.5';
   const weakenHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13870,9 +13924,10 @@ function activateClericMenu() {
 
   const healBtn = document.createElement('button');
   healBtn.className = 'perk-btn';
-  healBtn.innerHTML = `<div class="perk-name">💛 Divine Heal</div><div class="perk-desc">Restore 40% HP and cleanse poison/burning${healReady ? '' : ' (used this floor)'}</div>`;
+  healBtn.innerHTML = `<div class="perk-name">[2] 💛 Divine Heal</div><div class="perk-desc">Restore 40% HP and cleanse poison/burning${healReady ? '' : ' (used this floor)'}</div>`;
   if (!healReady) healBtn.style.opacity = '0.5';
   const healHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13886,8 +13941,9 @@ function activateClericMenu() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  cancelBtn.innerHTML = '<div class="perk-name">[Esc] ❌ Cancel</div>';
   const cancelHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13896,6 +13952,7 @@ function activateClericMenu() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
 
+  bindSpecialMenu([weakenHandler, healHandler], cancelHandler);
   overlay.classList.add('active');
 }
 
@@ -13914,9 +13971,10 @@ function activateConjurerMenu() {
 
   const dartBtn = document.createElement('button');
   dartBtn.className = 'perk-btn';
-  dartBtn.innerHTML = `<div class="perk-name">✨ Arcane Dart</div><div class="perk-desc">Low-damage ranged spell${dartReady ? '' : ` (${p.arcaneDartCooldown} turns)`}</div>`;
+  dartBtn.innerHTML = `<div class="perk-name">[1] ✨ Arcane Dart</div><div class="perk-desc">Low-damage ranged spell${dartReady ? '' : ` (${p.arcaneDartCooldown} turns)`}</div>`;
   if (!dartReady) dartBtn.style.opacity = '0.5';
   const dartHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13929,9 +13987,10 @@ function activateConjurerMenu() {
 
   const illusionBtn = document.createElement('button');
   illusionBtn.className = 'perk-btn';
-  illusionBtn.innerHTML = `<div class="perk-name">🎭 Illusion</div><div class="perk-desc">Summon a decoy${illusionReady ? '' : ` (${p.illusionCooldown} turns)`}</div>`;
+  illusionBtn.innerHTML = `<div class="perk-name">[2] 🎭 Illusion</div><div class="perk-desc">Summon a decoy${illusionReady ? '' : ` (${p.illusionCooldown} turns)`}</div>`;
   if (!illusionReady) illusionBtn.style.opacity = '0.5';
   const illusionHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13945,8 +14004,9 @@ function activateConjurerMenu() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  cancelBtn.innerHTML = '<div class="perk-name">[Esc] ❌ Cancel</div>';
   const cancelHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -13955,6 +14015,7 @@ function activateConjurerMenu() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
 
+  bindSpecialMenu([dartHandler, illusionHandler], cancelHandler);
   overlay.classList.add('active');
 }
 
@@ -14049,9 +14110,10 @@ function activateMonkMenu() {
   const inRoom = !!state.rooms.find(r => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
   const tooHungry = p.hunger < 30;
   const meditateNote = !meditateReady ? ` (${p.meditateCooldown}t)` : tooHungry ? ' (too hungry)' : !inRoom ? ' (need quiet room)' : '';
-  meditateBtn.innerHTML = `<div class="perk-name">🧘 Meditate</div><div class="perk-desc">Cleanse status effects and heal 20% HP${meditateNote}</div>`;
+  meditateBtn.innerHTML = `<div class="perk-name">[1] 🧘 Meditate</div><div class="perk-desc">Cleanse status effects and heal 20% HP${meditateNote}</div>`;
   if (!meditateReady || tooHungry || !inRoom) meditateBtn.style.opacity = '0.5';
   const meditateHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14064,9 +14126,10 @@ function activateMonkMenu() {
   const kiBoltBtn = document.createElement('button');
   kiBoltBtn.className = 'perk-btn';
   const kiBoltNote = !kiBoltReady ? ` (${p.kiBoltCooldown}t)` : '';
-  kiBoltBtn.innerHTML = `<div class="perk-name">💫 Ki Bolt</div><div class="perk-desc">Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8${kiBoltNote}</div>`;
+  kiBoltBtn.innerHTML = `<div class="perk-name">[2] 💫 Ki Bolt</div><div class="perk-desc">Ranged chi blast, ${2 + Math.floor(p.level * 0.75)} dmg, range 8${kiBoltNote}</div>`;
   if (!kiBoltReady) kiBoltBtn.style.opacity = '0.5';
   const kiBoltHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14079,8 +14142,9 @@ function activateMonkMenu() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  cancelBtn.innerHTML = '<div class="perk-name">[Esc] ❌ Cancel</div>';
   const cancelHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14089,6 +14153,7 @@ function activateMonkMenu() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
 
+  bindSpecialMenu([meditateHandler, kiBoltHandler], cancelHandler);
   overlay.classList.add('active');
   render();
 }
@@ -14325,9 +14390,10 @@ function activateElementalistMenu() {
 
   const vialBtn = document.createElement('button');
   vialBtn.className = 'perk-btn';
-  vialBtn.innerHTML = `<div class="perk-name">🟢 Vial of Slime</div><div class="perk-desc">Create 3×3 acid pool${vialReady ? '' : ` (${p.vialOfSlimeCooldown} turns)`}</div>`;
+  vialBtn.innerHTML = `<div class="perk-name">[1] 🟢 Vial of Slime</div><div class="perk-desc">Create 3×3 acid pool${vialReady ? '' : ` (${p.vialOfSlimeCooldown} turns)`}</div>`;
   if (!vialReady) vialBtn.style.opacity = '0.5';
   const vialHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14340,9 +14406,10 @@ function activateElementalistMenu() {
 
   const thunderBtn = document.createElement('button');
   thunderBtn.className = 'perk-btn';
-  thunderBtn.innerHTML = `<div class="perk-name">⚡ Thunderclap</div><div class="perk-desc">AoE lightning, stuns acid-soaked foes${thunderReady ? '' : ` (${p.thunderclapCooldown} turns)`}</div>`;
+  thunderBtn.innerHTML = `<div class="perk-name">[2] ⚡ Thunderclap</div><div class="perk-desc">AoE lightning, stuns acid-soaked foes${thunderReady ? '' : ` (${p.thunderclapCooldown} turns)`}</div>`;
   if (!thunderReady) thunderBtn.style.opacity = '0.5';
   const thunderHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14356,8 +14423,9 @@ function activateElementalistMenu() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  cancelBtn.innerHTML = '<div class="perk-name">[Esc] ❌ Cancel</div>';
   const cancelHandler = () => {
+    clearSpecialMenuBindings();
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
     overlay.classList.remove('active');
     inputLocked = false;
@@ -14366,6 +14434,7 @@ function activateElementalistMenu() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
 
+  bindSpecialMenu([vialHandler, thunderHandler], cancelHandler);
   overlay.classList.add('active');
 }
 
@@ -14592,18 +14661,23 @@ function activateBishopMenu() {
   container.style.maxHeight = '70vh';
 
   const availableSpells = BISHOP_SPELLS.filter(s => p.level >= s.levelReq);
+  const hotkeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+  const spellActions = [];
 
-  for (const spell of availableSpells) {
+  for (let i = 0; i < availableSpells.length; i++) {
+    const spell = availableSpells[i];
     const cd = (p.bishopSpellCooldowns && p.bishopSpellCooldowns[spell.id]) || 0;
     const ready = cd <= 0;
     const btn = document.createElement('button');
     btn.className = 'perk-btn';
     const descText = typeof spell.desc === 'function' ? spell.desc(p) : spell.desc;
     const cdText = ready ? '' : ` (${cd} turns)`;
-    btn.innerHTML = `<div class="perk-name">${spell.icon} ${spell.name}</div><div class="perk-desc">${descText}${cdText}</div>`;
+    const keyTag = hotkeys[i] ? `[${hotkeys[i]}] ` : '';
+    btn.innerHTML = `<div class="perk-name">${keyTag}${spell.icon} ${spell.name}</div><div class="perk-desc">${descText}${cdText}</div>`;
     if (!ready) btn.style.opacity = '0.5';
     const spellRef = spell;
     const handler = () => {
+      clearSpecialMenuBindings();
       container.style.overflowY = '';
       container.style.maxHeight = '';
       overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
@@ -14612,6 +14686,7 @@ function activateBishopMenu() {
       if (ready) castBishopSpell(spellRef);
       else addMessage(`${spellRef.name} recharging (${cd} turns).`, '');
     };
+    spellActions.push(handler);
     btn.addEventListener('click', handler);
     btn.addEventListener('touchend', (e) => { e.preventDefault(); handler(); }, { passive: false });
     container.appendChild(btn);
@@ -14620,8 +14695,9 @@ function activateBishopMenu() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'perk-btn';
   cancelBtn.style.borderColor = 'var(--text-dim)';
-  cancelBtn.innerHTML = '<div class="perk-name">❌ Cancel</div>';
+  cancelBtn.innerHTML = '<div class="perk-name">[Esc] ❌ Cancel</div>';
   const cancelHandler = () => {
+    clearSpecialMenuBindings();
     container.style.overflowY = '';
     container.style.maxHeight = '';
     overlay.querySelector('h1').textContent = '⬆️ LEVEL UP';
@@ -14632,6 +14708,7 @@ function activateBishopMenu() {
   cancelBtn.addEventListener('touchend', (e) => { e.preventDefault(); cancelHandler(); }, { passive: false });
   container.appendChild(cancelBtn);
 
+  bindSpecialMenu(spellActions, cancelHandler);
   overlay.classList.add('active');
 }
 

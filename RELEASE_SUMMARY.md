@@ -1,5 +1,14 @@
 # Release Summary
 
+## Spell Menu Hotkeys + Manual Accuracy Pass
+- Added keyboard spell-menu selection for all `Q`-driven class action menus:
+  `1` = first entry, `2` = second entry, through `0` for tenth.
+- Added `Esc` cancel support for these `Q` menus so players can cleanly back out.
+- Hardened omniscience classes (Conjurer and Bishop) so potion/scroll identification remains complete throughout a run, including loaded saves.
+- Updated rune pickup log formatting to use `:` separators instead of dash separators.
+- Rewrote manual sections to match the current game:
+  active class roster, bishop spellbook tiers, `Q` controls, enemy/floor structure, and 24-floor progression.
+
 ## Title Screen Mockup Refresh (Non-Emoji)
 - Reworked the initial title presentation into a premium dark-stone + gold layout with cleaner hierarchy and stronger visual focus.
 - Replaced emoji-based title scene art with a local sprite collage (`sample_character`, `slime`, `black-widow`) inside a framed hero card.

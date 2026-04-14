@@ -1,5 +1,11 @@
 # Changelog
 
+Apr 13, 2026 — 9:29 PM PT — Added Q-menu spell hotkeys, Conjurer omniscience enforcement, and a full manual refresh
+- Class spell/action menus opened with `Q` now support keyboard selection (`1`..`0`) and `Esc` cancel.
+- Conjurer/Bishop omniscience is now enforced across the whole run, including loaded saves, so potions/scrolls remain identified.
+- Rune pickup log text now uses `:` instead of dash separators to avoid subtraction-like wording.
+- Updated the in-game manual with current classes, current spell references, 24-floor structure, and corrected shortcuts.
+
 Apr 13, 2026 — 6:22 PM PT — Removed the “GLYPH DEPTHS” overline from title screen
 - Deleted the title overline text so the header now starts directly with `SHARDS OF THE UNKNOWN`.
 - Kept the rest of the title-screen mockup layout and behavior unchanged.

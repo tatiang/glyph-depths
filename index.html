@@ -1996,13 +1996,15 @@
 
       <div class="help-section">
         <div class="help-heading">The World</div>
-        <p class="help-note">Twenty floors of the Shards of the Unknown, divided into five biomes:</p>
+        <p class="help-note">Twenty-four floors of the Shards of the Unknown, divided into six regions:</p>
         <div class="help-row"><span class="hl">🟢 The Sewers (1–4)</span><span>Drowned ruins of Erathis. Rats, bats, and things that grew in the dark.</span></div>
-        <div class="help-row"><span class="hl">🔵 The Crypt (5–8)</span><span>Built by the dead, for the dead. Goblins, ghosts, and the Lich's domain.</span></div>
-        <div class="help-row"><span class="hl">🔴 The Citadel (9–12)</span><span>The King's fortress. Runed knights and demons still guard the halls.</span></div>
-        <div class="help-row"><span class="hl">🔷 The Abyss (13–16)</span><span>A wound in reality. Void creatures and things from between the words.</span></div>
-        <div class="help-row"><span class="hl">🟣 The Sanctum (17–20)</span><span>The throne of the Glyph King. Crystalline, beautiful, and lethal.</span></div>
-        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19. Wandering Sages offer healing and wisdom on floors 2, 5, 9, 13, 17. Taverns provide rest on floors 5, 10, 14. Mini-bosses guard floors 4, 8, 12, 16, and 19. The Glyph King awaits on floor 20.</p>
+        <div class="help-row"><span class="hl">🔵 The Caverns (5–8)</span><span>Flooded channels and hidden predators. Water controls movement and sightlines.</span></div>
+        <div class="help-row"><span class="hl">💀 The Crypt (9–12)</span><span>Built by the dead, for the dead. Ancient patrols and cursed halls.</span></div>
+        <div class="help-row"><span class="hl">🏰 The Citadel (13–16)</span><span>The King's fortress. Runed knights and demon fire guard the halls.</span></div>
+        <div class="help-row"><span class="hl">🌀 The Abyss (17–20)</span><span>A wound in reality. Chasms, voidspawn, and unstable terrain.</span></div>
+        <div class="help-row"><span class="hl">✨ The Sanctum (21–23)</span><span>Crystalline chambers where glyph energy bends combat itself.</span></div>
+        <div class="help-row"><span class="hl">👑 Throne Room (24)</span><span>The Glyph King waits on the final floor.</span></div>
+        <p class="help-note" style="margin-top:6px;">Merchants trade on floors 3, 7, 11, 15, 19, and 23. Wandering Sages appear on 2, 6, 10, 14, 18, and 22. Taverns appear on 9, 14, and 18. Mini-bosses guard 4, 8, 12, 16, 20, and 23. The Glyph King awaits on floor 24.</p>
         <p class="help-note" style="margin-top:6px;">🧱 <strong>Secret Walls</strong> hide throughout the dungeon — bump a wall to crack it, then hit again to break through. Cracked walls turn amber (▒). Rogues can sense nearby secrets with a shimmer. Behind them lies hidden loot worth the search.</p>
         <p class="help-note" style="margin-top:6px;">🗝️ <strong>Bone Keys</strong> appear on floors 6, 12, and 18. They unlock doors to bonus wings — dangerous side areas with rare loot and tougher enemies.</p>
         <p class="help-note" style="margin-top:6px;">◊ <strong>Teleport Tiles</strong> are invisible floor glyphs that warp you to a random location when stepped on. Once triggered, they become visible (cyan ◊) and remain active. Appear on floors 3+.</p>
@@ -2017,87 +2019,71 @@
         <div class="help-heading">Character Classes</div>
 
         <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧝 Adventurer</div>
-          <p class="help-note">The balanced choice. Natural regeneration heals 1 HP every 15 turns. 10% crit chance. Pathfinder: stairs are always visible on the minimap. Starts with Leather Vest and Healing Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Survivor's Instinct — auto-eat food when starving.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
           <div style="color:var(--gold);font-weight:700;font-size:13px;">🪖 Berserker</div>
-          <p class="help-note">High HP (22) and ATK (+4) but 2× hunger drain. Rage gives +3 ATK below 40% HP. Enrage ability: +5 ATK for 5 turns, once per floor. Starts with Short Sword and 2 Strength Potions.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Undying Fury — survive a lethal hit with 1 HP, once per floor.</p>
+          <p class="help-note">High HP and burst damage. Gains Rage (+3 ATK) below 40% HP and can trigger Enrage once per floor for guaranteed fury.</p>
         </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🥷 Rogue</div>
-          <p class="help-note">Low HP (10) but deadly precision: 15% dodge, 20% crit. Stealth reduces enemy detection. Starts with 6 Throwing Daggers and Invisibility Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Shadow Step — become invisible for 2 turns after killing an enemy.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧙 Wizard</div>
-          <p class="help-note">Fragile (11 HP, 1 ATK) but scroll effects are doubled. Arcane Blast AoE ability. Starts with Arcane Staff and 3 identified scrolls.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Mana Shield — 25% chance to completely negate incoming damage.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🏹 Ranger</div>
-          <p class="help-note">Survivalist with +2 FOV, 5% dodge, 15% crit. Forager (bonus food/arrows). Aimed Shot: 2× bow damage on 8-turn cooldown. Infinite basic arrows. Starts with Short Bow, Dagger, Throwing Daggers, and a Ration.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Quick Draw — Aimed Shot cooldown reduced from 8 to 5 turns.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">⛪ Cleric</div>
-          <p class="help-note">Holy warrior (18 HP, +2 ATK, +1 DEF). +3 ATK vs undead. Curse immune. Life-drain immune. Divine Heal: full HP restore once per run. Starts with Mace, Healing Potion, Scroll of Identify.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Sanctified Ground — heal 1 HP each time you wait (Space).</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🎵 Bard</div>
-          <p class="help-note">Charismatic performer (12 HP, +1 ATK, +1 DEF). Charm: 25% chance to pacify an enemy on hit. Song of Rest: heal 3 HP on a 10-turn cooldown. Starts with Lute (weapon) and Healing Potion.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Encore — charmed enemies may fight for you.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">⚒️ Artificer</div>
-          <p class="help-note">Master crafter (14 HP, +2 ATK, +1 DEF). Tinker: upgrade a piece of gear for gold, once per floor. Starts with Wrench (weapon), Leather Vest, and extra gold.</p>
-          <p class="help-note" style="color:#c0a0ff;">★ Class Perk: Master Smith — upgrades give +2 instead of +1.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🌑 Ninja</div>
-          <p class="help-note">Shadow assassin (11 HP, +3 ATK). 20% dodge, 25% crit chance. Star Throw: ranged shuriken attack on a 6-turn cooldown. High stealth reduces detection range.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🟣 Dark Wizard</div>
-          <p class="help-note">Corrupted mage (12 HP, +2 ATK). Acid Bolt: ranged poison attack on a 7-turn cooldown. Immune to poison. Scroll effects enhanced. Dark knowledge identifies potions.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧱 Brick Mason</div>
-          <p class="help-note">Stone-tough warrior (20 HP, +1 ATK, +3 DEF). Fortify: seal a doorway with a wall, once per floor. Extremely tanky but low offense.</p>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🤸 Daredevil</div>
-          <p class="help-note">Acrobatic fighter (13 HP, +2 ATK). 20% dodge. Flip: jump over an adjacent enemy (4-turn cooldown). Ricochet: melee hits chain to adjacent enemies at 50% then 25% damage.</p>
-        </div>
-
         <div style="margin-bottom:10px;">
           <div style="color:var(--gold);font-weight:700;font-size:13px;">💨 Escape Artist</div>
-          <p class="help-note">Evasive specialist (12 HP, +1 ATK, +1 DEF). 15% dodge. Escape Route: teleport to an adjacent room, once per floor. Leaves ice traps behind when fleeing enemies.</p>
+          <p class="help-note">Evasive skirmisher with 20% dodge. Uses Escape Route and leaves ice traps while retreating; melee can ricochet to nearby enemies.</p>
         </div>
-
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🏹 Ranger</div>
+          <p class="help-note">Long-range specialist with +2 FOV, Forager food economy, and Aimed Shot burst damage. Starts with a bow and arrow stock.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🥷 Rogue</div>
+          <p class="help-note">High crit / dodge assassin. Unlocks Roundhouse Kick at level 5 and excels at precision kills with daggers and stealth.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">⛪ Cleric</div>
+          <p class="help-note">Durable holy class. Uses Weaken and Divine Heal, resists curse effects, and punishes undead/life-drain enemies.</p>
+        </div>
         <div style="margin-bottom:10px;">
           <div style="color:var(--gold);font-weight:700;font-size:13px;">🎭 Conjurer</div>
-          <p class="help-note">Trickster mage (11 HP, +2 ATK). Summon illusory decoys to distract enemies (8-turn cooldown). Illusions draw enemy attention away from you.</p>
+          <p class="help-note">Omniscient trickster. All potions/scrolls stay identified all run. Casts Arcane Dart and summons Illusions to redirect enemy aggro.</p>
         </div>
-
         <div style="margin-bottom:10px;">
-          <div style="color:var(--gold);font-weight:700;font-size:13px;">🪙 Barterer</div>
-          <p class="help-note">Merchant-blooded survivor (14 HP, +1 ATK, +1 DEF). 25% discount at shops. Conjure Ration: sacrifice 5 HP to create food. Starts with extra gold.</p>
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">💀 Dark Wizard</div>
+          <p class="help-note">Glass-cannon caster. Scroll effects are amplified, Acid Bolt applies poison pressure, and necromancy can raise slain enemies as allies.</p>
         </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🧪 Elementalist</div>
+          <p class="help-note">Terrain-control caster. Immune to poison/fire/acid, applies acid-soaked on bump attacks, and cycles between Vial of Slime and Thunderclap.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🐺 Beastmaster</div>
+          <p class="help-note">Companion class with a permanent hound and passive regeneration. Beast Charm can convert non-boss enemies temporarily.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">📿 Monk</div>
+          <p class="help-note">Unarmed scaling fighter. ATK/DEF scale with level, can Meditate for cleanse/heal, fire Ki Bolt, and walk on water.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🔮 Bishop</div>
+          <p class="help-note">Spellbook class with all items identified and a growing roster of ten spells that unlock by level and cooldown management.</p>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:var(--gold);font-weight:700;font-size:13px;">🌋 Earthshaker</div>
+          <p class="help-note">Frontline disruptor. Tectonic Slam scales through tiers as you level, with Tremorsense and Surefooted passives for positional control.</p>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Spell Menus &amp; Hotkeys</div>
+        <p class="help-note">Press <kbd>Q</kbd> to open your class spell/action menu. Press <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd> ... <kbd>0</kbd> to cast the matching entry. Press <kbd>Esc</kbd> to close without casting.</p>
+        <div class="help-row"><span class="hl">Conjurer</span><span>Arcane Dart, Illusion</span></div>
+        <div class="help-row"><span class="hl">Cleric</span><span>Weaken, Divine Heal</span></div>
+        <div class="help-row"><span class="hl">Monk</span><span>Meditate, Ki Bolt</span></div>
+        <div class="help-row"><span class="hl">Elementalist</span><span>Vial of Slime, Thunderclap</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-heading">Bishop Spellbook</div>
+        <div class="help-row"><span class="hl">Lv 1</span><span>Magic Missile, Minor Heal</span></div>
+        <div class="help-row"><span class="hl">Lv 3</span><span>Identify, Sleep</span></div>
+        <div class="help-row"><span class="hl">Lv 5</span><span>Poison Cloud, Dispel</span></div>
+        <div class="help-row"><span class="hl">Lv 7</span><span>Holy Nova, Uncurse</span></div>
+        <div class="help-row"><span class="hl">Lv 9</span><span>Arcane Storm, Major Heal</span></div>
       </div>
 
       </div><!-- end PAGE 2 -->
@@ -2153,14 +2139,18 @@
       <div class="help-section">
         <div class="help-heading">Mastery System ⭐</div>
         <p class="help-note" style="margin-bottom:6px;">Permanent cross-run bonuses earned by completing achievements. These persist forever and apply to all future runs.</p>
-        <div class="help-row"><span class="hl">Adventurer Mastery</span><span>Win as Adventurer → +1 DEF start</span></div>
         <div class="help-row"><span class="hl">Berserker Mastery</span><span>Win as Berserker → +3 max HP start</span></div>
-        <div class="help-row"><span class="hl">Rogue Mastery</span><span>Win as Rogue → +5% crit start</span></div>
-        <div class="help-row"><span class="hl">Wizard Mastery</span><span>Win as Wizard → +2 ATK start</span></div>
+        <div class="help-row"><span class="hl">Escape Artist Mastery</span><span>Win as Escape Artist → +1 extra Escape Route use/floor</span></div>
         <div class="help-row"><span class="hl">Ranger Mastery</span><span>Win as Ranger → start with Hunting Bow</span></div>
+        <div class="help-row"><span class="hl">Rogue Mastery</span><span>Win as Rogue → +5% crit start</span></div>
         <div class="help-row"><span class="hl">Cleric Mastery</span><span>Win as Cleric → +3 max HP start</span></div>
-        <div class="help-row"><span class="hl">Bard Mastery</span><span>Win as Bard → +1 DEF, charm chance start</span></div>
-        <div class="help-row"><span class="hl">Artificer Mastery</span><span>Win as Artificer → start with bonus gold</span></div>
+        <div class="help-row"><span class="hl">Conjurer Mastery</span><span>Win as Conjurer → Illusion cooldown reduced</span></div>
+        <div class="help-row"><span class="hl">Dark Wizard Mastery</span><span>Win as Dark Wizard → stronger necromancy start</span></div>
+        <div class="help-row"><span class="hl">Elementalist Mastery</span><span>Win as Elementalist → faster Vial cooldown</span></div>
+        <div class="help-row"><span class="hl">Beastmaster Mastery</span><span>Win as Beastmaster → +3 max HP start</span></div>
+        <div class="help-row"><span class="hl">Monk Mastery</span><span>Win as Monk → +1 DEF start</span></div>
+        <div class="help-row"><span class="hl">Bishop Mastery</span><span>Win as Bishop → Minor Heal cooldown halved</span></div>
+        <div class="help-row"><span class="hl">Earthshaker Mastery</span><span>Win as Earthshaker → faster Tectonic Slam cooldown</span></div>
         <div class="help-row"><span class="hl">Veteran</span><span>Win any run → +1 max HP all classes</span></div>
         <div class="help-row"><span class="hl">Seasoned Slayer</span><span>Kill 100+ enemies total → +1 ATK all</span></div>
         <div class="help-row"><span class="hl">Rune Adept</span><span>Collect 15+ runes total → floor 1 rune revealed</span></div>
@@ -2186,12 +2176,12 @@
       <div class="help-section">
         <div class="help-heading">Enemies</div>
         <p class="help-note"><strong>Tier 1 (F1–4):</strong> Rats, Bats, Skeletons, Slimes — the vermin of drowned Erathis.<br>
-        <strong>Tier 2 (F5–8):</strong> Goblins, Ghosts, Spiders, Ogres — the Crypt's inhabitants.<br>
-        <strong>Tier 3 (F9–12):</strong> Wraiths, Mimics, Necromancers, Demons — the Citadel's runed guardians.<br>
-        <strong>Tier 4 (F13–16):</strong> Dark Knights, Banshees, Hydras, Warlocks — horrors of the Abyss.<br>
-        <strong>Tier 5 (F17–19):</strong> Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches — the Sanctum's last defenders.<br>
-        <strong>Floor 20:</strong> The Glyph King — a three-phase boss fight.</p>
-        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Lich 🧿 (F8), Balrog (F12), Void Titan (F16), Glyph Guardian (F19).</p>
+        <strong>Tier 2 (F5–8):</strong> Goblins, Ghosts, Spiders, Black Widows, Ogres, and cavern predators.<br>
+        <strong>Tier 3 (F9–12):</strong> Wraiths, Mimics, Necromancers, Demons, and Orb-Weavers.<br>
+        <strong>Tier 4 (F13–16):</strong> Dark Knights, Banshees, Hydras, Warlocks, and Shadow Stalkers.<br>
+        <strong>Tier 5 (F17–23):</strong> Abyssal Fiends, Void Wraiths, Elder Mimics, Arch Liches, Phantom Assassins.<br>
+        <strong>Floor 24:</strong> The Glyph King.</p>
+        <p class="help-note" style="margin-top:4px;"><strong>Mini-bosses:</strong> Cave Troll (F4), Cavern Wyrm (F8), Lich (F12), Balrog (F16), Void Titan (F20), Glyph Guardian (F23).</p>
         <p class="help-note" style="margin-top:4px;">Special enemies: <strong>Wraiths/Void Wraiths</strong> drain max HP (Clerics are immune; Glyph of Warding gives 50% resist; shrines can grant full immunity). <strong>Slimes/Hydras</strong> split on death. <strong>Mimics</strong> disguise as chests. <strong>Phase</strong> enemies walk through walls. <strong>Demons</strong> leave fire trails.</p>
         <p class="help-note" style="margin-top:4px;"><strong>Poison</strong> scales with depth: 1 HP/turn (floors 1–6), 2 HP/turn (floors 7–13), 3 HP/turn (floors 14+). Lasts 5 turns.</p>
       </div>
@@ -2205,12 +2195,12 @@
         • The ghost of your previous run haunts the floor where you fell. Defeat it for its treasure.<br>
         • Identify potions carefully — some were left as traps by the King's alchemists.<br>
         • Perk synergies combine the grammar of the glyphs. The right pair can unmake armies.<br>
-        • Merchants on floors 3, 7, 11, 15, 19 are cursed to never leave. Drop items while shopping to make room.<br>
-        • Taverns on floors 5, 10, 14 offer respite — buy food, hear one rumor (1 gold), or gamble.<br>
+        • Merchants on floors 3, 7, 11, 15, 19, 23 are cursed to never leave. Drop items while shopping to make room.<br>
+        • Taverns on floors 9, 14, 18 offer respite — buy food, hear one rumor (1 gold), or gamble.<br>
         • Bump walls to search for secret passages — Rogues can sense them nearby.<br>
         • Bone Keys (floors 6, 12, 18) unlock bonus wings with rare loot and dangerous foes.<br>
         • Rogues can close doors behind them (🚪 or <kbd>C</kbd>) — closed doors appear teal on the map.<br>
-        • Adventurers always see stairs on the minimap — the pathfinder's instinct.<br>
+        • Press <kbd>Q</kbd> for class actions. In spell menus, press <kbd>1</kbd>..<kbd>0</kbd> to cast quickly.<br>
         • Shrines offer random sacrifices: trade HP for ATK, gold for DEF, HP for hunger, or sanctify vs life-drain.<br>
         • Auto-equip prefers specialty weapons (burn, freeze) over plain ones at the same stats.<br>
         • Swipe the ⚙️ Config screen to browse Stats, Settings, and Save/Load pages.</p>
@@ -2225,8 +2215,9 @@
         <div class="help-row"><span class="hl">F</span><span>Fire ranged weapon</span></div>
         <div class="help-row"><span class="hl">T</span><span>Throw (daggers/stars)</span></div>
         <div class="help-row"><span class="hl">M</span><span>Toggle minimap</span></div>
-        <div class="help-row"><span class="hl">I</span><span>Use class ability</span></div>
-        <div class="help-row"><span class="hl">C</span><span>Close door (Rogue/Mason)</span></div>
+        <div class="help-row"><span class="hl">Q</span><span>Open class ability / spell menu</span></div>
+        <div class="help-row"><span class="hl">C</span><span>Close door (Rogue)</span></div>
+        <div class="help-row"><span class="hl">1–0</span><span>Select spell option in active Q menu</span></div>
         <div class="help-row"><span class="hl">1–8</span><span>Use inventory slot</span></div>
         <div class="help-row"><span class="hl">Escape</span><span>Close overlay / cancel</span></div>
         <div class="help-row"><span class="hl">← → arrows</span><span>Navigate paged screens</span></div>
