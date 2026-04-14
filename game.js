@@ -1328,32 +1328,19 @@ function generateCharacterName() {
 
 // === TITLE SCREEN ===
 function showTitle() {
-  // Build the dungeon graphic
-  const graphic = $('title-graphic');
-  graphic.innerHTML = [
-    '<span style="color:#3a3a4a">  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span>',
-    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">···········</span><span style="color:#3a3a4a">▓▓▓</span>',
-    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·</span><span style="color:#80ff80">▼</span><span style="color:#2a2a38">·········</span><span style="color:#8B6914">/</span><span style="color:#2a2a38">··</span><span style="color:#3a3a4a">▓</span>',
-    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·····</span><span style="color:#f0c040">' + (settings.heroIcon || '🧝') + '</span><span style="color:#2a2a38">····</span><span style="color:#3a3a4a">▓▓▓</span>',
-    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">·····</span><span style="color:#ff4040">🐀</span><span style="color:#2a2a38">····</span><span style="color:#3a3a4a">▓</span>',
-    '<span style="color:#3a3a4a">  ▓</span><span style="color:#2a2a38">···</span><span style="color:#ffcc00">💰</span><span style="color:#2a2a38">·······</span><span style="color:#3a3a4a">▓</span>',
-    '<span style="color:#3a3a4a">  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span>',
-  ].join('<br>');
-
-  // Floating particles
-  const particles = $('title-particles');
-  particles.innerHTML = '';
-  const glyphs = ['·', '✦', '◆', '▪', '✧', '⬥'];
-  for (let i = 0; i < 15; i++) {
-    const p = document.createElement('span');
-    p.className = 'particle';
-    p.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
-    p.style.left = (5 + Math.random() * 90) + '%';
-    p.style.color = ['#3a3a5a', '#504060', '#2a2a44', '#605040'][Math.floor(Math.random() * 4)];
-    p.style.animationDelay = (Math.random() * 8) + 's';
-    p.style.animationDuration = (6 + Math.random() * 6) + 's';
-    p.style.fontSize = (10 + Math.random() * 10) + 'px';
-    particles.appendChild(p);
+  // Lightweight ambient rune sparks for the title hero card
+  const runeLayer = $('title-rune-layer');
+  if (runeLayer) {
+    runeLayer.innerHTML = '';
+    for (let i = 0; i < 16; i++) {
+      const spark = document.createElement('span');
+      spark.className = 'rune-spark';
+      spark.style.left = (6 + Math.random() * 88) + '%';
+      spark.style.top = (18 + Math.random() * 68) + '%';
+      spark.style.setProperty('--dur', (7 + Math.random() * 5).toFixed(2) + 's');
+      spark.style.setProperty('--delay', (Math.random() * 6).toFixed(2) + 's');
+      runeLayer.appendChild(spark);
+    }
   }
 
   // Reset sections so title is visible, class section is hidden

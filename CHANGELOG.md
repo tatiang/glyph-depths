@@ -1,5 +1,10 @@
 # Changelog
 
+Apr 13, 2026 — 6:07 PM PT — Rebuilt the title screen with premium non-emoji key art and layout
+- Replaced the old emoji/glyph title graphic with a framed sprite collage using local assets (`sample_character`, `slime`, `black-widow`).
+- Added a new dark-stone + gold title visual system with fog/rune ambient motion and mobile-safe call-to-action layout.
+- Refactored `showTitle()` so it initializes title ambient rune sparks instead of generating inline emoji art.
+
 Apr 12, 2026 — 12:41 AM PT — Added persistent Run Chronicle with lifetime stats and cloud run-history merge
 - Added a new Run Chronicle overlay with scrollable run history entries (class, floor, outcome/cause, runes, badges, turns, steps, kills, score).
 - Added persistent lifetime metrics across runs: total turns, total steps, total kills, favorite class, and deepest floor.

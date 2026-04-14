@@ -1,5 +1,11 @@
 # Release Summary
 
+## Title Screen Mockup Refresh (Non-Emoji)
+- Reworked the initial title presentation into a premium dark-stone + gold layout with cleaner hierarchy and stronger visual focus.
+- Replaced emoji-based title scene art with a local sprite collage (`sample_character`, `slime`, `black-widow`) inside a framed hero card.
+- Added subtle ambient motion layers (fog and rune sparks) and updated title CTA grouping while preserving existing title button IDs and flow.
+- Simplified `showTitle()` to initialize lightweight ambient visuals instead of generating inline emoji dungeon markup.
+
 ## Run Chronicle + Lifetime Stats
 - Added a persistent Run Chronicle overlay available from both title and in-run Config screens.
 - Each completed run now records class, floor reached, outcome/cause, runes collected, badges earned, turns, steps, kills, and score.

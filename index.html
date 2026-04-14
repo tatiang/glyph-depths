@@ -1063,9 +1063,172 @@
     /* Title screen */
     #title-screen {
       gap: 0;
+      background:
+        radial-gradient(120% 80% at 50% -10%, rgba(255, 190, 90, 0.12), rgba(255, 190, 90, 0) 58%),
+        radial-gradient(90% 60% at 50% 110%, rgba(35, 55, 85, 0.3), rgba(35, 55, 85, 0) 65%),
+        linear-gradient(180deg, rgba(4, 6, 11, 0.95) 0%, rgba(8, 10, 16, 0.97) 52%, rgba(3, 4, 7, 0.98) 100%);
     }
     #title-screen.class-mode {
       overflow-y: hidden;
+    }
+    #title-section {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 4px 12px;
+      animation: titleRiseIn 0.75s ease-out;
+    }
+    .title-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+    .title-overline {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: #9ca6b4;
+      font-weight: 700;
+    }
+    .title-logo {
+      font-family: "Cinzel", "Palatino Linotype", "Book Antiqua", serif;
+      font-size: clamp(26px, 6.2vw, 34px);
+      line-height: 1.04;
+      letter-spacing: 0.1em;
+      color: #e7c983;
+      text-shadow: 0 0 20px rgba(242, 188, 92, 0.35), 0 0 60px rgba(242, 188, 92, 0.12);
+    }
+    .title-subtitle {
+      font-size: 13px;
+      color: #b0b7c2;
+      font-style: italic;
+      letter-spacing: 0.03em;
+      margin-top: 2px;
+    }
+    .title-hero-card {
+      position: relative;
+      width: min(100%, 390px);
+      height: clamp(190px, 34vh, 270px);
+      border: 1px solid rgba(194, 165, 108, 0.6);
+      border-radius: 14px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(255, 204, 110, 0.12), rgba(255, 204, 110, 0) 48%),
+        linear-gradient(180deg, rgba(24, 28, 38, 0.86) 0%, rgba(11, 13, 18, 0.94) 48%, rgba(8, 9, 13, 0.98) 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 234, 190, 0.18),
+        inset 0 -34px 56px rgba(0, 0, 0, 0.52),
+        0 18px 40px rgba(0, 0, 0, 0.55);
+    }
+    .title-frame-glow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: 14px;
+      box-shadow:
+        inset 0 0 0 1px rgba(128, 102, 62, 0.35),
+        inset 0 0 46px rgba(230, 169, 82, 0.1);
+    }
+    .title-fog-layer {
+      position: absolute;
+      inset: -10% -18%;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 22% 70%, rgba(120, 140, 170, 0.18), rgba(120, 140, 170, 0) 46%),
+        radial-gradient(circle at 79% 30%, rgba(90, 115, 145, 0.14), rgba(90, 115, 145, 0) 44%),
+        radial-gradient(circle at 50% 104%, rgba(36, 44, 64, 0.6), rgba(36, 44, 64, 0) 54%);
+      animation: titleFogDrift 14s ease-in-out infinite alternate;
+    }
+    .title-rune-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .title-rune-layer .rune-spark {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(252, 213, 126, 0.95) 0%, rgba(252, 213, 126, 0) 72%);
+      filter: drop-shadow(0 0 5px rgba(252, 213, 126, 0.45));
+      animation: titleRuneDrift var(--dur, 9s) ease-in-out infinite;
+      animation-delay: var(--delay, 0s);
+      opacity: 0.5;
+    }
+    .title-collage {
+      position: absolute;
+      inset: 0;
+    }
+    .title-hero {
+      position: absolute;
+      left: 50%;
+      bottom: 4%;
+      width: clamp(128px, 34vw, 184px);
+      transform: translateX(-50%);
+      filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.62)) drop-shadow(0 0 14px rgba(242, 188, 92, 0.28));
+      animation: titleHeroFloat 4.8s ease-in-out infinite;
+      image-rendering: auto;
+      z-index: 3;
+    }
+    .title-enemy {
+      position: absolute;
+      bottom: 12%;
+      width: clamp(64px, 16vw, 92px);
+      opacity: 0.9;
+      filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.58));
+      image-rendering: auto;
+      z-index: 2;
+    }
+    .title-enemy-left {
+      left: 10%;
+      transform: rotate(-9deg);
+      animation: titleEnemyFloatLeft 5.7s ease-in-out infinite;
+    }
+    .title-enemy-right {
+      right: 11%;
+      transform: rotate(7deg);
+      animation: titleEnemyFloatRight 5.2s ease-in-out infinite;
+    }
+    .title-cta-stack {
+      width: min(100%, 350px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+      animation: titleFadeUp 0.7s ease-out 0.2s both;
+    }
+    #title-section .title-secondary-btn {
+      background: rgba(22, 28, 40, 0.82);
+      border: 1px solid #5f82a8;
+      color: #7fb0dc;
+      font-size: 14px;
+      width: 100%;
+      padding: 12px 16px;
+      min-height: 44px;
+    }
+    .title-quick-links {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      animation: titleFadeUp 0.8s ease-out 0.34s both;
+    }
+    .title-badge-count {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+      min-height: 14px;
+      animation: titleFadeUp 0.9s ease-out 0.4s both;
     }
     #class-section {
       flex: 1;
@@ -1082,56 +1245,35 @@
       border-top: 1px solid var(--panel-border);
       background: rgba(5,5,8,0.85);
     }
-    #title-section .title-graphic {
-      font-size: 28px;
-      line-height: 1.15;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      opacity: 0;
-      transform: translateY(10px);
-      animation: titleFadeIn 1.5s ease-out 0.3s forwards;
-    }
-    #title-section .title {
-      font-size: 28px;
-      letter-spacing: 3px;
-      color: var(--gold);
-      text-shadow: 0 0 20px rgba(240, 192, 64, 0.4), 0 0 60px rgba(240, 192, 64, 0.15);
-      margin-bottom: 8px;
-      opacity: 0;
-      animation: titleFadeIn 1s ease-out 1.2s forwards;
-    }
-    #title-section .subtitle {
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 28px;
-      font-style: italic;
-      opacity: 0;
-      animation: titleFadeIn 1s ease-out 1.8s forwards;
-    }
-    #title-section .big-btn {
-      opacity: 0;
-      animation: titleFadeIn 0.8s ease-out 2.4s forwards;
-    }
-    #title-section .title-particles {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    #title-section .title-particles .particle {
-      position: absolute;
-      font-size: 14px;
-      opacity: 0;
-      animation: particleDrift 8s linear infinite;
-    }
-    @keyframes titleFadeIn {
+    @keyframes titleRiseIn {
+      from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    @keyframes particleDrift {
-      0% { opacity: 0; transform: translateY(100vh) rotate(0deg); }
-      10% { opacity: 0.3; }
-      90% { opacity: 0.3; }
-      100% { opacity: 0; transform: translateY(-20px) rotate(180deg); }
+    @keyframes titleFadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes titleFogDrift {
+      from { transform: translate3d(-2%, 0, 0) scale(1.01); }
+      to { transform: translate3d(2%, -1%, 0) scale(1.04); }
+    }
+    @keyframes titleHeroFloat {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-6px); }
+    }
+    @keyframes titleEnemyFloatLeft {
+      0%, 100% { transform: rotate(-9deg) translateY(0); }
+      50% { transform: rotate(-11deg) translateY(-5px); }
+    }
+    @keyframes titleEnemyFloatRight {
+      0%, 100% { transform: rotate(7deg) translateY(0); }
+      50% { transform: rotate(9deg) translateY(-4px); }
+    }
+    @keyframes titleRuneDrift {
+      0%   { transform: translateY(0) scale(0.85); opacity: 0.15; }
+      35%  { opacity: 0.75; }
+      70%  { opacity: 0.45; }
+      100% { transform: translateY(-26px) scale(1.05); opacity: 0.05; }
     }
 
     /* Fade transition */
@@ -1642,20 +1784,35 @@
   <div class="overlay" id="title-screen" style="justify-content:flex-start;overflow-y:auto;">
     <!-- Step 1: Title -->
     <div id="title-section" style="display:flex;flex-direction:column;align-items:center;width:100%;">
-      <div class="title-particles" id="title-particles"></div>
-      <div class="title-graphic" id="title-graphic"></div>
-      <div class="title">SHARDS OF THE UNKNOWN</div>
-      <div class="subtitle">The depths remember every step.</div>
-      <button class="big-btn" id="btn-start">Descend</button>
-      <button class="big-btn" id="btn-saves-from-title" style="margin-top:8px;background:var(--panel-bg);border-color:#69b;color:#69b;">📂 Saved Games</button>
-      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">
+      <div class="title-header">
+        <div class="title-overline">GLYPH DEPTHS</div>
+        <div class="title-logo">SHARDS OF THE UNKNOWN</div>
+        <div class="title-subtitle">The depths remember every step.</div>
+      </div>
+
+      <div class="title-hero-card">
+        <div class="title-fog-layer"></div>
+        <div class="title-rune-layer" id="title-rune-layer"></div>
+        <div class="title-collage">
+          <img class="title-enemy title-enemy-left" src="images/slime.png" alt="Slime">
+          <img class="title-hero" src="images/sample_character.png" alt="Champion">
+          <img class="title-enemy title-enemy-right" src="images/black-widow.png" alt="Black Widow">
+        </div>
+        <div class="title-frame-glow"></div>
+      </div>
+
+      <div class="title-cta-stack">
+        <button class="big-btn" id="btn-start">Descend</button>
+        <button class="big-btn title-secondary-btn" id="btn-saves-from-title">📂 Saved Games</button>
+      </div>
+      <div class="title-quick-links">
         <button class="help-btn" id="btn-help-from-title" style="animation:none;opacity:1;">⚡ Quickstart</button>
         <button class="help-btn" id="btn-badges" style="animation:none;opacity:1;">🏆 Badges</button>
         <button class="help-btn" id="btn-runs-from-title" style="animation:none;opacity:1;">📜 Runs</button>
         <button class="help-btn" id="btn-manual-from-title" style="animation:none;opacity:1;">📜 Manual</button>
         <button class="help-btn" id="btn-updatelog-from-title" style="animation:none;opacity:1;">📋 Updates</button>
       </div>
-      <div id="title-badge-count" style="font-size:11px;color:var(--text-dim);margin-top:6px;"></div>
+      <div id="title-badge-count" class="title-badge-count"></div>
     </div>
     <!-- Step 2: Class selection (shown after clicking Descend) -->
     <div id="class-section" style="display:none;flex-direction:column;width:100%;flex:1;min-height:0;">
