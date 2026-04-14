@@ -1,5 +1,9 @@
 # Changelog
 
+Apr 13, 2026 — 6:19 PM PT — Swapped title hero art from sample character to Elementalist
+- Updated the title hero-card collage to use `images/elementalist.png` instead of `sample_character.png`.
+- Kept the rest of the title mockup layout and behavior unchanged.
+
 Apr 13, 2026 — 6:07 PM PT — Rebuilt the title screen with premium non-emoji key art and layout
 - Replaced the old emoji/glyph title graphic with a framed sprite collage using local assets (`sample_character`, `slime`, `black-widow`).
 - Added a new dark-stone + gold title visual system with fog/rune ambient motion and mobile-safe call-to-action layout.
