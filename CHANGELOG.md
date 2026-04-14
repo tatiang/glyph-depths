@@ -1,5 +1,9 @@
 # Changelog
 
+Apr 13, 2026 — 6:22 PM PT — Removed the “GLYPH DEPTHS” overline from title screen
+- Deleted the title overline text so the header now starts directly with `SHARDS OF THE UNKNOWN`.
+- Kept the rest of the title-screen mockup layout and behavior unchanged.
+
 Apr 13, 2026 — 6:19 PM PT — Swapped title hero art from sample character to Elementalist
 - Updated the title hero-card collage to use `images/elementalist.png` instead of `sample_character.png`.
 - Kept the rest of the title mockup layout and behavior unchanged.
